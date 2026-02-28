@@ -1,0 +1,108 @@
+package com.opic.android.audio
+
+import android.content.Context
+import android.os.Bundle
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.util.Log
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
+import java.security.MessageDigest
+import java.util.Locale
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
+
+/**
+ * Python pyttsx3 대응.
+ * Android TextToSpeech 엔진으로 텍스트 → WAV 파일 생성.
+ * SHA1 해시 기반 캐시 (Python tts_cache_path와 동일).
+ */
+@Singleton
+class TtsManager @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
+    companion object {
+        private const val TAG = "TtsManager"
+    }
+
+    private var tts: TextToSpeech? = null
+    private var isInitialized = false
+
+    private val cacheDir: File by lazy {
+        File(context.cacheDir, "tts").also { it.mkdirs() }
+    }
+
+    fun init() {
+        if (tts != null) return
+        tts = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts?.language = Locale.US
+                isInitialized = true
+                Log.d(TAG, "TTS 초기화 완료")
+            } else {
+                Log.e(TAG, "TTS 초기화 실패: status=$status")
+            }
+        }
+    }
+
+    /**
+     * 텍스트 → WAV 파일 생성 (캐시 우선).
+     * @return 생성된 WAV 파일 경로, 실패 시 null
+     */
+    suspend fun generateToFile(text: String): String? {
+        if (text.isBlank()) return null
+
+        val cachedFile = getCachePath(text)
+        if (cachedFile.exists() && cachedFile.length() > 44) {
+            Log.d(TAG, "TTS 캐시 사용: ${cachedFile.name}")
+            return cachedFile.absolutePath
+        }
+
+        if (!isInitialized) {
+            Log.w(TAG, "TTS 미초기화")
+            return null
+        }
+
+        return suspendCoroutine { cont ->
+            val utteranceId = "tts_${System.currentTimeMillis()}"
+
+            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(id: String?) {}
+                override fun onDone(id: String?) {
+                    if (id == utteranceId) {
+                        Log.d(TAG, "TTS 생성 완료: ${cachedFile.name}")
+                        cont.resume(cachedFile.absolutePath)
+                    }
+                }
+                override fun onError(id: String?) {
+                    if (id == utteranceId) {
+                        Log.e(TAG, "TTS 생성 실패")
+                        cont.resume(null)
+                    }
+                }
+            })
+
+            val params = Bundle().apply {
+                putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
+            }
+            tts?.synthesizeToFile(text, params, cachedFile, utteranceId)
+        }
+    }
+
+    /** Python tts_cache_path() 대응: SHA1 해시 기반 캐시 파일 경로 */
+    private fun getCachePath(text: String): File {
+        val digest = MessageDigest.getInstance("SHA-1")
+        val hash = digest.digest(text.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        return File(cacheDir, "tts_$hash.wav")
+    }
+
+    fun shutdown() {
+        tts?.stop()
+        tts?.shutdown()
+        tts = null
+        isInitialized = false
+    }
+}
