@@ -150,7 +150,7 @@ fun StartScreen(
                         shape = RoundedCornerShape(0.dp),
                         modifier = Modifier
                             .weight(1.2f)
-                            .height(64.dp)
+                            .height(50.dp)
                     ) {
                         Text("Test >", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     }

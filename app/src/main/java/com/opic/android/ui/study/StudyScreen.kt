@@ -168,17 +168,13 @@ private fun StudyContent(
             )
         }
 
-        // ===== 스크립트 영역 (스크롤) =====
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-        ) {
-            // Question Script
-            if (expandedScript == null || expandedScript == "question") {
+        // ===== 스크립트 영역 (비율 고정, 내부 스크롤) =====
+        if (expandedScript == null) {
+            // 일반 모드: 비율로 크기 고정, 각 박스 내부 스크롤 (외부 스크롤 없음)
+            Column(modifier = Modifier.weight(1f)) {
                 ScriptSection(
-                    modifier = if (expandedScript == "question") Modifier.fillMaxWidth() else Modifier,
-                    label = "",
+                    modifier = Modifier.weight(2f),
+                    label = "Question",
                     scriptText = state.currentQuestion?.questionText,
                     highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.QUESTION) state.highlightedWordIndex else -1,
                     isEditing = state.editingQuestion,
@@ -191,19 +187,13 @@ private fun StudyContent(
                     onDraftChange = { viewModel.updateQuestionDraft(it) },
                     onSave = { viewModel.saveQuestionScript() },
                     fontSize = state.fontSize,
-                    isExpanded = expandedScript == "question",
-                    onExpandToggle = {
-                        expandedScript = if (expandedScript == "question") null else "question"
-                    }
+                    isExpanded = false,
+                    onExpandToggle = { expandedScript = "question" }
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            // Answer Script
-            if (expandedScript == null || expandedScript == "answer") {
+                Spacer(modifier = Modifier.height(4.dp))
                 ScriptSection(
-                    modifier = if (expandedScript == "answer") Modifier.fillMaxWidth() else Modifier,
-                    label = "",
+                    modifier = Modifier.weight(2.5f),
+                    label = "Answer",
                     scriptText = state.currentQuestion?.answerScript,
                     highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.ANSWER) state.highlightedWordIndex else -1,
                     isEditing = state.editingAnswer,
@@ -216,30 +206,74 @@ private fun StudyContent(
                     onDraftChange = { viewModel.updateAnswerDraft(it) },
                     onSave = { viewModel.saveAnswerScript() },
                     fontSize = state.fontSize,
-                    isExpanded = expandedScript == "answer",
-                    onExpandToggle = {
-                        expandedScript = if (expandedScript == "answer") null else "answer"
-                    }
+                    isExpanded = false,
+                    onExpandToggle = { expandedScript = "answer" }
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            // User Script + 녹음
-            if (expandedScript == null || expandedScript == "user") {
+                Spacer(modifier = Modifier.height(4.dp))
                 UserScriptSection(
+                    modifier = Modifier.weight(1f),
                     state = state,
                     viewModel = viewModel,
                     isBusy = isBusy,
-                    isExpanded = expandedScript == "user",
-                    onExpandToggle = {
-                        expandedScript = if (expandedScript == "user") null else "user"
-                    },
+                    isExpanded = false,
+                    onExpandToggle = { expandedScript = "user" },
                     onPractice = {
                         val qId = state.currentQuestion?.questionId
                         if (qId != null) onPractice(qId)
                     }
                 )
             }
+        } else if (expandedScript == "question") {
+            ScriptSection(
+                modifier = Modifier.weight(1f),
+                label = "Question",
+                scriptText = state.currentQuestion?.questionText,
+                highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.QUESTION) state.highlightedWordIndex else -1,
+                isEditing = state.editingQuestion,
+                draft = state.questionDraft,
+                isPlaying = state.playingTarget == StudyPlayTarget.QUESTION,
+                canPlay = !isBusy,
+                onPlay = { viewModel.playQuestionAudio() },
+                onStop = { viewModel.stopAudio() },
+                onToggleEdit = { viewModel.toggleEditQuestion() },
+                onDraftChange = { viewModel.updateQuestionDraft(it) },
+                onSave = { viewModel.saveQuestionScript() },
+                fontSize = state.fontSize,
+                isExpanded = true,
+                onExpandToggle = { expandedScript = null }
+            )
+        } else if (expandedScript == "answer") {
+            ScriptSection(
+                modifier = Modifier.weight(1f),
+                label = "Answer",
+                scriptText = state.currentQuestion?.answerScript,
+                highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.ANSWER) state.highlightedWordIndex else -1,
+                isEditing = state.editingAnswer,
+                draft = state.answerDraft,
+                isPlaying = state.playingTarget == StudyPlayTarget.ANSWER,
+                canPlay = !isBusy,
+                onPlay = { viewModel.playAnswerAudio() },
+                onStop = { viewModel.stopAudio() },
+                onToggleEdit = { viewModel.toggleEditAnswer() },
+                onDraftChange = { viewModel.updateAnswerDraft(it) },
+                onSave = { viewModel.saveAnswerScript() },
+                fontSize = state.fontSize,
+                isExpanded = true,
+                onExpandToggle = { expandedScript = null }
+            )
+        } else if (expandedScript == "user") {
+            UserScriptSection(
+                modifier = Modifier.weight(1f),
+                state = state,
+                viewModel = viewModel,
+                isBusy = isBusy,
+                isExpanded = true,
+                onExpandToggle = { expandedScript = null },
+                onPractice = {
+                    val qId = state.currentQuestion?.questionId
+                    if (qId != null) onPractice(qId)
+                }
+            )
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -494,12 +528,13 @@ private fun UserScriptSection(
     state: StudyUiState,
     viewModel: StudyViewModel,
     isBusy: Boolean,
+    modifier: Modifier = Modifier,
     isExpanded: Boolean = false,
     onExpandToggle: () -> Unit = {},
     onPractice: () -> Unit = {}
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
@@ -612,6 +647,10 @@ private fun UserScriptSection(
             Spacer(modifier = Modifier.height(4.dp))
         }
 
+        // 편집/STT 영역 (항상 내부 스크롤)
+        Column(
+            modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())
+        ) {
         if (state.editingUserScript) {
             OutlinedTextField(
                 value = state.userScriptDraft,
@@ -705,6 +744,7 @@ private fun UserScriptSection(
                 }
             }
         }
+        } // 편집/STT 영역 Column
     }
 }
 
@@ -830,25 +870,27 @@ private fun ScriptSection(
                 onValueChange = onDraftChange,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(120.dp),
+                    .weight(1f),
                 textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = fontSize.sp)
             )
         } else if (!scriptText.isNullOrBlank()) {
-            // 스크립트가 있으면 항상 표시, 재생 중이면 하이라이트
-            if (isPlaying && highlightedWordIndex >= 0) {
-                HighlightedScriptText(
-                    text = scriptText,
-                    highlightedWordIndex = highlightedWordIndex,
-                    fontSize = fontSize
-                )
-            } else {
-                Text(
-                    text = scriptText,
-                    fontSize = fontSize.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                )
+            // 텍스트 항상 내부 스크롤 (박스 크기는 외부 modifier로 결정)
+            Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                if (isPlaying && highlightedWordIndex >= 0) {
+                    HighlightedScriptText(
+                        text = scriptText,
+                        highlightedWordIndex = highlightedWordIndex,
+                        fontSize = fontSize
+                    )
+                } else {
+                    Text(
+                        text = scriptText,
+                        fontSize = fontSize.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                    )
+                }
             }
         } else {
             Text(

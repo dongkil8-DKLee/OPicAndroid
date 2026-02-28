@@ -106,14 +106,15 @@ fun OPicNavGraph(navController: NavHostController) {
             arguments = listOf(navArgument("questionId") { type = NavType.IntType })
         ) {
             PracticeScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onSettings = { navController.navigate(Screen.Settings.route) }
             )
         }
 
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onHome = {
-                    navController.popBackStack(Screen.Start.route, inclusive = false)
+                    navController.popBackStack()
                 }
             )
         }

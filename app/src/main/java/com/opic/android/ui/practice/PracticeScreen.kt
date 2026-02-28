@@ -75,6 +75,7 @@ import com.opic.android.ui.theme.OPicColors
 @Composable
 fun PracticeScreen(
     onBack: () -> Unit,
+    onSettings: () -> Unit = {},
     viewModel: PracticeViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -99,7 +100,7 @@ fun PracticeScreen(
                     }
                 }
             }
-            else -> PracticeContent(state, viewModel, onBack)
+            else -> PracticeContent(state, viewModel, onBack, onSettings)
         }
     }
 }
@@ -109,9 +110,11 @@ fun PracticeScreen(
 private fun PracticeContent(
     state: PracticeUiState,
     viewModel: PracticeViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onSettings: () -> Unit = {}
 ) {
     val isBusy = state.isPlayingOriginal || state.isPlayingUser || state.isRecording || state.sttListening
+    var showFilter by remember { mutableStateOf(false) }
     val currentSentenceText = state.sentences.getOrNull(state.currentIndex)?.segment?.text ?: ""
     val currentSentenceState = state.sentences.getOrNull(state.currentIndex)
 
@@ -124,7 +127,13 @@ private fun PracticeContent(
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         // ===== 최상단: 속도 + FilterList + Settings 아이콘 =====
-        PracticeSpeedRow(state, viewModel)
+        PracticeSpeedRow(
+            state = state,
+            viewModel = viewModel,
+            showFilter = showFilter,
+            onToggleFilter = { showFilter = !showFilter },
+            onSettings = onSettings
+        )
 
         // ===== 타이틀 네비게이터 =====
         PracticeTitleRow(state, viewModel)
@@ -169,6 +178,7 @@ private fun PracticeContent(
                     viewModel = viewModel,
                     isBusy = isBusy,
                     isExpanded = expandedSection == "practice",
+                    showSentenceTable = !showFilter,
                     onExpandToggle = {
                         expandedSection = if (expandedSection == "practice") null else "practice"
                     }
@@ -205,7 +215,13 @@ private fun PracticeContent(
 // ==================== 속도 행 ====================
 
 @Composable
-private fun PracticeSpeedRow(state: PracticeUiState, viewModel: PracticeViewModel) {
+private fun PracticeSpeedRow(
+    state: PracticeUiState,
+    viewModel: PracticeViewModel,
+    showFilter: Boolean = false,
+    onToggleFilter: () -> Unit = {},
+    onSettings: () -> Unit = {}
+) {
     val speedOptions = listOf(0.75f, 1.0f, 1.25f, 1.5f)
 
     Row(
@@ -231,21 +247,30 @@ private fun PracticeSpeedRow(state: PracticeUiState, viewModel: PracticeViewMode
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // FilterList 아이콘 (향후 필터 기능 확장용 — 현재는 표시만)
-        Icon(
-            Icons.Filled.FilterList,
-            contentDescription = null,
-            tint = Color.Gray,
-            modifier = Modifier.size(22.dp)
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        // Settings 아이콘 (향후 설정 연동용)
-        Icon(
-            Icons.Filled.Settings,
-            contentDescription = null,
-            tint = Color.Gray,
-            modifier = Modifier.size(22.dp)
-        )
+        // FilterList 아이콘 (문장 목록 숨김/표시 토글)
+        IconButton(
+            onClick = onToggleFilter,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                Icons.Filled.FilterList,
+                contentDescription = "Filter",
+                tint = if (showFilter) OPicColors.Primary else Color.Gray,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        // Settings 아이콘 → Settings 화면 이동
+        IconButton(
+            onClick = onSettings,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                Icons.Filled.Settings,
+                contentDescription = "Settings",
+                tint = Color.Gray,
+                modifier = Modifier.size(22.dp)
+            )
+        }
     }
 }
 
@@ -395,6 +420,7 @@ private fun PracticeSentenceSection(
     viewModel: PracticeViewModel,
     isBusy: Boolean,
     isExpanded: Boolean,
+    showSentenceTable: Boolean = true,
     onExpandToggle: () -> Unit
 ) {
     val currentSentence = state.sentences.getOrNull(state.currentIndex)
@@ -504,20 +530,22 @@ private fun PracticeSentenceSection(
             Spacer(modifier = Modifier.height(4.dp))
         }
 
-        // 문장 테이블
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, OPicColors.Border, RoundedCornerShape(4.dp))
-        ) {
-            state.sentences.forEachIndexed { index, sentenceState ->
-                SentenceTableRow(
-                    index = index,
-                    text = sentenceState.segment.text,
-                    isSelected = index == state.currentIndex,
-                    accuracyPercent = sentenceState.analysisResult?.accuracyPercent?.toInt(),
-                    onClick = { viewModel.goToSentence(index) }
-                )
+        // 문장 테이블 (FilterList 토글 시 숨김)
+        if (showSentenceTable) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, OPicColors.Border, RoundedCornerShape(4.dp))
+            ) {
+                state.sentences.forEachIndexed { index, sentenceState ->
+                    SentenceTableRow(
+                        index = index,
+                        text = sentenceState.segment.text,
+                        isSelected = index == state.currentIndex,
+                        accuracyPercent = sentenceState.analysisResult?.accuracyPercent?.toInt(),
+                        onClick = { viewModel.goToSentence(index) }
+                    )
+                }
             }
         }
     }
