@@ -14,7 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -45,7 +46,7 @@ import java.io.File
  * OPIc 메인 화면.
  *
  * 레이아웃:
- *   설정 아이콘 (우상단)
+ *   우상단 아이콘: [단어장] [Report]
  *   레벨 아바타 (외부 폴더 우선 → drawable fallback)
  *   "Level N" 텍스트
  *   게이지 바
@@ -57,6 +58,7 @@ fun StartScreen(
     onNext: () -> Unit,
     onReview: () -> Unit,
     onReport: () -> Unit = {},
+    onVocabulary: () -> Unit = {},
     onSettings: () -> Unit = {},
     viewModel: StartViewModel = hiltViewModel()
 ) {
@@ -68,6 +70,31 @@ fun StartScreen(
 
     Surface(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxSize()) {
+
+            // 우측 상단 아이콘 (단어장, Report)
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 8.dp, end = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                IconButton(onClick = onVocabulary, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.MenuBook,
+                        contentDescription = "단어장",
+                        tint = OPicColors.Primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                IconButton(onClick = onReport, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        Icons.Filled.Description,
+                        contentDescription = "Report",
+                        tint = OPicColors.Primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
 
             // 중앙 콘텐츠 (아바타 + 텍스트 + 게이지)
             Column(
@@ -120,11 +147,9 @@ fun StartScreen(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // 하단 버튼 행 (고정)
+                // 하단 버튼 행 (3개: Study, Test >, Review)
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 0.dp, vertical = 0.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -169,25 +194,8 @@ fun StartScreen(
                     ) {
                         Text("Review", fontWeight = FontWeight.Bold)
                     }
-
-                    Button(
-                        onClick = onReport,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = OPicColors.Secondary,
-                            contentColor = OPicColors.TextOnLight
-                        ),
-                        shape = RoundedCornerShape(0.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(50.dp)
-                    ) {
-                        Text("Report", fontWeight = FontWeight.Bold)
-                    }
                 }
             }
-
-            // 설정 아이콘: 향후 사용자 설정 추가 시 활성화
-            // (현재 숨김 처리)
         }
     }
 }

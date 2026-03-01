@@ -57,3 +57,24 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         """)
     }
 }
+
+/**
+ * v2 → v3: Vocabulary 테이블 추가 (단어장/암기장).
+ */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("""
+            CREATE TABLE IF NOT EXISTS `Vocabulary` (
+                `wordId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `word` TEXT NOT NULL,
+                `meaning` TEXT,
+                `memo` TEXT,
+                `pronunciation` TEXT,
+                `isMemorized` INTEGER NOT NULL DEFAULT 0,
+                `isFavorite` INTEGER NOT NULL DEFAULT 0,
+                `sourceQuestionId` INTEGER,
+                `createdAt` TEXT
+            )
+        """)
+    }
+}

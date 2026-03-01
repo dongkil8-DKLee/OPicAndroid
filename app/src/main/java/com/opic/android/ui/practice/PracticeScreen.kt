@@ -1,5 +1,11 @@
 package com.opic.android.ui.practice
 
+import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,26 +32,20 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,22 +55,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.opic.android.ui.common.DiffText
-import com.opic.android.ui.common.HomeButton
+import com.opic.android.ui.common.SpeechAnalysisPanel
 import com.opic.android.ui.theme.OPicColors
 
 /**
- * 문장연습 화면 (이미지 기반 리디자인).
- * 레이아웃: SpeedFilterRow → TitleSelector → <<학습종료
- *           Answer섹션(전체스크립트+하이라이트) → 문장테이블+녹음버튼 → Result섹션
+ * PracticeScreen (집중학습) - 리팩토링 버전.
+ * - PracticeSpeedRow, HomeButton, ResultSection 제거
+ * - UserScript 섹션 추가 (Study에서 이동)
+ * - < Back 좌측 하단으로 이동
+ * - STT 완료 후 자동 분석
+ * - 누락 단어 클릭 → 단어장 추가
  */
 @Composable
 fun PracticeScreen(
@@ -79,6 +80,15 @@ fun PracticeScreen(
     viewModel: PracticeViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+
+    // 단어 추가 메시지 Toast
+    LaunchedEffect(state.wordAddedMessage) {
+        state.wordAddedMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            viewModel.clearWordAddedMessage()
+        }
+    }
 
     Surface(modifier = Modifier.fillMaxSize()) {
         when {
@@ -100,25 +110,21 @@ fun PracticeScreen(
                     }
                 }
             }
-            else -> PracticeContent(state, viewModel, onBack, onSettings)
+            else -> PracticeContent(state, viewModel, onBack)
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PracticeContent(
     state: PracticeUiState,
     viewModel: PracticeViewModel,
-    onBack: () -> Unit,
-    onSettings: () -> Unit = {}
+    onBack: () -> Unit
 ) {
     val isBusy = state.isPlayingOriginal || state.isPlayingUser || state.isRecording || state.sttListening
-    var showFilter by remember { mutableStateOf(false) }
-    val currentSentenceText = state.sentences.getOrNull(state.currentIndex)?.segment?.text ?: ""
-    val currentSentenceState = state.sentences.getOrNull(state.currentIndex)
 
-    // 확대 섹션 상태: null=모두 표시, "answer"/"practice"/"result"=해당만 표시
+    // 확대 섹션 상태: null=모두 표시, "practice"/"userscript"=해당만 표시
     var expandedSection by remember { mutableStateOf<String?>(null) }
 
     Column(
@@ -126,135 +132,64 @@ private fun PracticeContent(
             .fillMaxSize()
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        // ===== 최상단: 속도 + FilterList + Settings 아이콘 =====
-        PracticeSpeedRow(
-            state = state,
-            viewModel = viewModel,
-            showFilter = showFilter,
-            onToggleFilter = { showFilter = !showFilter },
-            onSettings = onSettings
-        )
-
         // ===== 타이틀 네비게이터 =====
         PracticeTitleRow(state, viewModel)
 
-        // ===== < Back =====
-        TextButton(
-            onClick = onBack,
-            modifier = Modifier.align(Alignment.Start)
-        ) {
-            Text("< Back", fontSize = 13.sp, color = OPicColors.Primary, fontWeight = FontWeight.Bold)
-        }
-
         Spacer(modifier = Modifier.height(4.dp))
 
-        // ===== 비율 고정 영역 (외부 스크롤 없음) =====
+        // ===== 비율 고정 영역 =====
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // ===== 녹음/문장연습 섹션 =====
-            if (expandedSection == null || expandedSection == "practice") {
+            AnimatedVisibility(
+                visible = expandedSection == null || expandedSection == "practice",
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+                modifier = if (expandedSection == null) Modifier.weight(2f) else Modifier.weight(1f)
+            ) {
                 PracticeSentenceSection(
-                    modifier = Modifier.weight(if (expandedSection == null) 2f else 1f),
+                    modifier = Modifier,
                     state = state,
                     viewModel = viewModel,
                     isBusy = isBusy,
                     isExpanded = expandedSection == "practice",
-                    showSentenceTable = !showFilter,
                     onExpandToggle = {
                         expandedSection = if (expandedSection == "practice") null else "practice"
-                    },
-                    onAnalyze = { viewModel.analyzeCurrentSentence() }
+                    }
                 )
             }
 
-            // ===== Result 섹션 =====
-            if (expandedSection == null || expandedSection == "result") {
-                ResultSection(
-                    modifier = Modifier.weight(1f),
-                    sttText = currentSentenceState?.sttText,
-                    analysisResult = currentSentenceState?.analysisResult,
-                    expectedText = currentSentenceText,
-                    isExpanded = expandedSection == "result",
+            // ===== UserScript 섹션 (Study에서 이동) =====
+            AnimatedVisibility(
+                visible = expandedSection == null || expandedSection == "userscript",
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+                modifier = if (expandedSection == null) Modifier.weight(1.5f) else Modifier.weight(1f)
+            ) {
+                UserScriptSection(
+                    modifier = Modifier,
+                    state = state,
+                    viewModel = viewModel,
+                    isExpanded = expandedSection == "userscript",
                     onExpandToggle = {
-                        expandedSection = if (expandedSection == "result") null else "result"
-                    },
-                    onAnalyze = { viewModel.analyzeCurrentSentence() }
+                        expandedSection = if (expandedSection == "userscript") null else "userscript"
+                    }
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // ===== 하단: Home 버튼 =====
+        // ===== < Back 좌측 하단 =====
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center
+            horizontalArrangement = Arrangement.Start
         ) {
-            HomeButton(onClick = onBack)
-        }
-    }
-}
-
-// ==================== 속도 행 ====================
-
-@Composable
-private fun PracticeSpeedRow(
-    state: PracticeUiState,
-    viewModel: PracticeViewModel,
-    showFilter: Boolean = false,
-    onToggleFilter: () -> Unit = {},
-    onSettings: () -> Unit = {}
-) {
-    val speedOptions = listOf(0.75f, 1.0f, 1.25f, 1.5f)
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Text("속도:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-
-        speedOptions.forEach { speed ->
-            val label = if (speed == speed.toInt().toFloat()) "${speed.toInt()}x" else "${speed}x"
-            val isSelected = state.playbackSpeed == speed
-            TextButton(
-                onClick = { viewModel.setPlaybackSpeed(speed) },
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = if (isSelected) OPicColors.Primary else Color.Gray
-                ),
-                modifier = Modifier.height(32.dp)
-            ) {
-                Text(label, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+            TextButton(onClick = onBack) {
+                Text("< Back", fontSize = 13.sp, color = OPicColors.Primary, fontWeight = FontWeight.Bold)
             }
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        // FilterList 아이콘 (문장 목록 숨김/표시 토글)
-        IconButton(
-            onClick = onToggleFilter,
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(
-                Icons.Filled.FilterList,
-                contentDescription = "Filter",
-                tint = if (showFilter) OPicColors.Primary else Color.Gray,
-                modifier = Modifier.size(22.dp)
-            )
-        }
-        // Settings 아이콘 → Settings 화면 이동
-        IconButton(
-            onClick = onSettings,
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(
-                Icons.Filled.Settings,
-                contentDescription = "Settings",
-                tint = Color.Gray,
-                modifier = Modifier.size(22.dp)
-            )
         }
     }
 }
@@ -278,7 +213,6 @@ private fun PracticeTitleRow(state: PracticeUiState, viewModel: PracticeViewMode
             Icon(Icons.Filled.ChevronLeft, contentDescription = "이전 문장")
         }
 
-        // 제목 표시
         Text(
             text = if (state.questionTitle.isNotBlank()) state.questionTitle else "—",
             fontSize = 13.sp,
@@ -304,99 +238,6 @@ private fun PracticeTitleRow(state: PracticeUiState, viewModel: PracticeViewMode
     }
 }
 
-// ==================== Answer 섹션 ====================
-
-@Composable
-private fun AnswerSection(
-    answerScript: String,
-    selectedSentenceText: String,
-    isPlayingTts: Boolean,
-    canPlay: Boolean,
-    isExpanded: Boolean,
-    onPlay: () -> Unit,
-    onStop: () -> Unit,
-    onExpandToggle: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
-            .padding(8.dp)
-    ) {
-        // 헤더
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Answer", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isPlayingTts) {
-                    TextButton(onClick = onStop) {
-                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Text(" Stop", fontSize = 12.sp)
-                    }
-                } else {
-                    TextButton(onClick = onPlay, enabled = canPlay && selectedSentenceText.isNotBlank()) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Text(" Play", fontSize = 12.sp)
-                    }
-                }
-                IconButton(onClick = onExpandToggle, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        if (isExpanded) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
-                        contentDescription = if (isExpanded) "축소" else "확대",
-                        tint = Color.Gray,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
-
-        // 전체 스크립트 (선택된 문장 하이라이트)
-        if (answerScript.isNotBlank()) {
-            HighlightedAnswerText(
-                fullText = answerScript,
-                highlightedSentence = selectedSentenceText
-            )
-        } else {
-            Text("스크립트 없음", color = OPicColors.DisabledBg, fontSize = 13.sp, modifier = Modifier.padding(vertical = 4.dp))
-        }
-    }
-}
-
-/** 전체 텍스트에서 선택된 문장을 Primary 색상으로 하이라이트 */
-@Composable
-private fun HighlightedAnswerText(fullText: String, highlightedSentence: String) {
-    val annotated = remember(fullText, highlightedSentence) {
-        if (highlightedSentence.isBlank()) {
-            buildAnnotatedString { append(fullText) }
-        } else {
-            val idx = fullText.indexOf(highlightedSentence)
-            if (idx < 0) {
-                buildAnnotatedString { append(fullText) }
-            } else {
-                buildAnnotatedString {
-                    append(fullText.substring(0, idx))
-                    withStyle(SpanStyle(color = OPicColors.Primary, fontWeight = FontWeight.Bold)) {
-                        append(fullText.substring(idx, idx + highlightedSentence.length))
-                    }
-                    append(fullText.substring(idx + highlightedSentence.length))
-                }
-            }
-        }
-    }
-
-    Text(
-        text = annotated,
-        fontSize = 14.sp,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp)
-    )
-}
-
 // ==================== 녹음/문장연습 섹션 ====================
 
 @Composable
@@ -406,9 +247,7 @@ private fun PracticeSentenceSection(
     viewModel: PracticeViewModel,
     isBusy: Boolean,
     isExpanded: Boolean,
-    showSentenceTable: Boolean = true,
-    onExpandToggle: () -> Unit,
-    onAnalyze: () -> Unit = {}
+    onExpandToggle: () -> Unit
 ) {
     val currentSentence = state.sentences.getOrNull(state.currentIndex)
     val hasUserRecording = currentSentence?.userRecordingPath != null
@@ -419,7 +258,7 @@ private fun PracticeSentenceSection(
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
-        // 헤더: 컨트롤 버튼들
+        // 헤더: 컨트롤 버튼들 (Result 버튼 제거됨)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -472,14 +311,6 @@ private fun PracticeSentenceSection(
                 }
             }
 
-            // Result 버튼
-            TextButton(
-                onClick = onAnalyze,
-                enabled = currentSentence?.sttText != null && !isBusy
-            ) {
-                Text("Result", fontSize = 11.sp, color = Color(0xFF2ECC71), fontWeight = FontWeight.Bold)
-            }
-
             Spacer(modifier = Modifier.weight(1f))
 
             IconButton(onClick = onExpandToggle, modifier = Modifier.size(28.dp)) {
@@ -511,24 +342,22 @@ private fun PracticeSentenceSection(
             Spacer(modifier = Modifier.height(4.dp))
         }
 
-        // 문장 테이블 (FilterList 토글 시 숨김, 내부 스크롤)
-        if (showSentenceTable) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .border(1.dp, OPicColors.Border, RoundedCornerShape(4.dp))
-            ) {
-                state.sentences.forEachIndexed { index, sentenceState ->
-                    SentenceTableRow(
-                        index = index,
-                        text = sentenceState.segment.text,
-                        isSelected = index == state.currentIndex,
-                        accuracyPercent = sentenceState.analysisResult?.accuracyPercent?.toInt(),
-                        onClick = { viewModel.goToSentence(index) }
-                    )
-                }
+        // 문장 테이블 (내부 스크롤)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .border(1.dp, OPicColors.Border, RoundedCornerShape(4.dp))
+        ) {
+            state.sentences.forEachIndexed { index, sentenceState ->
+                SentenceTableRow(
+                    index = index,
+                    text = sentenceState.segment.text,
+                    isSelected = index == state.currentIndex,
+                    accuracyPercent = sentenceState.analysisResult?.accuracyPercent?.toInt(),
+                    onClick = { viewModel.goToSentence(index) }
+                )
             }
         }
     }
@@ -549,14 +378,10 @@ private fun SentenceTableRow(
             .fillMaxWidth()
             .background(bgColor)
             .clickable { onClick() }
-            .border(
-                width = 0.5.dp,
-                color = OPicColors.Border
-            )
+            .border(width = 0.5.dp, color = OPicColors.Border)
             .padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 선택 표시 박스
         Box(
             modifier = Modifier
                 .size(18.dp)
@@ -595,31 +420,49 @@ private fun SentenceTableRow(
     }
 }
 
-// ==================== Result 섹션 ====================
+// ==================== UserScript 섹션 (Study에서 이동) ====================
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ResultSection(
+private fun UserScriptSection(
     modifier: Modifier = Modifier,
-    sttText: String?,
-    analysisResult: com.opic.android.util.AnalysisResult?,
-    expectedText: String,
+    state: PracticeUiState,
+    viewModel: PracticeViewModel,
     isExpanded: Boolean,
-    onExpandToggle: () -> Unit,
-    onAnalyze: () -> Unit
+    onExpandToggle: () -> Unit
 ) {
+    val isBusy = state.isRecordingUserScript || state.isPlayingUserAudio || state.userScriptSttListening
+
     Column(
         modifier = modifier
             .fillMaxWidth()
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
-        // 헤더 고정
+        // 헤더: UserScript + Edit/Cancel/Save + 확대/축소
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Result", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF2ECC71))
+            Text("UserScript", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // Edit/Cancel/Save 토글
+            if (state.editingUserScript) {
+                TextButton(onClick = { viewModel.cancelEditUserScript() }) {
+                    Text("Cancel", fontSize = 12.sp, color = Color.Gray)
+                }
+                TextButton(onClick = { viewModel.saveUserScript() }) {
+                    Text("Save", fontSize = 12.sp, color = OPicColors.Primary)
+                }
+            } else {
+                TextButton(onClick = { viewModel.toggleEditUserScript() }) {
+                    Text("Edit", fontSize = 12.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
 
             IconButton(onClick = onExpandToggle, modifier = Modifier.size(28.dp)) {
                 Icon(
@@ -631,75 +474,152 @@ private fun ResultSection(
             }
         }
 
-        // 내용 내부 스크롤
+        // 녹음/재생/STT 컨트롤
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Rec
+            if (state.isRecordingUserScript) {
+                TextButton(onClick = { viewModel.stopUserScriptRecording() }) {
+                    Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(16.dp), tint = OPicColors.RecordActive)
+                    Text(" Stop Rec", fontSize = 11.sp, color = OPicColors.RecordActive)
+                }
+            } else {
+                TextButton(
+                    onClick = { viewModel.toggleUserScriptRecording() },
+                    enabled = !isBusy
+                ) {
+                    Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Text(" Rec", fontSize = 11.sp)
+                }
+            }
+
+            // Play
+            if (state.isPlayingUserAudio) {
+                TextButton(onClick = { viewModel.stopUserScriptAudio() }) {
+                    Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Text(" Stop", fontSize = 11.sp)
+                }
+            } else {
+                TextButton(
+                    onClick = { viewModel.playUserScriptAudio() },
+                    enabled = state.hasUserAudio && !isBusy
+                ) {
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Text(" Play", fontSize = 11.sp)
+                }
+            }
+
+            // STT
+            if (state.userScriptSttListening) {
+                TextButton(onClick = { viewModel.stopUserScriptStt() }) {
+                    Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(16.dp), tint = OPicColors.RecordActive)
+                    Text(" Stop STT", fontSize = 11.sp, color = OPicColors.RecordActive)
+                }
+            } else {
+                TextButton(
+                    onClick = { viewModel.startUserScriptStt() },
+                    enabled = !isBusy
+                ) {
+                    Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF3498DB))
+                    Text(" STT", fontSize = 11.sp)
+                }
+            }
+        }
+
+        // 마이크 레벨 바
+        if (state.isRecordingUserScript) {
+            LinearProgressIndicator(
+                progress = { state.userScriptMicLevel },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = OPicColors.TimerGreen,
+                trackColor = OPicColors.Border,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        if (state.userScriptSttListening) {
+            Text("Listening...", fontSize = 12.sp, color = OPicColors.RecordActive, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        // 내용 영역
         Column(
             modifier = Modifier
+                .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
         ) {
-            if (analysisResult != null) {
-                // 정확도 % 크게 표시
-                Text(
-                    text = "정확도: ${analysisResult.accuracyPercent.toInt()}%",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = when {
-                        analysisResult.accuracyPercent >= 80 -> Color(0xFF2ECC71)
-                        analysisResult.accuracyPercent >= 50 -> OPicColors.TimerOrange
-                        else -> OPicColors.TimerRed
+            if (state.editingUserScript) {
+                OutlinedTextField(
+                    value = state.userScriptDraft,
+                    onValueChange = { viewModel.updateUserScriptDraft(it) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
+                    placeholder = {
+                        Text("나만의 스크립트를 작성하세요.", fontSize = 13.sp, color = OPicColors.DisabledBg)
                     }
                 )
+            }
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // STT 텍스트
-                if (!sttText.isNullOrBlank()) {
-                    Text("내 발화:", fontSize = 12.sp, color = Color.Gray)
-                    Text(
-                        text = sttText,
-                        fontSize = 13.sp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, Color(0xFF3498DB), RoundedCornerShape(4.dp))
-                            .padding(6.dp)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    // Diff 표시
-                    if (expectedText.isNotBlank()) {
-                        Text("단어 비교:", fontSize = 12.sp, color = Color.Gray)
-                        DiffText(
-                            expected = expectedText,
-                            actual = sttText,
-                            fontSize = 13
-                        )
-                    }
-                }
-            } else if (!sttText.isNullOrBlank()) {
-                // STT 결과는 있지만 분석 전
-                Text("STT 결과:", fontSize = 12.sp, color = Color.Gray)
+            // STT 텍스트 바로 표시 (제목 없이)
+            if (!state.userScriptSttText.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = sttText,
-                    fontSize = 13.sp,
+                    text = state.userScriptSttText,
+                    fontSize = 14.sp,
                     modifier = Modifier
                         .fillMaxWidth()
                         .border(1.dp, Color(0xFF3498DB), RoundedCornerShape(4.dp))
-                        .padding(6.dp)
+                        .padding(8.dp)
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text("분석 버튼을 눌러 정확도를 확인하세요.", fontSize = 12.sp, color = Color.Gray)
+            }
 
-                // Analyze 버튼
-                TextButton(onClick = onAnalyze) {
-                    Text("분석하기", fontSize = 12.sp, color = Color(0xFF2ECC71), fontWeight = FontWeight.Bold)
-                }
-            } else {
-                Text(
-                    text = "STT 녹음 후 Result 버튼으로 정확도를 확인하세요.",
-                    color = OPicColors.DisabledBg,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(vertical = 8.dp)
+            // 분석 결과
+            if (state.userScriptAnalysisResult != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                SpeechAnalysisPanel(
+                    result = state.userScriptAnalysisResult,
+                    expectedText = state.answerScript,
+                    actualText = state.userScriptSttText ?: ""
                 )
+
+                // 누락 단어 클릭 → 단어장 추가
+                if (state.userScriptAnalysisResult.missingWords.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("누락 단어 (탭하여 단어장 추가):", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE74C3C))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        state.userScriptAnalysisResult.missingWords.forEach { word ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFFE74C3C).copy(alpha = 0.12f),
+                                modifier = Modifier.clickable {
+                                    viewModel.addMissingWordToVocabulary(word)
+                                }
+                            ) {
+                                Text(
+                                    text = word,
+                                    fontSize = 12.sp,
+                                    color = Color(0xFFE74C3C),
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            } else if (!state.editingUserScript && state.userScriptSttText.isNullOrBlank()) {
+                // 아무것도 없을 때 안내 없이 빈 공간
             }
         }
     }

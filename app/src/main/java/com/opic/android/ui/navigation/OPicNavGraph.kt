@@ -16,6 +16,7 @@ import com.opic.android.ui.practice.PracticeScreen
 import com.opic.android.ui.report.ReportScreen
 import com.opic.android.ui.study.StudyScreen
 import com.opic.android.ui.test.TestScreen
+import com.opic.android.ui.vocabulary.VocabularyScreen
 
 @Composable
 fun OPicNavGraph(navController: NavHostController) {
@@ -27,6 +28,7 @@ fun OPicNavGraph(navController: NavHostController) {
                 onNext = { navController.navigate(Screen.Survey.route) },
                 onReview = { navController.navigate(Screen.ReviewList.route) },
                 onReport = { navController.navigate(Screen.Report.route) },
+                onVocabulary = { navController.navigate(Screen.Vocabulary.route) },
                 onSettings = { navController.navigate(Screen.Settings.route) }
             )
         }
@@ -116,6 +118,14 @@ fun OPicNavGraph(navController: NavHostController) {
         composable(Screen.Report.route) {
             ReportScreen(
                 onHome = {
+                    navController.popBackStack(Screen.Start.route, inclusive = false)
+                }
+            )
+        }
+
+        composable(Screen.Vocabulary.route) {
+            VocabularyScreen(
+                onBack = {
                     navController.popBackStack(Screen.Start.route, inclusive = false)
                 }
             )

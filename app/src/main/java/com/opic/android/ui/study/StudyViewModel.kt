@@ -558,6 +558,19 @@ class StudyViewModel @Inject constructor(
         }
     }
 
+    /** Cancel edit without saving (Edit/Cancel/Save 토글 패턴) */
+    fun cancelEditQuestion() {
+        _uiState.update { it.copy(editingQuestion = false, questionDraft = "") }
+    }
+
+    fun cancelEditAnswer() {
+        _uiState.update { it.copy(editingAnswer = false, answerDraft = "") }
+    }
+
+    fun cancelEditUserScript() {
+        _uiState.update { it.copy(editingUserScript = false, userScriptDraft = "") }
+    }
+
     fun updateQuestionDraft(text: String) { _uiState.update { it.copy(questionDraft = text) } }
     fun updateAnswerDraft(text: String) { _uiState.update { it.copy(answerDraft = text) } }
     fun updateUserScriptDraft(text: String) { _uiState.update { it.copy(userScriptDraft = text) } }

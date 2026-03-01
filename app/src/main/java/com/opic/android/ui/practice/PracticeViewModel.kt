@@ -12,7 +12,10 @@ import com.opic.android.audio.AudioRecorder
 import com.opic.android.audio.SttManager
 import com.opic.android.audio.TtsManager
 import com.opic.android.data.local.dao.QuestionDao
+import com.opic.android.data.local.dao.VocabularyDao
+import com.opic.android.data.local.entity.VocabularyEntity
 import com.opic.android.util.AnalysisResult
+import com.opic.android.util.DictionaryApi
 import com.opic.android.util.SentenceSegment
 import com.opic.android.util.SentenceSplitter
 import com.opic.android.util.SpeechAnalyzer
@@ -59,7 +62,23 @@ data class PracticeUiState(
     val isCombinedRecording: Boolean = false,
     val playbackSpeed: Float = 1.0f,
     val hasOriginalAudio: Boolean = false,
-    val assetPath: com.opic.android.audio.AudioSource? = null
+    val assetPath: com.opic.android.audio.AudioSource? = null,
+
+    // UserScript 관련 상태 (Study에서 이동)
+    val editingUserScript: Boolean = false,
+    val userScriptDraft: String = "",
+    val userScriptText: String? = null,
+    val hasUserAudio: Boolean = false,
+    val userAudioPath: String? = null,
+    val isRecordingUserScript: Boolean = false,
+    val userScriptMicLevel: Float = 0f,
+    val isPlayingUserAudio: Boolean = false,
+    val userScriptSttListening: Boolean = false,
+    val userScriptSttText: String? = null,
+    val userScriptAnalysisResult: AnalysisResult? = null,
+
+    // 단어 추가 피드백
+    val wordAddedMessage: String? = null
 )
 
 @HiltViewModel
@@ -67,6 +86,7 @@ class PracticeViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val savedStateHandle: SavedStateHandle,
     private val questionDao: QuestionDao,
+    private val vocabularyDao: VocabularyDao,
     private val audioPlayer: AudioPlayer,
     private val audioRecorder: AudioRecorder,
     private val audioFileResolver: AudioFileResolver,
@@ -86,6 +106,7 @@ class PracticeViewModel @Inject constructor(
     }
 
     private var recordingJob: Job? = null
+    private var userScriptRecordingJob: Job? = null
 
     init {
         val questionId = savedStateHandle.get<Int>("questionId") ?: 0
@@ -115,13 +136,15 @@ class PracticeViewModel @Inject constructor(
                 val totalDurationMs = if (assetPath != null) {
                     measureAudioDuration(assetPath)
                 } else {
-                    // TTS fallback: 추정 시간 (단어 수 * 500ms)
                     val wordCount = answerScript.split("\\s+".toRegex()).size
                     (wordCount * 500L).coerceAtLeast(3000L)
                 }
 
                 val segments = SentenceSplitter.split(answerScript, totalDurationMs)
                 val sentenceStates = segments.map { SentenceState(segment = it) }
+
+                // UserScript 녹음 파일 검색
+                val userAudio = findUserRecording(questionId)
 
                 _uiState.update {
                     it.copy(
@@ -134,7 +157,10 @@ class PracticeViewModel @Inject constructor(
                         currentSentenceText = sentenceStates.firstOrNull()?.segment?.text ?: "",
                         currentSegment = sentenceStates.firstOrNull()?.segment,
                         hasOriginalAudio = assetPath != null,
-                        assetPath = assetPath
+                        assetPath = assetPath,
+                        userScriptText = question.userScript,
+                        hasUserAudio = userAudio != null,
+                        userAudioPath = userAudio
                     )
                 }
             } catch (e: Exception) {
@@ -144,7 +170,15 @@ class PracticeViewModel @Inject constructor(
         }
     }
 
-    /** 임시 MediaPlayer로 오디오 duration 측정 (asset 또는 외부 파일 모두 지원) */
+    private fun findUserRecording(questionId: Int): String? {
+        if (!recordingDir.exists()) return null
+        val pattern = "UserRec_${questionId}_"
+        return recordingDir.listFiles()
+            ?.filter { it.name.startsWith(pattern) && it.name.endsWith(".wav") }
+            ?.maxByOrNull { it.name }
+            ?.absolutePath
+    }
+
     private suspend fun measureAudioDuration(source: com.opic.android.audio.AudioSource): Long = withContext(Dispatchers.IO) {
         var mp: MediaPlayer? = null
         try {
@@ -167,7 +201,7 @@ class PracticeViewModel @Inject constructor(
             mp.duration.toLong()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to measure duration: $source", e)
-            10000L // fallback 10s
+            10000L
         } finally {
             try { mp?.release() } catch (_: Exception) {}
         }
@@ -204,8 +238,6 @@ class PracticeViewModel @Inject constructor(
         val segment = state.currentSegment ?: return
 
         _uiState.update { it.copy(isPlayingOriginal = true) }
-
-        // Mark sentence as IN_PROGRESS if NOT_STARTED
         markInProgressIfNeeded()
 
         when (val source = state.assetPath) {
@@ -280,7 +312,6 @@ class PracticeViewModel @Inject constructor(
             audioRecorder.record(outputFile) { rmsLevel ->
                 _uiState.update { it.copy(micLevel = rmsLevel) }
             }
-            // 녹음 완료
             val valid = outputFile.exists() && outputFile.length() > 44
             _uiState.update { s ->
                 val updated = s.sentences.toMutableList()
@@ -321,6 +352,9 @@ class PracticeViewModel @Inject constructor(
                     s.copy(sttListening = false, sentences = updated)
                 }
                 Log.d(TAG, "STT result for sentence $idx: $text")
+
+                // STT 완료 시 자동 분석
+                autoAnalyzeAfterStt()
             },
             onError = { error ->
                 _uiState.update { it.copy(sttListening = false) }
@@ -331,6 +365,11 @@ class PracticeViewModel @Inject constructor(
 
     fun stopStt() {
         sttManager.stopListening()
+    }
+
+    /** STT 완료 시 자동 분석 */
+    private fun autoAnalyzeAfterStt() {
+        analyzeCurrentSentence()
     }
 
     // ==================== Rec+STT 통합 ====================
@@ -347,12 +386,10 @@ class PracticeViewModel @Inject constructor(
         _uiState.update { it.copy(isRecording = true, isCombinedRecording = true, micLevel = 0f) }
         markInProgressIfNeeded()
 
-        // 1. 녹음 시작
         recordingJob = viewModelScope.launch {
             audioRecorder.record(outputFile) { rmsLevel ->
                 _uiState.update { it.copy(micLevel = rmsLevel) }
             }
-            // 녹음 완료
             val valid = outputFile.exists() && outputFile.length() > 44
             _uiState.update { s ->
                 val updated = s.sentences.toMutableList()
@@ -369,7 +406,6 @@ class PracticeViewModel @Inject constructor(
             Log.d(TAG, "Combined recording done: ${outputFile.name}")
         }
 
-        // 2. STT 동시 시작 (딜레이 후)
         viewModelScope.launch {
             kotlinx.coroutines.delay(300)
             sttManager.startListening(
@@ -383,6 +419,7 @@ class PracticeViewModel @Inject constructor(
                         s.copy(sttListening = false, sentences = updated)
                     }
                     Log.d(TAG, "Combined STT result for sentence $currentIdx: $text")
+                    autoAnalyzeAfterStt()
                 },
                 onError = { error ->
                     _uiState.update { it.copy(sttListening = false) }
@@ -420,6 +457,166 @@ class PracticeViewModel @Inject constructor(
             s.copy(sentences = updated)
         }
         Log.d(TAG, "Analysis for sentence $idx: ${result.grade} (${result.accuracyPercent}%)")
+    }
+
+    // ==================== UserScript 기능 (Study에서 이동) ====================
+
+    fun toggleUserScriptRecording() {
+        if (_uiState.value.isRecordingUserScript) {
+            stopUserScriptRecording()
+            return
+        }
+        startUserScriptRecording()
+    }
+
+    private fun startUserScriptRecording() {
+        val state = _uiState.value
+        val qId = state.questionId
+        if (qId <= 0) return
+
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val filename = "UserRec_${qId}_$timestamp.wav"
+        val outputFile = File(recordingDir, filename)
+
+        _uiState.update { it.copy(isRecordingUserScript = true, userScriptMicLevel = 0f) }
+
+        userScriptRecordingJob = viewModelScope.launch {
+            audioRecorder.record(outputFile) { rmsLevel ->
+                _uiState.update { it.copy(userScriptMicLevel = rmsLevel) }
+            }
+            _uiState.update {
+                it.copy(
+                    isRecordingUserScript = false,
+                    userScriptMicLevel = 0f,
+                    hasUserAudio = outputFile.exists() && outputFile.length() > 44,
+                    userAudioPath = outputFile.absolutePath
+                )
+            }
+            Log.d(TAG, "UserScript recording done: ${outputFile.name}")
+        }
+    }
+
+    fun stopUserScriptRecording() {
+        audioRecorder.stop()
+    }
+
+    fun playUserScriptAudio() {
+        val state = _uiState.value
+        val path = state.userAudioPath ?: return
+        if (state.isPlayingUserAudio) return
+
+        _uiState.update { it.copy(isPlayingUserAudio = true) }
+        audioPlayer.playFromFile(path) {
+            _uiState.update { it.copy(isPlayingUserAudio = false) }
+        }
+    }
+
+    fun stopUserScriptAudio() {
+        audioPlayer.stop()
+        _uiState.update { it.copy(isPlayingUserAudio = false) }
+    }
+
+    fun startUserScriptStt() {
+        val state = _uiState.value
+        if (state.userScriptSttListening) return
+
+        _uiState.update { it.copy(userScriptSttListening = true) }
+
+        sttManager.startListening(
+            onResult = { text ->
+                _uiState.update { it.copy(userScriptSttText = text, userScriptSttListening = false) }
+                Log.d(TAG, "UserScript STT result: $text")
+
+                // 자동 분석
+                analyzeUserScript()
+            },
+            onError = { error ->
+                _uiState.update { it.copy(userScriptSttListening = false) }
+                Log.w(TAG, "UserScript STT error: $error")
+            }
+        )
+    }
+
+    fun stopUserScriptStt() {
+        sttManager.stopListening()
+    }
+
+    fun analyzeUserScript() {
+        val state = _uiState.value
+        val sttText = state.userScriptSttText ?: return
+        val answerScript = state.answerScript
+        if (sttText.isBlank() || answerScript.isBlank()) return
+
+        val result = SpeechAnalyzer.analyze(answerScript, sttText)
+        _uiState.update { it.copy(userScriptAnalysisResult = result) }
+        Log.d(TAG, "UserScript analysis: ${result.grade} (${result.accuracyPercent}%)")
+    }
+
+    fun toggleEditUserScript() {
+        val state = _uiState.value
+        if (state.editingUserScript) {
+            _uiState.update { it.copy(editingUserScript = false, userScriptDraft = "") }
+        } else {
+            _uiState.update {
+                it.copy(editingUserScript = true, userScriptDraft = state.userScriptText ?: "")
+            }
+        }
+    }
+
+    fun cancelEditUserScript() {
+        _uiState.update { it.copy(editingUserScript = false, userScriptDraft = "") }
+    }
+
+    fun updateUserScriptDraft(text: String) {
+        _uiState.update { it.copy(userScriptDraft = text) }
+    }
+
+    fun saveUserScript() {
+        val state = _uiState.value
+        val draft = state.userScriptDraft
+        viewModelScope.launch {
+            questionDao.updateUserScript(state.questionId, draft)
+            _uiState.update {
+                it.copy(
+                    userScriptText = draft,
+                    editingUserScript = false,
+                    userScriptDraft = ""
+                )
+            }
+        }
+    }
+
+    // ==================== 누락 단어 → 단어장 추가 ====================
+
+    fun addMissingWordToVocabulary(word: String) {
+        viewModelScope.launch {
+            try {
+                val existing = vocabularyDao.getWordByText(word.lowercase())
+                if (existing != null) {
+                    _uiState.update { it.copy(wordAddedMessage = "'$word' 이미 단어장에 있습니다.") }
+                    return@launch
+                }
+
+                val now = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+                val pronunciation = DictionaryApi.fetchPronunciation(word)
+                val entity = VocabularyEntity(
+                    word = word.lowercase(),
+                    pronunciation = pronunciation,
+                    sourceQuestionId = _uiState.value.questionId,
+                    createdAt = now
+                )
+                vocabularyDao.insertWord(entity)
+                _uiState.update { it.copy(wordAddedMessage = "'$word' 단어장에 추가됨!") }
+                Log.d(TAG, "Word added to vocabulary: $word")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to add word: $word", e)
+                _uiState.update { it.copy(wordAddedMessage = "단어 추가 실패") }
+            }
+        }
+    }
+
+    fun clearWordAddedMessage() {
+        _uiState.update { it.copy(wordAddedMessage = null) }
     }
 
     // ==================== 속도 ====================
@@ -463,5 +660,6 @@ class PracticeViewModel @Inject constructor(
         audioRecorder.stop()
         sttManager.stopListening()
         recordingJob?.cancel()
+        userScriptRecordingJob?.cancel()
     }
 }
