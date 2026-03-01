@@ -30,12 +30,12 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
             )
         """)
 
-        // 2. 기존 데이터 복사
+        // 2. 기존 데이터 복사 (progress_id는 AUTOINCREMENT가 자동 할당)
         database.execSQL("""
             INSERT INTO `User_Study_Progress_new`
-                (`progress_id`, `user_id`, `question_id`, `study_count`,
+                (`user_id`, `question_id`, `study_count`,
                  `last_modified`, `is_favorite`, `stt_text`, `analysis_result`)
-            SELECT `progress_id`, `user_id`, `question_id`, `study_count`,
+            SELECT `user_id`, `question_id`, `study_count`,
                    `last_modified`, `is_favorite`, `stt_text`, `analysis_result`
             FROM `User_Study_Progress`
         """)
