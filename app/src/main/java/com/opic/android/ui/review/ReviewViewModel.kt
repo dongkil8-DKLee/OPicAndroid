@@ -13,6 +13,8 @@ import com.opic.android.data.local.dao.TestResultWithQuestion
 import com.opic.android.util.AnalysisResult
 import com.opic.android.util.SpeechAnalyzer
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -39,7 +41,19 @@ data class ReviewUiState(
     val analysisResult: AnalysisResult? = null,
 
     // 분석 결과 맵 (인덱스별)
-    val analysisResults: Map<Int, AnalysisResult> = emptyMap()
+    val analysisResults: Map<Int, AnalysisResult> = emptyMap(),
+
+    // 연속 재생
+    val playAllActive: Boolean = false,
+    val playAllStatus: String = ""
+)
+
+/** PlayAll 플레이리스트 항목 */
+private data class ReviewPlaylistItem(
+    val questionIndex: Int,
+    val target: PlayTarget,   // QUESTION or ANSWER
+    val audioLink: String?,
+    val text: String?
 )
 
 @HiltViewModel
@@ -60,6 +74,10 @@ class ReviewViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ReviewUiState())
     val uiState: StateFlow<ReviewUiState> = _uiState
+
+    private var playAllJob: Job? = null
+    private var reviewPlaylist: List<ReviewPlaylistItem> = emptyList()
+    private var currentPlaylistIndex = 0
 
     init {
         loadSession()
@@ -174,19 +192,28 @@ class ReviewViewModel @Inject constructor(
     }
 
     fun stopAudio() {
+        if (_uiState.value.playAllActive) {
+            stopPlayAll()
+            return
+        }
         audioPlayer.stop()
         _uiState.update { it.copy(playingTarget = null) }
     }
 
-    private fun playAudioOrTts(audioLink: String?, text: String?) {
+    private fun playAudioOrTts(
+        audioLink: String?,
+        text: String?,
+        onFinish: (() -> Unit)? = null
+    ) {
+        val finishCallback = onFinish ?: { onPlaybackFinished() }
         val audioSource = if (audioLink != null) audioFileResolver.resolve(audioLink) else null
         when (audioSource) {
             is com.opic.android.audio.AudioSource.AssetPath -> {
-                audioPlayer.playFromAssets(audioSource.path) { onPlaybackFinished() }
+                audioPlayer.playFromAssets(audioSource.path) { finishCallback() }
                 return
             }
             is com.opic.android.audio.AudioSource.FilePath -> {
-                audioPlayer.playFromFile(audioSource.path) { onPlaybackFinished() }
+                audioPlayer.playFromFile(audioSource.path) { finishCallback() }
                 return
             }
             null -> { /* TTS 폴백으로 진행 */ }
@@ -196,19 +223,111 @@ class ReviewViewModel @Inject constructor(
             viewModelScope.launch {
                 val ttsPath = ttsManager.generateToFile(text)
                 if (ttsPath != null) {
-                    audioPlayer.playFromFile(ttsPath) { onPlaybackFinished() }
+                    audioPlayer.playFromFile(ttsPath) { finishCallback() }
                 } else {
-                    onPlaybackFinished()
+                    finishCallback()
                 }
             }
             return
         }
 
-        onPlaybackFinished()
+        finishCallback()
     }
 
     private fun onPlaybackFinished() {
         _uiState.update { it.copy(playingTarget = null) }
+    }
+
+    // ==================== 연속 재생 (Play All) ====================
+
+    fun togglePlayAll() {
+        if (_uiState.value.playAllActive) {
+            stopPlayAll()
+        } else {
+            startPlayAll()
+        }
+    }
+
+    private fun startPlayAll() {
+        val state = _uiState.value
+        if (state.results.isEmpty()) return
+
+        // 현재 문제부터 마지막까지 Q→A→Q→A... 플레이리스트 생성
+        val items = mutableListOf<ReviewPlaylistItem>()
+        for (i in state.currentIndex until state.results.size) {
+            val r = state.results[i]
+            items.add(ReviewPlaylistItem(i, PlayTarget.QUESTION, r.questionAudio, r.questionText))
+            items.add(ReviewPlaylistItem(i, PlayTarget.ANSWER, r.answerAudio, r.answerScript))
+        }
+
+        if (items.isEmpty()) return
+
+        reviewPlaylist = items
+        currentPlaylistIndex = 0
+
+        _uiState.update {
+            it.copy(
+                playAllActive = true,
+                playAllStatus = "Play All: 1/${items.size}"
+            )
+        }
+
+        playNextInReviewPlaylist()
+    }
+
+    private fun stopPlayAll() {
+        audioPlayer.stop()
+        playAllJob?.cancel()
+        reviewPlaylist = emptyList()
+        currentPlaylistIndex = 0
+        _uiState.update {
+            it.copy(
+                playAllActive = false,
+                playAllStatus = "",
+                playingTarget = null
+            )
+        }
+    }
+
+    private fun playNextInReviewPlaylist() {
+        if (currentPlaylistIndex >= reviewPlaylist.size) {
+            stopPlayAll()
+            return
+        }
+
+        val item = reviewPlaylist[currentPlaylistIndex]
+        val progress = "${currentPlaylistIndex + 1}/${reviewPlaylist.size}"
+        val label = if (item.target == PlayTarget.QUESTION) "Q" else "A"
+
+        // 현재 질문으로 이동
+        val state = _uiState.value
+        if (item.questionIndex != state.currentIndex) {
+            _uiState.update {
+                it.copy(
+                    currentIndex = item.questionIndex,
+                    hasUserAudio = hasValidAudio(state.results[item.questionIndex].userAudioPath),
+                    sttText = state.results[item.questionIndex].sttResult,
+                    analysisResult = state.analysisResults[item.questionIndex]
+                )
+            }
+        }
+
+        _uiState.update {
+            it.copy(
+                playingTarget = item.target,
+                playAllStatus = "Play All: $progress ($label${item.questionIndex + 1})"
+            )
+        }
+
+        playAudioOrTts(item.audioLink, item.text, onFinish = {
+            // 1초 대기 → 다음 항목
+            playAllJob = viewModelScope.launch {
+                delay(1000)
+                _uiState.update { it.copy(playingTarget = null) }
+                currentPlaylistIndex++
+                playNextInReviewPlaylist()
+            }
+        })
     }
 
     // ==================== Utility ====================
@@ -237,5 +356,6 @@ class ReviewViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         audioPlayer.stop()
+        playAllJob?.cancel()
     }
 }

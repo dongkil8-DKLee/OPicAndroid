@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.opic.android.ui.common.HomeButton
 import com.opic.android.ui.theme.OPicColors
 
 /**
@@ -53,6 +54,7 @@ private val DIFFICULTY_DESCRIPTIONS = listOf(
 @Composable
 fun SelfAssessmentScreen(
     onBack: () -> Unit,
+    onHome: () -> Unit = {},
     onNext: (difficulty: Int) -> Unit
 ) {
     var selectedDifficulty by remember { mutableIntStateOf(-1) }
@@ -136,7 +138,7 @@ fun SelfAssessmentScreen(
                 }
             }
 
-            // --- 하단: Back / Next ---
+            // --- 하단: Back / Home / Next ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -153,6 +155,8 @@ fun SelfAssessmentScreen(
                 ) {
                     Text("< Back", fontWeight = FontWeight.Bold)
                 }
+
+                HomeButton(onClick = onHome)
 
                 Button(
                     onClick = {

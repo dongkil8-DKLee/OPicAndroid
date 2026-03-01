@@ -13,13 +13,20 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
+import com.opic.android.data.prefs.AppPreferences
+import com.opic.android.ui.navigation.BottomNavState
+import com.opic.android.ui.navigation.LocalBottomNavState
+import com.opic.android.ui.navigation.OPicBottomBar
 import com.opic.android.ui.navigation.OPicNavGraph
 import com.opic.android.ui.theme.OPicTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 /**
  * 단일 Activity — NavHost로 모든 화면 관리.
@@ -27,6 +34,8 @@ import dagger.hilt.android.AndroidEntryPoint
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var appPrefs: AppPreferences
 
     private val requestPermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -37,14 +46,28 @@ class MainActivity : ComponentActivity() {
         requestStoragePermissionsIfNeeded()
         enableEdgeToEdge()
         setContent {
-            OPicTheme {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(WindowInsets.systemBars.asPaddingValues())
-                ) {
-                    val navController = rememberNavController()
-                    OPicNavGraph(navController = navController)
+            val themeMode = appPrefs.themeMode
+            val darkTheme = when (themeMode) {
+                "dark" -> true
+                "light" -> false
+                else -> false // system default → light for now
+            }
+            OPicTheme(darkTheme = darkTheme) {
+                val navController = rememberNavController()
+                val bottomNavState = remember { BottomNavState() }
+
+                CompositionLocalProvider(LocalBottomNavState provides bottomNavState) {
+                    Scaffold(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(WindowInsets.systemBars.asPaddingValues()),
+                        bottomBar = { OPicBottomBar(navController) }
+                    ) { innerPadding ->
+                        OPicNavGraph(
+                            navController = navController,
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
                 }
             }
         }

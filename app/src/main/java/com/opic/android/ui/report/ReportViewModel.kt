@@ -6,6 +6,9 @@ import com.opic.android.data.local.dao.QuestionDao
 import com.opic.android.data.local.dao.SessionSummary
 import com.opic.android.data.local.dao.StudyProgressDao
 import com.opic.android.data.local.dao.TestDao
+import com.opic.android.data.local.dao.VocabularyDao
+import com.opic.android.data.prefs.AppPreferences
+import com.opic.android.domain.LevelCalculator
 import com.opic.android.util.SpeechAnalyzer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +28,18 @@ data class ReportUiState(
     val weeklyGoal: Int = 20,
     val gradeDistribution: Map<String, Int> = emptyMap(),
     val topicWeakness: List<TopicAccuracy> = emptyList(),
-    val recentTests: List<SessionSummary> = emptyList()
+    val recentTests: List<SessionSummary> = emptyList(),
+
+    // Level info (from StartScreen)
+    val level: Int = 1,
+    val gaugePercent: Int = 0,
+    val levelImageDir: String = "",
+
+    // Vocabulary summary
+    val vocabTotal: Int = 0,
+    val vocabMemorized: Int = 0,
+    val vocabFavorites: Int = 0,
+    val vocabRecentWeekAdded: Int = 0
 )
 
 data class TopicAccuracy(
@@ -38,7 +52,10 @@ data class TopicAccuracy(
 class ReportViewModel @Inject constructor(
     private val questionDao: QuestionDao,
     private val studyProgressDao: StudyProgressDao,
-    private val testDao: TestDao
+    private val testDao: TestDao,
+    private val levelCalculator: LevelCalculator,
+    private val appPrefs: AppPreferences,
+    private val vocabularyDao: VocabularyDao
 ) : ViewModel() {
 
     companion object {
@@ -55,6 +72,9 @@ class ReportViewModel @Inject constructor(
     private fun loadReportData() {
         viewModelScope.launch {
             try {
+                // Level info
+                val levelInfo = levelCalculator.calculate()
+
                 // 1. 전체/학습완료/즐겨찾기 수
                 val allSummaries = questionDao.getAllQuestionsWithProgress(USER_ID)
                 val total = allSummaries.size
@@ -103,6 +123,21 @@ class ReportViewModel @Inject constructor(
                     }
                 }
 
+                // 5. Vocabulary summary
+                val allWords = vocabularyDao.getAllWordsSync()
+                val vocabTotal = allWords.size
+                val vocabMemorized = allWords.count { it.isMemorized }
+                val vocabFavorites = allWords.count { it.isFavorite }
+                val vocabRecentWeekAdded = allWords.count { word ->
+                    val dateStr = word.createdAt?.take(10) ?: return@count false
+                    try {
+                        val date = LocalDate.parse(dateStr)
+                        !date.isBefore(weekAgo)
+                    } catch (_: Exception) {
+                        false
+                    }
+                }
+
                 _uiState.update {
                     it.copy(
                         loading = false,
@@ -113,7 +148,14 @@ class ReportViewModel @Inject constructor(
                         weeklyStudied = weeklyStudied,
                         gradeDistribution = gradeMap,
                         topicWeakness = topicWeakness,
-                        recentTests = recentTests
+                        recentTests = recentTests,
+                        level = levelInfo.level,
+                        gaugePercent = levelInfo.gaugePercent,
+                        levelImageDir = appPrefs.levelImageDir,
+                        vocabTotal = vocabTotal,
+                        vocabMemorized = vocabMemorized,
+                        vocabFavorites = vocabFavorites,
+                        vocabRecentWeekAdded = vocabRecentWeekAdded
                     )
                 }
             } catch (_: Exception) {

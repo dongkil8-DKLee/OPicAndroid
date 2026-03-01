@@ -159,24 +159,6 @@ private fun PracticeContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // ===== < Back 좌측 하단 (BeginTestScreen 스타일) =====
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Start
-        ) {
-            Button(
-                onClick = onBack,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = OPicColors.Primary,
-                    contentColor = OPicColors.PrimaryText
-                ),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("< Back", fontWeight = FontWeight.Bold)
-            }
-        }
     }
 }
 

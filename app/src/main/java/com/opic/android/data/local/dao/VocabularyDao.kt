@@ -35,4 +35,7 @@ interface VocabularyDao {
 
     @Query("UPDATE Vocabulary SET isFavorite = NOT isFavorite WHERE wordId = :wordId")
     suspend fun toggleFavorite(wordId: Int)
+
+    @Query("SELECT * FROM Vocabulary ORDER BY createdAt DESC")
+    suspend fun getAllWordsSync(): List<VocabularyEntity>
 }

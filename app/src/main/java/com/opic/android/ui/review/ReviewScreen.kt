@@ -22,10 +22,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -43,13 +42,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.opic.android.ui.common.HomeButton
 import com.opic.android.ui.common.SpeechAnalysisPanel
 import com.opic.android.ui.theme.OPicColors
 
 @Composable
 fun ReviewScreen(
-    onHome: () -> Unit,
     viewModel: ReviewViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -57,8 +54,8 @@ fun ReviewScreen(
     Surface(modifier = Modifier.fillMaxSize()) {
         when {
             state.loading -> LoadingContent()
-            state.results.isEmpty() -> EmptyContent(onHome)
-            else -> ReviewContent(state, viewModel, onHome)
+            state.results.isEmpty() -> EmptyContent()
+            else -> ReviewContent(state, viewModel)
         }
     }
 }
@@ -75,13 +72,9 @@ private fun LoadingContent() {
 }
 
 @Composable
-private fun EmptyContent(onHome: () -> Unit) {
+private fun EmptyContent() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("시험 결과가 없습니다.", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onHome) { Text("Home") }
-        }
+        Text("시험 결과가 없습니다.", style = MaterialTheme.typography.titleMedium)
     }
 }
 
@@ -89,21 +82,57 @@ private fun EmptyContent(onHome: () -> Unit) {
 @Composable
 private fun ReviewContent(
     state: ReviewUiState,
-    viewModel: ReviewViewModel,
-    onHome: () -> Unit
+    viewModel: ReviewViewModel
 ) {
     val currentResult = state.results[state.currentIndex]
     val isPlaying = state.playingTarget != null
 
     Column(modifier = Modifier.fillMaxSize()) {
 
-        // --- 상단: Question X of N ---
-        Text(
-            text = "Question ${state.currentIndex + 1} of ${state.totalQuestions}",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 4.dp)
-        )
+        // --- 상단: Question X of N + Play All ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Question ${state.currentIndex + 1} of ${state.totalQuestions}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+
+            // Play All / Stop 버튼
+            if (state.playAllActive) {
+                IconButton(onClick = { viewModel.togglePlayAll() }, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.Stop, contentDescription = "Stop All", tint = OPicColors.RecordActive)
+                }
+            } else {
+                IconButton(
+                    onClick = { viewModel.togglePlayAll() },
+                    enabled = !isPlaying,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.PlayArrow,
+                        contentDescription = "Play All",
+                        tint = if (!isPlaying) OPicColors.PlayButton else Color.Gray
+                    )
+                }
+            }
+        }
+
+        // Play All 상태 텍스트
+        if (state.playAllActive && state.playAllStatus.isNotBlank()) {
+            Text(
+                text = state.playAllStatus,
+                fontSize = 12.sp,
+                color = OPicColors.Primary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
 
         // --- 상단 고정 카드: question_text ---
         QuestionTextCard(
@@ -197,39 +226,6 @@ private fun ReviewContent(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Back / Home / Next 버튼
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Button(
-                    onClick = { viewModel.onPrev() },
-                    enabled = state.currentIndex > 0 && !isPlaying,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = OPicColors.Primary,
-                        contentColor = OPicColors.PrimaryText
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("< Back", fontWeight = FontWeight.Bold)
-                }
-
-                HomeButton(onClick = onHome)
-
-                Button(
-                    onClick = { viewModel.onNext() },
-                    enabled = state.currentIndex < state.totalQuestions - 1 && !isPlaying,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = OPicColors.Primary,
-                        contentColor = OPicColors.PrimaryText
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Next >", fontWeight = FontWeight.Bold)
-                }
-            }
         }
     }
 }

@@ -16,12 +16,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -47,12 +44,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.opic.android.data.local.dao.SessionSummary
-import com.opic.android.ui.common.HomeButton
 import com.opic.android.ui.theme.OPicColors
 
 @Composable
 fun ReviewListScreen(
-    onHome: () -> Unit,
     onSessionClick: (Int) -> Unit,
     viewModel: ReviewListViewModel = hiltViewModel()
 ) {
@@ -111,16 +106,6 @@ fun ReviewListScreen(
                         }
                     }
                 }
-            }
-
-            // 하단 Home 버튼
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                HomeButton(onClick = onHome)
             }
         }
     }

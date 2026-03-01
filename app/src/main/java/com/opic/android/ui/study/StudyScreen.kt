@@ -24,13 +24,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
@@ -72,15 +71,13 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.opic.android.ui.common.HomeButton
 import com.opic.android.ui.theme.OPicColors
 
 /**
- * StudyScreen (리팩토링: UserScript 제거, 아이콘 행 추가, Edit/Cancel/Save 토글).
+ * StudyScreen (리팩토링: Fullscreen 복원, Play/Edit ScriptSection 내부, 아이콘 행 3개).
  */
 @Composable
 fun StudyScreen(
-    onHome: () -> Unit,
     onPractice: (Int) -> Unit = {},
     onSettings: () -> Unit = {},
     viewModel: StudyViewModel = hiltViewModel()
@@ -97,7 +94,7 @@ fun StudyScreen(
                 }
             }
         } else {
-            StudyContent(state, viewModel, onHome, onPractice, onSettings)
+            StudyContent(state, viewModel, onPractice, onSettings)
         }
     }
 }
@@ -107,14 +104,13 @@ fun StudyScreen(
 private fun StudyContent(
     state: StudyUiState,
     viewModel: StudyViewModel,
-    onHome: () -> Unit,
     onPractice: (Int) -> Unit,
     onSettings: () -> Unit
 ) {
     val context = LocalContext.current
     val isBusy = state.playingTarget != null || state.isRecording || state.groupPlaying
     var showFilter by remember { mutableStateOf(false) }
-    // null = 모두 표시, "question" / "answer" = 해당만 확장
+    // 전체화면 토글: null=기본, "question"=Q 전체화면, "answer"=A 전체화면
     var expandedScript by remember { mutableStateOf<String?>(null) }
 
     Column(
@@ -122,15 +118,6 @@ private fun StudyContent(
             .fillMaxSize()
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        // ===== 최상단: 속도 + 필터 아이콘 + 설정 아이콘 =====
-        SpeedFilterRow(
-            state = state,
-            viewModel = viewModel,
-            showFilter = showFilter,
-            onToggleFilter = { showFilter = !showFilter },
-            onSettings = onSettings
-        )
-
         // ===== 필터 패널 (슬라이드 다운) =====
         AnimatedVisibility(
             visible = showFilter,
@@ -148,8 +135,8 @@ private fun StudyContent(
             }
         }
 
-        // ===== 타이틀 선택 + Prev/Next (항상 표시) =====
-        TitleSelector(state, viewModel)
+        // ===== 타이틀 선택 + Prev/Next + 필터아이콘 (항상 표시) =====
+        TitleSelector(state, viewModel, showFilter, onToggleFilter = { showFilter = !showFilter })
 
         Spacer(modifier = Modifier.height(4.dp))
 
@@ -164,7 +151,7 @@ private fun StudyContent(
             )
         }
 
-        // ===== 스크립트 영역 (비율 고정, 내부 스크롤) =====
+        // ===== 스크립트 영역 (전체화면 토글 지원) =====
         if (expandedScript == null || expandedScript == "question") {
             ScriptSection(
                 modifier = Modifier.weight(if (expandedScript == null) 2f else 1f),
@@ -173,23 +160,23 @@ private fun StudyContent(
                 highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.QUESTION) state.highlightedWordIndex else -1,
                 isEditing = state.editingQuestion,
                 draft = state.questionDraft,
-                isPlaying = state.playingTarget == StudyPlayTarget.QUESTION,
-                canPlay = !isBusy,
-                onPlay = { viewModel.playQuestionAudio() },
-                onStop = { viewModel.stopAudio() },
                 onToggleEdit = { viewModel.toggleEditQuestion() },
                 onCancelEdit = { viewModel.cancelEditQuestion() },
                 onDraftChange = { viewModel.updateQuestionDraft(it) },
                 onSave = { viewModel.saveQuestionScript() },
                 fontSize = state.fontSize,
+                isPlaying = state.playingTarget == StudyPlayTarget.QUESTION,
+                canPlay = !isBusy && state.currentQuestion != null,
+                onPlay = { viewModel.playQuestionAudio() },
+                onStop = { viewModel.stopAudio() },
                 isExpanded = expandedScript == "question",
                 onExpandToggle = {
                     expandedScript = if (expandedScript == "question") null else "question"
                 }
             )
-        }
 
-        if (expandedScript == null) Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(4.dp))
+        }
 
         if (expandedScript == null || expandedScript == "answer") {
             ScriptSection(
@@ -199,25 +186,30 @@ private fun StudyContent(
                 highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.ANSWER) state.highlightedWordIndex else -1,
                 isEditing = state.editingAnswer,
                 draft = state.answerDraft,
-                isPlaying = state.playingTarget == StudyPlayTarget.ANSWER,
-                canPlay = !isBusy,
-                onPlay = { viewModel.playAnswerAudio() },
-                onStop = { viewModel.stopAudio() },
                 onToggleEdit = { viewModel.toggleEditAnswer() },
                 onCancelEdit = { viewModel.cancelEditAnswer() },
                 onDraftChange = { viewModel.updateAnswerDraft(it) },
                 onSave = { viewModel.saveAnswerScript() },
                 fontSize = state.fontSize,
+                isPlaying = state.playingTarget == StudyPlayTarget.ANSWER,
+                canPlay = !isBusy && state.currentQuestion != null,
+                onPlay = { viewModel.playAnswerAudio() },
+                onStop = { viewModel.stopAudio() },
                 isExpanded = expandedScript == "answer",
                 onExpandToggle = {
                     expandedScript = if (expandedScript == "answer") null else "answer"
                 }
             )
+
+            Spacer(modifier = Modifier.height(4.dp))
         }
+
+        // ===== 속도 행 =====
+        SpeedRow(state = state, viewModel = viewModel, onSettings = onSettings)
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // ===== 아이콘 버튼 행 (녹음/재생/집중학습/확대축소) =====
+        // ===== 아이콘 행 (🎤 녹음, ▶ 재생, 💬 연습) =====
         IconButtonRow(
             state = state,
             viewModel = viewModel,
@@ -225,118 +217,103 @@ private fun StudyContent(
             onPractice = {
                 val qId = state.currentQuestion?.questionId
                 if (qId != null) onPractice(qId)
-            },
-            isExpanded = expandedScript != null,
-            onExpandToggle = { expandedScript = if (expandedScript != null) null else "question" }
+            }
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // ===== 하단: Home 버튼 =====
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            HomeButton(onClick = onHome)
+        // 마이크 레벨 바 (녹음 중에만 표시)
+        if (state.isRecording) {
+            Spacer(modifier = Modifier.height(4.dp))
+            LinearProgressIndicator(
+                progress = { state.micLevel },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = OPicColors.TimerGreen,
+                trackColor = OPicColors.Border,
+            )
         }
     }
 }
 
-// ==================== 아이콘 버튼 행 (녹음/재생/집중학습/확대축소) ====================
+// ==================== 아이콘 행 (🎤 녹음, ▶ 재생, 💬 연습) ====================
 
 @Composable
 private fun IconButtonRow(
     state: StudyUiState,
     viewModel: StudyViewModel,
     isBusy: Boolean,
-    onPractice: () -> Unit,
-    isExpanded: Boolean,
-    onExpandToggle: () -> Unit
+    onPractice: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 녹음 버튼
+        // 🎤 녹음
         if (state.isRecording) {
-            IconButton(onClick = { viewModel.stopRecording() }, modifier = Modifier.size(40.dp)) {
-                Icon(Icons.Filled.Stop, contentDescription = "녹음 중지", tint = OPicColors.RecordActive)
+            IconButton(onClick = { viewModel.stopRecording() }, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.Filled.Stop, contentDescription = "녹음 중지", tint = OPicColors.RecordActive, modifier = Modifier.size(28.dp))
             }
         } else {
             IconButton(
                 onClick = { viewModel.toggleRecording() },
                 enabled = !isBusy && state.currentQuestion != null,
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(48.dp)
             ) {
-                Icon(Icons.Filled.Mic, contentDescription = "녹음", tint = if (!isBusy && state.currentQuestion != null) OPicColors.RecordActive else Color.Gray)
+                Icon(
+                    Icons.Filled.Mic,
+                    contentDescription = "녹음",
+                    tint = if (!isBusy && state.currentQuestion != null) OPicColors.RecordActive else Color.Gray,
+                    modifier = Modifier.size(28.dp)
+                )
             }
         }
 
-        // 재생 버튼
+        // ▶ 사용자 녹음 재생
         if (state.playingTarget == StudyPlayTarget.USER) {
-            IconButton(onClick = { viewModel.stopAudio() }, modifier = Modifier.size(40.dp)) {
-                Icon(Icons.Filled.Stop, contentDescription = "재생 중지")
+            IconButton(onClick = { viewModel.stopAudio() }, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.Filled.Stop, contentDescription = "재생 중지", modifier = Modifier.size(28.dp))
             }
         } else {
             IconButton(
                 onClick = { viewModel.playUserAudio() },
                 enabled = state.hasUserAudio && !isBusy,
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(48.dp)
             ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = "녹음 재생", tint = if (state.hasUserAudio && !isBusy) OPicColors.PlayButton else Color.Gray)
+                Icon(
+                    Icons.Filled.PlayArrow,
+                    contentDescription = "녹음 재생",
+                    tint = if (state.hasUserAudio && !isBusy) OPicColors.PlayButton else Color.Gray,
+                    modifier = Modifier.size(28.dp)
+                )
             }
         }
 
-        // 집중학습 버튼
+        // 💬 집중학습 (Practice)
         IconButton(
             onClick = onPractice,
             enabled = state.currentQuestion != null,
-            modifier = Modifier.size(40.dp)
+            modifier = Modifier.size(48.dp)
         ) {
             Icon(
-                Icons.AutoMirrored.Filled.MenuBook,
+                Icons.AutoMirrored.Filled.Chat,
                 contentDescription = "집중학습",
-                tint = if (state.currentQuestion != null) OPicColors.Primary else Color.Gray
+                tint = if (state.currentQuestion != null) OPicColors.Primary else Color.Gray,
+                modifier = Modifier.size(28.dp)
             )
         }
-
-        // 확대/축소 버튼
-        IconButton(onClick = onExpandToggle, modifier = Modifier.size(40.dp)) {
-            Icon(
-                if (isExpanded) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
-                contentDescription = if (isExpanded) "축소" else "확대",
-                tint = Color.Gray
-            )
-        }
-    }
-
-    // 마이크 레벨 바 (녹음 중에만 표시)
-    if (state.isRecording) {
-        LinearProgressIndicator(
-            progress = { state.micLevel },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp)),
-            color = OPicColors.TimerGreen,
-            trackColor = OPicColors.Border,
-        )
     }
 }
 
-// ==================== 속도 + 필터 + 설정 아이콘 행 ====================
+// ==================== 속도 행 ====================
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SpeedFilterRow(
+private fun SpeedRow(
     state: StudyUiState,
     viewModel: StudyViewModel,
-    showFilter: Boolean,
-    onToggleFilter: () -> Unit,
     onSettings: () -> Unit
 ) {
     val speedOptions = listOf(0.75f, 1.0f, 1.25f, 1.5f)
@@ -368,19 +345,7 @@ private fun SpeedFilterRow(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // 필터 아이콘 (토글 → 필터 패널)
-        IconButton(
-            onClick = onToggleFilter,
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(
-                Icons.Filled.FilterList,
-                contentDescription = "Filter",
-                tint = if (showFilter) OPicColors.Primary else Color.Gray
-            )
-        }
-
-        // 설정 아이콘 → Main Settings 화면 이동
+        // 설정 아이콘
         IconButton(
             onClick = onSettings,
             modifier = Modifier.size(32.dp)
@@ -438,11 +403,16 @@ private fun FilterSection(state: StudyUiState, viewModel: StudyViewModel) {
     }
 }
 
-// ==================== 타이틀 선택 ====================
+// ==================== 타이틀 선택 + 필터 아이콘 ====================
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TitleSelector(state: StudyUiState, viewModel: StudyViewModel) {
+private fun TitleSelector(
+    state: StudyUiState,
+    viewModel: StudyViewModel,
+    showFilter: Boolean,
+    onToggleFilter: () -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -474,6 +444,18 @@ private fun TitleSelector(state: StudyUiState, viewModel: StudyViewModel) {
             fontSize = 12.sp,
             modifier = Modifier.padding(start = 4.dp)
         )
+
+        // 필터 아이콘
+        IconButton(
+            onClick = onToggleFilter,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                Icons.Filled.FilterList,
+                contentDescription = "Filter",
+                tint = if (showFilter) OPicColors.Primary else Color.Gray
+            )
+        }
     }
 }
 
@@ -591,7 +573,7 @@ private fun HighlightedScriptText(
     )
 }
 
-// ==================== 공용 스크립트 섹션 (Edit/Cancel/Save 토글 패턴) ====================
+// ==================== 공용 스크립트 섹션 (Play + Edit + Fullscreen 포함) ====================
 
 @Composable
 private fun ScriptSection(
@@ -601,17 +583,17 @@ private fun ScriptSection(
     highlightedWordIndex: Int = -1,
     isEditing: Boolean,
     draft: String,
-    isPlaying: Boolean,
-    canPlay: Boolean,
-    onPlay: () -> Unit,
-    onStop: () -> Unit,
     onToggleEdit: () -> Unit,
     onCancelEdit: () -> Unit,
     onDraftChange: (String) -> Unit,
     onSave: () -> Unit,
     fontSize: Int,
-    isExpanded: Boolean = false,
-    onExpandToggle: () -> Unit = {}
+    isPlaying: Boolean,
+    canPlay: Boolean,
+    onPlay: () -> Unit,
+    onStop: () -> Unit,
+    isExpanded: Boolean,
+    onExpandToggle: () -> Unit
 ) {
     Column(
         modifier = modifier
@@ -619,19 +601,31 @@ private fun ScriptSection(
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
-        // 헤더: 라벨 + Edit/Cancel/Save + Play/Stop + 확대/축소
+        // 헤더: 라벨 + ▶ Play + Edit + Fullscreen
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 라벨
             if (label.isNotBlank()) {
                 Text(label, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
 
             Spacer(modifier = Modifier.width(4.dp))
 
-            // Edit / Cancel+Save 토글
+            // Play / Stop 버튼
+            if (isPlaying) {
+                TextButton(onClick = onStop) {
+                    Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(16.dp), tint = OPicColors.RecordActive)
+                    Text(" Stop", fontSize = 11.sp, color = OPicColors.RecordActive)
+                }
+            } else {
+                TextButton(onClick = onPlay, enabled = canPlay) {
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Text(" Play", fontSize = 11.sp)
+                }
+            }
+
+            // Edit / Cancel / Save
             if (isEditing) {
                 TextButton(onClick = onCancelEdit) {
                     Text("Cancel", fontSize = 12.sp, color = Color.Gray)
@@ -647,24 +641,8 @@ private fun ScriptSection(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Play/Stop
-            if (isPlaying) {
-                TextButton(onClick = onStop) {
-                    Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text(" Stop", fontSize = 12.sp)
-                }
-            } else {
-                TextButton(onClick = onPlay, enabled = canPlay) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text(" Play", fontSize = 12.sp)
-                }
-            }
-
-            // 확대/축소 아이콘
-            IconButton(
-                onClick = onExpandToggle,
-                modifier = Modifier.size(28.dp)
-            ) {
+            // Fullscreen 아이콘
+            IconButton(onClick = onExpandToggle, modifier = Modifier.size(28.dp)) {
                 Icon(
                     if (isExpanded) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
                     contentDescription = if (isExpanded) "축소" else "확대",
@@ -685,7 +663,7 @@ private fun ScriptSection(
             )
         } else if (!scriptText.isNullOrBlank()) {
             Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                if (isPlaying && highlightedWordIndex >= 0) {
+                if (highlightedWordIndex >= 0) {
                     HighlightedScriptText(
                         text = scriptText,
                         highlightedWordIndex = highlightedWordIndex,

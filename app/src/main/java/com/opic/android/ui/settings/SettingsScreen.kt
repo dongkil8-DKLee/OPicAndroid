@@ -19,12 +19,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -38,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -66,7 +65,6 @@ import com.opic.android.ui.theme.OPicColors
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onHome: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -119,6 +117,20 @@ fun SettingsScreen(
         uri?.let { viewModel.importCsv(it) }
     }
 
+    // Vocab CSV Export launcher
+    val vocabCsvExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let { viewModel.exportVocabCsv(it) }
+    }
+
+    // Vocab CSV Import launcher
+    val vocabCsvImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.importVocabCsv(it) }
+    }
+
     // 삭제 확인 다이얼로그
     if (showDeleteDialog) {
         AlertDialog(
@@ -144,20 +156,11 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onHome, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
+            Text(
+                text = "Settings",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -167,6 +170,36 @@ fun SettingsScreen(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // === Theme Mode ===
+                Text("Theme", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    listOf("light" to "Light", "dark" to "Dark", "system" to "System").forEach { (value, label) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = state.themeMode == value,
+                                onClick = { viewModel.onThemeModeChanged(value) }
+                            )
+                            Text(label, fontSize = 13.sp)
+                        }
+                    }
+                }
+
+                // === TTS Voice Selection ===
+                Text("TTS Voice", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                if (state.availableVoices.isNotEmpty()) {
+                    VoiceDropdown(
+                        selected = state.selectedVoice.ifBlank { "Default" },
+                        options = listOf("Default") + state.availableVoices,
+                        onSelected = { viewModel.onVoiceSelected(it) }
+                    )
+                } else {
+                    Text("음성 목록 로딩 중...", fontSize = 12.sp, color = Color.Gray)
+                }
+
                 // === Text Size ===
                 Text("Text Size", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Row(
@@ -303,9 +336,9 @@ fun SettingsScreen(
                 }
 
                 // ======================================================
-                // === CSV Import/Export ===
+                // === CSV Import/Export (Questions) ===
                 // ======================================================
-                Text("CSV Import/Export", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray)
+                Text("CSV Import/Export (Questions)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray)
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -335,32 +368,82 @@ fun SettingsScreen(
                     }
                 }
 
+                // ======================================================
+                // === 단어장 CSV Import/Export ===
+                // ======================================================
+                Text("단어장 CSV Import/Export", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { vocabCsvImportLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "*/*")) },
+                        colors = ButtonDefaults.buttonColors(containerColor = OPicColors.Primary),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("가져오기", fontSize = 12.sp)
+                    }
+
+                    Button(
+                        onClick = { vocabCsvExportLauncher.launch("opic_vocabulary.csv") },
+                        colors = ButtonDefaults.buttonColors(containerColor = OPicColors.Primary),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.Upload, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("내보내기", fontSize = 12.sp)
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
             // Snackbar
             SnackbarHost(hostState = snackbarHostState)
+        }
+    }
+}
 
-            // Home button
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Button(
-                    onClick = onHome,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = OPicColors.Secondary,
-                        contentColor = OPicColors.TextOnLight
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.height(44.dp)
-                ) {
-                    Icon(Icons.Filled.Home, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Home", fontWeight = FontWeight.Bold)
-                }
+// ==================== TTS Voice 드롭다운 ====================
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VoiceDropdown(selected: String, options: List<String>, onSelected: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        TextField(
+            value = selected,
+            onValueChange = {},
+            readOnly = true,
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                .fillMaxWidth()
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            options.forEach { voice ->
+                DropdownMenuItem(
+                    text = { Text(voice, fontSize = 13.sp) },
+                    onClick = {
+                        onSelected(voice)
+                        expanded = false
+                    }
+                )
             }
         }
     }

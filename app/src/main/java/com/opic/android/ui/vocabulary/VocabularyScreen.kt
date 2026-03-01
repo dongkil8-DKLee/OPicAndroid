@@ -18,12 +18,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.OndemandVideo
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.outlined.StarBorder
@@ -33,7 +32,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -61,9 +59,10 @@ import com.opic.android.data.local.entity.VocabularyEntity
 import com.opic.android.ui.theme.OPicColors
 import java.util.Locale
 
+private val CardBg = Color(0xFFF5F5F5)
+
 @Composable
 fun VocabularyScreen(
-    onBack: () -> Unit,
     viewModel: VocabularyViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -82,16 +81,19 @@ fun VocabularyScreen(
     }
 
     Surface(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            // ===== 탭 + Add 버튼 =====
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // ===== 탭 =====
                 TabRow(
                     selectedTabIndex = state.selectedTab,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.weight(1f)
                 ) {
                     Tab(
                         selected = state.selectedTab == 0,
@@ -104,74 +106,55 @@ fun VocabularyScreen(
                         text = { Text("암기장", fontWeight = FontWeight.Bold) }
                     )
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // ===== 단어 목록 =====
-                val words = if (state.selectedTab == 0) state.allWords else state.unmemorizedWords
-
-                if (words.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (state.selectedTab == 0) "단어장이 비어있습니다.\n+ 버튼으로 단어를 추가하세요."
-                            else "암기하지 못한 단어가 없습니다.",
-                            color = OPicColors.DisabledBg,
-                            fontSize = 14.sp
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(words, key = { it.wordId }) { word ->
-                            VocabularyCard(
-                                word = word,
-                                isExpanded = word.wordId in state.expandedWordIds,
-                                onTap = { viewModel.toggleWordExpanded(word.wordId) },
-                                onToggleMemorized = { viewModel.toggleMemorized(word.wordId) },
-                                onToggleFavorite = { viewModel.toggleFavorite(word.wordId) },
-                                onEdit = { viewModel.showEditDialog(word) },
-                                onDelete = { viewModel.deleteWord(word) },
-                                onYouglish = {
-                                    val url = "https://youglish.com/pronounce/${word.word}/english"
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                                },
-                                onTts = { tts?.speak(word.word, TextToSpeech.QUEUE_FLUSH, null, null) }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // ===== < Back 좌측 하단 =====
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start
+                IconButton(
+                    onClick = { viewModel.showAddDialog() },
+                    modifier = Modifier.size(40.dp)
                 ) {
-                    TextButton(onClick = onBack) {
-                        Text("< Back", fontSize = 13.sp, color = OPicColors.Primary, fontWeight = FontWeight.Bold)
-                    }
+                    Icon(Icons.Filled.Add, contentDescription = "단어 추가", tint = OPicColors.Primary)
                 }
             }
 
-            // ===== FAB: 단어 추가 =====
-            FloatingActionButton(
-                onClick = { viewModel.showAddDialog() },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 8.dp, end = 8.dp),
-                shape = CircleShape,
-                containerColor = OPicColors.Primary,
-                contentColor = Color.White
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = "단어 추가")
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ===== 단어 목록 =====
+            val words = if (state.selectedTab == 0) state.allWords else state.unmemorizedWords
+
+            if (words.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (state.selectedTab == 0) "단어장이 비어있습니다.\n+ 버튼으로 단어를 추가하세요."
+                        else "암기하지 못한 단어가 없습니다.",
+                        color = OPicColors.DisabledBg,
+                        fontSize = 14.sp
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(words, key = { it.wordId }) { word ->
+                        VocabularyCard(
+                            word = word,
+                            isExpanded = word.wordId in state.expandedWordIds,
+                            onTap = { viewModel.toggleWordExpanded(word.wordId) },
+                            onToggleMemorized = { viewModel.toggleMemorized(word.wordId) },
+                            onToggleFavorite = { viewModel.toggleFavorite(word.wordId) },
+                            onEdit = { viewModel.showEditDialog(word) },
+                            onDelete = { viewModel.deleteWord(word) },
+                            onYouglish = {
+                                val url = "https://youglish.com/pronounce/${word.word}/english"
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                            },
+                            onTts = { tts?.speak(word.word, TextToSpeech.QUEUE_FLUSH, null, null) }
+                        )
+                    }
+                }
             }
         }
 
@@ -236,7 +219,7 @@ private fun VocabularyCard(
             .fillMaxWidth()
             .clickable { onTap() },
         colors = CardDefaults.cardColors(
-            containerColor = OPicColors.DarkBg
+            containerColor = CardBg
         ),
         shape = RoundedCornerShape(12.dp)
     ) {
@@ -254,7 +237,7 @@ private fun VocabularyCard(
                     text = word.word,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = OPicColors.TextOnDark,
+                    color = OPicColors.TextOnLight,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -283,7 +266,7 @@ private fun VocabularyCard(
                         Icon(
                             Icons.Filled.MoreVert,
                             contentDescription = "더보기",
-                            tint = OPicColors.TextOnDark,
+                            tint = OPicColors.TextOnLight,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -309,7 +292,7 @@ private fun VocabularyCard(
                 Text(
                     text = word.meaning,
                     fontSize = 14.sp,
-                    color = OPicColors.TextOnDark.copy(alpha = 0.8f)
+                    color = OPicColors.TextOnLight.copy(alpha = 0.8f)
                 )
             }
 
@@ -319,7 +302,7 @@ private fun VocabularyCard(
                 Text(
                     text = word.pronunciation,
                     fontSize = 13.sp,
-                    color = OPicColors.TextOnDark.copy(alpha = 0.6f)
+                    color = OPicColors.TextOnLight.copy(alpha = 0.6f)
                 )
             }
 
@@ -329,7 +312,7 @@ private fun VocabularyCard(
                 Text(
                     text = word.memo,
                     fontSize = 12.sp,
-                    color = OPicColors.TextOnDark.copy(alpha = 0.5f)
+                    color = OPicColors.TextOnLight.copy(alpha = 0.5f)
                 )
             }
 
@@ -351,7 +334,7 @@ private fun VocabularyCard(
                     Icon(
                         imageVector = if (word.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
                         contentDescription = "즐겨찾기",
-                        tint = if (word.isFavorite) OPicColors.TimerOrange else OPicColors.TextOnDark.copy(alpha = 0.5f),
+                        tint = if (word.isFavorite) OPicColors.TimerOrange else OPicColors.TextOnLight.copy(alpha = 0.5f),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -364,9 +347,9 @@ private fun VocabularyCard(
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
-                        Icons.Filled.Description,
+                        Icons.Filled.OndemandVideo,
                         contentDescription = "Youglish",
-                        tint = OPicColors.TextOnDark.copy(alpha = 0.5f),
+                        tint = OPicColors.TextOnLight.copy(alpha = 0.5f),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -381,7 +364,7 @@ private fun VocabularyCard(
                     Icon(
                         Icons.AutoMirrored.Filled.VolumeUp,
                         contentDescription = "TTS",
-                        tint = OPicColors.TextOnDark.copy(alpha = 0.5f),
+                        tint = OPicColors.TextOnLight.copy(alpha = 0.5f),
                         modifier = Modifier.size(20.dp)
                     )
                 }

@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
@@ -54,7 +53,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.opic.android.R
-import com.opic.android.ui.common.HomeButton
 import com.opic.android.ui.theme.OPicColors
 
 /**
@@ -293,14 +291,23 @@ private fun TestContent(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // --- 하단: Home / Next ---
+        // --- 하단: < Back (시험 중단 확인) / Next ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            HomeButton(onClick = onHome)
+            Button(
+                onClick = onHome,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = OPicColors.Primary,
+                    contentColor = OPicColors.PrimaryText
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("< Back", fontWeight = FontWeight.Bold)
+            }
 
             Button(
                 onClick = { viewModel.onNext() },

@@ -7,8 +7,11 @@ import android.provider.DocumentsContract
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.opic.android.audio.TtsManager
 import com.opic.android.data.local.dao.QuestionDao
+import com.opic.android.data.local.dao.VocabularyDao
 import com.opic.android.data.local.entity.QuestionEntity
+import com.opic.android.data.local.entity.VocabularyEntity
 import com.opic.android.data.prefs.AppPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -42,6 +45,13 @@ data class SettingsUiState(
     // CSV
     val csvPath: String = "",
 
+    // TTS Voice
+    val availableVoices: List<String> = emptyList(),
+    val selectedVoice: String = "",
+
+    // Theme
+    val themeMode: String = "light",
+
     // 피드백
     val snackbarMessage: String? = null
 )
@@ -50,7 +60,9 @@ data class SettingsUiState(
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val appPrefs: AppPreferences,
-    private val questionDao: QuestionDao
+    private val questionDao: QuestionDao,
+    private val vocabularyDao: VocabularyDao,
+    private val ttsManager: TtsManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -64,12 +76,49 @@ class SettingsViewModel @Inject constructor(
                 textSize = appPrefs.textSize,
                 levelImageDir = appPrefs.levelImageDir,
                 soundDir = appPrefs.soundDir,
-                targetGrade = appPrefs.targetGrade
+                targetGrade = appPrefs.targetGrade,
+                selectedVoice = appPrefs.selectedVoice,
+                themeMode = appPrefs.themeMode
             )
         }
         viewModelScope.launch {
             loadQuestions()
+            loadAvailableVoices()
         }
+    }
+
+    // ==================== TTS Voice ====================
+
+    private fun loadAvailableVoices() {
+        // TTS init이 비동기이므로 약간 지연 후 조회
+        viewModelScope.launch {
+            ttsManager.init()
+            // TTS 초기화 완료 대기 (최대 3초)
+            repeat(30) {
+                val voices = ttsManager.getAvailableEnglishVoices()
+                if (voices.isNotEmpty()) {
+                    _uiState.update { it.copy(availableVoices = voices) }
+                    return@launch
+                }
+                kotlinx.coroutines.delay(100)
+            }
+        }
+    }
+
+    fun onVoiceSelected(voice: String) {
+        val voiceName = if (voice == "Default") "" else voice
+        appPrefs.selectedVoice = voiceName
+        _uiState.update { it.copy(selectedVoice = voiceName) }
+        if (voiceName.isNotBlank()) {
+            ttsManager.setVoice(voiceName)
+        }
+    }
+
+    // ==================== Theme ====================
+
+    fun onThemeModeChanged(mode: String) {
+        appPrefs.themeMode = mode
+        _uiState.update { it.copy(themeMode = mode) }
     }
 
     // ==================== 기존 설정 ====================
@@ -209,7 +258,7 @@ class SettingsViewModel @Inject constructor(
         _uiState.update { it.copy(snackbarMessage = null) }
     }
 
-    // ==================== CSV ====================
+    // ==================== CSV (Questions) ====================
 
     fun onCsvPathChanged(path: String) {
         _uiState.update { it.copy(csvPath = path) }
@@ -290,6 +339,84 @@ class SettingsViewModel @Inject constructor(
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
                 _uiState.update { it.copy(snackbarMessage = "가져오기 실패: ${e.message}") }
+            }
+        }
+    }
+
+    // ==================== Vocabulary CSV ====================
+
+    fun exportVocabCsv(uri: Uri) = viewModelScope.launch(Dispatchers.IO) {
+        try {
+            val words = vocabularyDao.getAllWordsSync()
+            context.contentResolver.openOutputStream(uri)?.use { out ->
+                val writer = out.bufferedWriter()
+                writer.write("wordId,word,meaning,memo,pronunciation,isMemorized,isFavorite,sourceQuestionId,createdAt\n")
+                words.forEach { w ->
+                    val row = listOf(
+                        w.wordId.toString(),
+                        w.word.csvEscape(),
+                        (w.meaning ?: "").csvEscape(),
+                        (w.memo ?: "").csvEscape(),
+                        (w.pronunciation ?: "").csvEscape(),
+                        if (w.isMemorized) "1" else "0",
+                        if (w.isFavorite) "1" else "0",
+                        (w.sourceQuestionId?.toString() ?: ""),
+                        (w.createdAt ?: "").csvEscape()
+                    ).joinToString(",")
+                    writer.write("$row\n")
+                }
+                writer.flush()
+            }
+            withContext(Dispatchers.Main) {
+                _uiState.update { it.copy(snackbarMessage = "단어장 CSV 내보내기 완료") }
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                _uiState.update { it.copy(snackbarMessage = "단어장 내보내기 실패: ${e.message}") }
+            }
+        }
+    }
+
+    fun importVocabCsv(uri: Uri) = viewModelScope.launch(Dispatchers.IO) {
+        try {
+            context.contentResolver.openInputStream(uri)?.use { ins ->
+                val lines = ins.bufferedReader().readLines()
+                if (lines.isEmpty()) return@use
+                val header = lines.first().split(",")
+                val idxWord = header.indexOf("word")
+                val idxMeaning = header.indexOf("meaning")
+                val idxMemo = header.indexOf("memo")
+                val idxPronunciation = header.indexOf("pronunciation")
+                val idxIsMemorized = header.indexOf("isMemorized")
+                val idxIsFavorite = header.indexOf("isFavorite")
+                val idxSourceQId = header.indexOf("sourceQuestionId")
+                val idxCreatedAt = header.indexOf("createdAt")
+
+                var imported = 0
+                lines.drop(1).forEach { line ->
+                    val cols = parseCsvLine(line)
+                    val word = cols.getOrNull(idxWord)?.ifBlank { null } ?: return@forEach
+                    val entity = VocabularyEntity(
+                        word = word,
+                        meaning = cols.getOrNull(idxMeaning)?.ifBlank { null },
+                        memo = cols.getOrNull(idxMemo)?.ifBlank { null },
+                        pronunciation = cols.getOrNull(idxPronunciation)?.ifBlank { null },
+                        isMemorized = cols.getOrNull(idxIsMemorized) == "1",
+                        isFavorite = cols.getOrNull(idxIsFavorite) == "1",
+                        sourceQuestionId = cols.getOrNull(idxSourceQId)?.toIntOrNull(),
+                        createdAt = cols.getOrNull(idxCreatedAt)?.ifBlank { null }
+                    )
+                    vocabularyDao.insertWord(entity)
+                    imported++
+                }
+
+                withContext(Dispatchers.Main) {
+                    _uiState.update { it.copy(snackbarMessage = "단어장 가져오기 완료 ($imported 단어)") }
+                }
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                _uiState.update { it.copy(snackbarMessage = "단어장 가져오기 실패: ${e.message}") }
             }
         }
     }

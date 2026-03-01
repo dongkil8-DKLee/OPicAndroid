@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
+import com.opic.android.data.prefs.AppPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.security.MessageDigest
@@ -21,7 +22,8 @@ import kotlin.coroutines.suspendCoroutine
  */
 @Singleton
 class TtsManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val appPrefs: AppPreferences
 ) {
     companion object {
         private const val TAG = "TtsManager"
@@ -39,12 +41,40 @@ class TtsManager @Inject constructor(
         tts = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts?.language = Locale.US
+                // 저장된 음성 적용
+                val savedVoice = appPrefs.selectedVoice
+                if (savedVoice.isNotBlank()) {
+                    setVoice(savedVoice)
+                }
                 isInitialized = true
                 Log.d(TAG, "TTS 초기화 완료")
             } else {
                 Log.e(TAG, "TTS 초기화 실패: status=$status")
             }
         }
+    }
+
+    /** TTS 음성 변경 */
+    fun setVoice(voiceName: String) {
+        val engine = tts ?: return
+        val voices = engine.voices ?: return
+        val voice = voices.find { it.name == voiceName }
+        if (voice != null) {
+            engine.voice = voice
+            Log.d(TAG, "TTS 음성 설정: $voiceName")
+        } else {
+            Log.w(TAG, "TTS 음성 찾기 실패: $voiceName")
+        }
+    }
+
+    /** 사용 가능한 영어 음성 목록 조회 */
+    fun getAvailableEnglishVoices(): List<String> {
+        val engine = tts ?: return emptyList()
+        val voices = engine.voices ?: return emptyList()
+        return voices
+            .filter { it.locale.language == "en" && !it.isNetworkConnectionRequired }
+            .map { it.name }
+            .sorted()
     }
 
     /**

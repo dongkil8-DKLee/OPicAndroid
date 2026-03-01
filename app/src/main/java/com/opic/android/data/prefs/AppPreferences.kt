@@ -31,4 +31,12 @@ class AppPreferences @Inject constructor(
     var targetGrade: String
         get() = prefs.getString("target_grade", "IM2") ?: "IM2"
         set(v) = prefs.edit().putString("target_grade", v).apply()
+
+    var selectedVoice: String
+        get() = prefs.getString("selected_voice", "") ?: ""
+        set(v) = prefs.edit().putString("selected_voice", v).apply()
+
+    var themeMode: String
+        get() = prefs.getString("theme_mode", "light") ?: "light"
+        set(v) = prefs.edit().putString("theme_mode", v).apply()
 }

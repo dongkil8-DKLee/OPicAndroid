@@ -1,6 +1,9 @@
 package com.opic.android.ui.report
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,16 +27,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.opic.android.ui.common.HomeButton
+import com.opic.android.R
 import com.opic.android.ui.theme.OPicColors
+import java.io.File
 
 // Grade colors (SpeechAnalysisPanel.kt 기준)
 private val GradeA = Color(0xFF2ECC71)
@@ -51,7 +60,7 @@ private fun gradeColor(grade: String): Color = when (grade) {
 
 @Composable
 fun ReportScreen(
-    onHome: () -> Unit,
+    onSessionClick: (Int) -> Unit = {},
     viewModel: ReportViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -62,48 +71,182 @@ fun ReportScreen(
                 CircularProgressIndicator(color = OPicColors.Primary)
             }
         } else {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Column(
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 헤더: 레벨 아바타 + Level N + 게이지
+                LevelHeaderSection(state)
+
+                // 단어장 요약 카드
+                VocabSummarySection(state)
+
+                // 섹션 1: Overall Stats
+                OverallStatsSection(state)
+
+                // 섹션 2: Weekly Activity
+                WeeklyActivitySection(state)
+
+                // 섹션 3: Grade Distribution
+                GradeDistributionSection(state)
+
+                // 섹션 4: Topic Weakness
+                TopicWeaknessSection(state)
+
+                // 섹션 5: Recent Tests (clickable)
+                RecentTestsSection(state, onSessionClick)
+            }
+        }
+    }
+}
+
+// ==================== 레벨 헤더 (StartScreen에서 이동) ====================
+
+@Composable
+private fun LevelHeaderSection(state: ReportUiState) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // 레벨 아바타
+        LevelAvatar(level = state.level, externalDir = state.levelImageDir)
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Level ${state.level}",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = OPicColors.TextOnLight
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // 게이지 바
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.6f)
+                .padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            LinearProgressIndicator(
+                progress = { state.gaugePercent / 100f },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(12.dp)
+                    .clip(RoundedCornerShape(6.dp)),
+                color = OPicColors.LevelGauge,
+                trackColor = OPicColors.Border,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${state.gaugePercent}%",
+                fontSize = 14.sp,
+                color = OPicColors.TextOnLight
+            )
+        }
+    }
+}
+
+/** 외부 폴더 우선 이미지 로드, 없으면 drawable fallback */
+@Composable
+private fun LevelAvatar(level: Int, externalDir: String) {
+    val externalBitmap = remember(level, externalDir) {
+        if (externalDir.isNotBlank()) {
+            val file = File(externalDir, "level_$level.png")
+            if (file.exists()) {
+                try {
+                    BitmapFactory.decodeFile(file.absolutePath)
+                } catch (_: Exception) { null }
+            } else null
+        } else null
+    }
+
+    if (externalBitmap != null) {
+        Image(
+            bitmap = externalBitmap.asImageBitmap(),
+            contentDescription = "Level $level Avatar",
+            modifier = Modifier.size(120.dp),
+            contentScale = ContentScale.Fit
+        )
+    } else {
+        Image(
+            painter = painterResource(id = levelDrawable(level)),
+            contentDescription = "Level $level Avatar",
+            modifier = Modifier.size(120.dp),
+            contentScale = ContentScale.Fit
+        )
+    }
+}
+
+/** level 번호(1~10) → R.drawable.level_N 매핑 */
+private fun levelDrawable(level: Int): Int {
+    return when (level) {
+        1 -> R.drawable.level_1
+        2 -> R.drawable.level_2
+        3 -> R.drawable.level_3
+        4 -> R.drawable.level_4
+        5 -> R.drawable.level_5
+        6 -> R.drawable.level_6
+        7 -> R.drawable.level_7
+        8 -> R.drawable.level_8
+        9 -> R.drawable.level_9
+        10 -> R.drawable.level_10
+        else -> R.drawable.level_1
+    }
+}
+
+// ==================== 단어장 요약 ====================
+
+@Composable
+private fun VocabSummarySection(state: ReportUiState) {
+    SectionCard(title = "단어장 현황") {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            StatItem("총 단어", "${state.vocabTotal}")
+            StatItem("암기완료", "${state.vocabMemorized}")
+            StatItem("미암기", "${state.vocabTotal - state.vocabMemorized}")
+            StatItem("즐겨찾기", "${state.vocabFavorites}")
+        }
+
+        if (state.vocabTotal > 0) {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("진행률:", fontSize = 12.sp, color = OPicColors.TextOnLight)
+                Spacer(Modifier.width(8.dp))
+                LinearProgressIndicator(
+                    progress = { state.vocabMemorized.toFloat() / state.vocabTotal },
                     modifier = Modifier
                         .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // 헤더
-                    Text(
-                        text = "학습 리포트",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = OPicColors.TextOnLight
-                    )
-
-                    // 섹션 1: Overall Stats
-                    OverallStatsSection(state)
-
-                    // 섹션 2: Weekly Activity
-                    WeeklyActivitySection(state)
-
-                    // 섹션 3: Grade Distribution
-                    GradeDistributionSection(state)
-
-                    // 섹션 4: Topic Weakness
-                    TopicWeaknessSection(state)
-
-                    // 섹션 5: Recent Tests
-                    RecentTestsSection(state)
-                }
-
-                // 하단 Home 버튼
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    HomeButton(onClick = onHome)
-                }
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    color = GradeA,
+                    trackColor = OPicColors.Border
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "${(state.vocabMemorized * 100f / state.vocabTotal).toInt()}%",
+                    fontSize = 12.sp,
+                    color = OPicColors.TextOnLight
+                )
             }
+        }
+
+        if (state.vocabRecentWeekAdded > 0) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "최근 7일 추가: ${state.vocabRecentWeekAdded}단어",
+                fontSize = 12.sp,
+                color = OPicColors.Primary
+            )
         }
     }
 }
@@ -282,10 +425,10 @@ private fun TopicWeaknessSection(state: ReportUiState) {
     }
 }
 
-// ==================== 섹션 5: Recent Tests ====================
+// ==================== 섹션 5: Recent Tests (clickable) ====================
 
 @Composable
-private fun RecentTestsSection(state: ReportUiState) {
+private fun RecentTestsSection(state: ReportUiState, onSessionClick: (Int) -> Unit) {
     SectionCard(title = "최근 테스트") {
         if (state.recentTests.isEmpty()) {
             Text(
@@ -298,7 +441,8 @@ private fun RecentTestsSection(state: ReportUiState) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 3.dp),
+                        .padding(vertical = 3.dp)
+                        .clickable { onSessionClick(session.sessionId) },
                     colors = CardDefaults.cardColors(containerColor = OPicColors.LightBg),
                     shape = RoundedCornerShape(6.dp)
                 ) {

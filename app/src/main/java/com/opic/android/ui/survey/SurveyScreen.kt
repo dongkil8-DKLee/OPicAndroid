@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.opic.android.ui.common.HomeButton
 import com.opic.android.ui.theme.OPicColors
 
 /**
@@ -41,6 +42,7 @@ import com.opic.android.ui.theme.OPicColors
 @Composable
 fun SurveyScreen(
     onBack: () -> Unit,
+    onHome: () -> Unit = {},
     onNext: () -> Unit,
     viewModel: SurveyViewModel = hiltViewModel()
 ) {
@@ -71,7 +73,7 @@ fun SurveyScreen(
                 }
             }
 
-            // --- 하단: Back / Next ---
+            // --- 하단: Back / Home / Next ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -90,6 +92,8 @@ fun SurveyScreen(
                 ) {
                     Text("< Back", fontWeight = FontWeight.Bold)
                 }
+
+                HomeButton(onClick = onHome)
 
                 Button(
                     onClick = {
