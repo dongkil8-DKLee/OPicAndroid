@@ -13,6 +13,7 @@ import com.opic.android.ui.survey.SurveyScreen
 import com.opic.android.ui.review.ReviewListScreen
 import com.opic.android.ui.review.ReviewScreen
 import com.opic.android.ui.practice.PracticeScreen
+import com.opic.android.ui.report.ReportScreen
 import com.opic.android.ui.study.StudyScreen
 import com.opic.android.ui.test.TestScreen
 
@@ -25,6 +26,7 @@ fun OPicNavGraph(navController: NavHostController) {
                 onStudy = { navController.navigate(Screen.Study.route) },
                 onNext = { navController.navigate(Screen.Survey.route) },
                 onReview = { navController.navigate(Screen.ReviewList.route) },
+                onReport = { navController.navigate(Screen.Report.route) },
                 onSettings = { navController.navigate(Screen.Settings.route) }
             )
         }
@@ -108,6 +110,14 @@ fun OPicNavGraph(navController: NavHostController) {
             PracticeScreen(
                 onBack = { navController.popBackStack() },
                 onSettings = { navController.navigate(Screen.Settings.route) }
+            )
+        }
+
+        composable(Screen.Report.route) {
+            ReportScreen(
+                onHome = {
+                    navController.popBackStack(Screen.Start.route, inclusive = false)
+                }
             )
         }
 

@@ -133,6 +133,9 @@ class StudyViewModel @Inject constructor(
     /** 전체 문제 요약 캐시 (필터 체인에서 반복 사용) */
     private var allSummaries: List<QuestionSummary> = emptyList()
 
+    /** questionId → 분석 등급 캐시 (복습 큐레이션용) */
+    private var analysisGrades: Map<Int, String> = emptyMap()
+
     private val recordingDir: File by lazy {
         File(context.getExternalFilesDir(null), "Recording").also { it.mkdirs() }
     }
@@ -153,6 +156,7 @@ class StudyViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 allSummaries = questionDao.getAllQuestionsWithProgress(USER_ID)
+                refreshAnalysisGrades()
                 val sets = allSummaries.mapNotNull { it.set }.distinct().sorted()
                 val types = allSummaries.mapNotNull { it.type }.distinct().sorted()
 
@@ -304,6 +308,22 @@ class StudyViewModel @Inject constructor(
             "전체" -> { /* no filter */ }
             "📌" -> filtered = filtered.filter { (it.isFavorite ?: 0) == 1 }
             "0" -> filtered = filtered.filter { (it.studyCount ?: 0) == 0 }
+            "저득점" -> {
+                val lowGradeIds = analysisGrades.filter { it.value == "D" || it.value == "F" }.keys
+                filtered = filtered.filter { it.questionId in lowGradeIds }
+            }
+            "최근오답" -> {
+                val lowGradeIds = analysisGrades.filter { it.value == "D" || it.value == "F" }.keys
+                val weekAgo = try { java.time.LocalDate.now().minusDays(7) } catch (_: Exception) { null }
+                filtered = filtered.filter { summary ->
+                    summary.questionId in lowGradeIds && weekAgo != null && run {
+                        val dateStr = summary.lastModified?.take(10) ?: return@run false
+                        try {
+                            !java.time.LocalDate.parse(dateStr).isBefore(weekAgo)
+                        } catch (_: Exception) { false }
+                    }
+                }
+            }
             else -> {
                 val count = state.selectedStudyFilter.toIntOrNull()
                 if (count != null) {
@@ -895,6 +915,7 @@ class StudyViewModel @Inject constructor(
                 ensureProgressExists(q.questionId)
                 val json = SpeechAnalyzer.toJson(result)
                 studyProgressDao.updateAnalysisResult(USER_ID, q.questionId, json)
+                refreshAnalysisGrades()
                 Log.d(TAG, "Analysis result saved: questionId=${q.questionId}")
             } catch (e: Exception) {
                 Log.e(TAG, "Analysis result save failed", e)
@@ -964,6 +985,17 @@ class StudyViewModel @Inject constructor(
                 )
             )
         }
+    }
+
+    /** 분석 등급 캐시 갱신 (복습 큐레이션 필터용) */
+    private suspend fun refreshAnalysisGrades() {
+        val allProgress = studyProgressDao.getAllProgressForUserSync(USER_ID)
+        analysisGrades = allProgress.mapNotNull { p ->
+            val qId = p.questionId ?: return@mapNotNull null
+            val grade = p.analysisResult?.let { SpeechAnalyzer.fromJson(it)?.grade }
+                ?: return@mapNotNull null
+            qId to grade
+        }.toMap()
     }
 
     /** 필터 체인 캐시 갱신 (study_count/is_favorite 변경 시) — 단건 갱신 */

@@ -395,7 +395,7 @@ private fun FilterSection(state: StudyUiState, viewModel: StudyViewModel) {
         CompactDropdown(
             label = "학습",
             selected = state.selectedStudyFilter,
-            options = listOf("전체", "\uD83D\uDCCC", "0", "1", "2", "3", "4", "5", "6", "7"),
+            options = listOf("전체", "\uD83D\uDCCC", "저득점", "최근오답", "0", "1", "2", "3", "4", "5", "6", "7"),
             onSelected = { viewModel.onStudyFilterChanged(it) },
             modifier = Modifier.width(90.dp)
         )

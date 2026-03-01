@@ -56,6 +56,7 @@ fun StartScreen(
     onStudy: () -> Unit,
     onNext: () -> Unit,
     onReview: () -> Unit,
+    onReport: () -> Unit = {},
     onSettings: () -> Unit = {},
     viewModel: StartViewModel = hiltViewModel()
 ) {
@@ -167,6 +168,20 @@ fun StartScreen(
                             .height(50.dp)
                     ) {
                         Text("Review", fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = onReport,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = OPicColors.Secondary,
+                            contentColor = OPicColors.TextOnLight
+                        ),
+                        shape = RoundedCornerShape(0.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp)
+                    ) {
+                        Text("Report", fontWeight = FontWeight.Bold)
                     }
                 }
             }
