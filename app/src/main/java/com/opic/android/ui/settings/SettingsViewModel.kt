@@ -2,6 +2,9 @@ package com.opic.android.ui.settings
 
 import android.content.Context
 import android.net.Uri
+import android.os.Environment
+import android.provider.DocumentsContract
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.opic.android.data.local.dao.QuestionDao
@@ -77,13 +80,42 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun onLevelImageDirChanged(dir: String) {
-        appPrefs.levelImageDir = dir
-        _uiState.update { it.copy(levelImageDir = dir) }
+        val realPath = convertTreeUriToFilePath(dir)
+        appPrefs.levelImageDir = realPath
+        _uiState.update { it.copy(levelImageDir = realPath) }
     }
 
     fun onSoundDirChanged(dir: String) {
-        appPrefs.soundDir = dir
-        _uiState.update { it.copy(soundDir = dir) }
+        val realPath = convertTreeUriToFilePath(dir)
+        appPrefs.soundDir = realPath
+        _uiState.update { it.copy(soundDir = realPath) }
+    }
+
+    /**
+     * SAF OpenDocumentTree URI(content://...) → 실제 파일 경로(/storage/emulated/0/...) 변환.
+     * primary 내부 저장소에서만 동작. SD카드 등 외부 저장소는 원본 URI 그대로 반환.
+     */
+    private fun convertTreeUriToFilePath(uriStr: String): String {
+        return try {
+            val uri = Uri.parse(uriStr)
+            if (DocumentsContract.isTreeUri(uri)) {
+                val docId = DocumentsContract.getTreeDocumentId(uri)
+                val parts = docId.split(":")
+                val type = parts.getOrElse(0) { "" }
+                val relativePath = parts.getOrElse(1) { "" }
+                if (type.equals("primary", ignoreCase = true)) {
+                    val base = Environment.getExternalStorageDirectory().absolutePath
+                    val result = if (relativePath.isNotEmpty()) "$base/$relativePath" else base
+                    Log.d("SettingsVM", "SAF URI 변환: $uriStr → $result")
+                    return result
+                }
+            }
+            Log.w("SettingsVM", "SAF URI 변환 불가 (primary 아님): $uriStr")
+            uriStr
+        } catch (e: Exception) {
+            Log.e("SettingsVM", "SAF URI 변환 오류: $uriStr", e)
+            uriStr
+        }
     }
 
     fun onTargetGradeChanged(grade: String) {

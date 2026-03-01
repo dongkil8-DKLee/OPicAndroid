@@ -59,7 +59,7 @@ data class PracticeUiState(
     val isCombinedRecording: Boolean = false,
     val playbackSpeed: Float = 1.0f,
     val hasOriginalAudio: Boolean = false,
-    val assetPath: String? = null
+    val assetPath: com.opic.android.audio.AudioSource? = null
 )
 
 @HiltViewModel
@@ -113,7 +113,7 @@ class PracticeViewModel @Inject constructor(
 
                 val assetPath = audioFileResolver.resolve(question.answerAudio)
                 val totalDurationMs = if (assetPath != null) {
-                    measureAssetDuration(assetPath)
+                    measureAudioDuration(assetPath)
                 } else {
                     // TTS fallback: 추정 시간 (단어 수 * 500ms)
                     val wordCount = answerScript.split("\\s+".toRegex()).size
@@ -144,20 +144,29 @@ class PracticeViewModel @Inject constructor(
         }
     }
 
-    /** 임시 MediaPlayer로 asset 오디오 duration 측정 */
-    private suspend fun measureAssetDuration(assetPath: String): Long = withContext(Dispatchers.IO) {
+    /** 임시 MediaPlayer로 오디오 duration 측정 (asset 또는 외부 파일 모두 지원) */
+    private suspend fun measureAudioDuration(source: com.opic.android.audio.AudioSource): Long = withContext(Dispatchers.IO) {
         var mp: MediaPlayer? = null
         try {
-            val afd = context.assets.openFd(assetPath)
-            mp = MediaPlayer().apply {
-                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                prepare()
+            mp = when (source) {
+                is com.opic.android.audio.AudioSource.AssetPath -> {
+                    val afd = context.assets.openFd(source.path)
+                    MediaPlayer().apply {
+                        setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                        afd.close()
+                        prepare()
+                    }
+                }
+                is com.opic.android.audio.AudioSource.FilePath -> {
+                    MediaPlayer().apply {
+                        setDataSource(source.path)
+                        prepare()
+                    }
+                }
             }
-            val durationMs = mp.duration.toLong()
-            afd.close()
-            durationMs
+            mp.duration.toLong()
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to measure duration: $assetPath", e)
+            Log.e(TAG, "Failed to measure duration: $source", e)
             10000L // fallback 10s
         } finally {
             try { mp?.release() } catch (_: Exception) {}
@@ -199,14 +208,16 @@ class PracticeViewModel @Inject constructor(
         // Mark sentence as IN_PROGRESS if NOT_STARTED
         markInProgressIfNeeded()
 
-        val assetPath = state.assetPath
-        if (assetPath != null) {
-            audioPlayer.playRangeFromAssets(assetPath, segment.startMs, segment.endMs) {
-                _uiState.update { it.copy(isPlayingOriginal = false) }
-            }
-        } else {
-            // TTS fallback
-            viewModelScope.launch {
+        when (val source = state.assetPath) {
+            is com.opic.android.audio.AudioSource.AssetPath ->
+                audioPlayer.playRangeFromAssets(source.path, segment.startMs, segment.endMs) {
+                    _uiState.update { it.copy(isPlayingOriginal = false) }
+                }
+            is com.opic.android.audio.AudioSource.FilePath ->
+                audioPlayer.playRangeFromFile(source.path, segment.startMs, segment.endMs) {
+                    _uiState.update { it.copy(isPlayingOriginal = false) }
+                }
+            null -> viewModelScope.launch {
                 val ttsPath = ttsManager.generateToFile(segment.text)
                 if (ttsPath != null) {
                     audioPlayer.playFromFile(ttsPath) {
@@ -450,6 +461,7 @@ class PracticeViewModel @Inject constructor(
         super.onCleared()
         audioPlayer.stop()
         audioRecorder.stop()
+        sttManager.stopListening()
         recordingJob?.cancel()
     }
 }

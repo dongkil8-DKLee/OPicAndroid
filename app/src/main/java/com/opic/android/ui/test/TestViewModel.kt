@@ -46,7 +46,9 @@ data class TestUiState(
     val micLevel: Float = 0f,
     val questions: List<QuestionGenerator.TestQuestion> = emptyList(),
     val answeredIndices: Set<Int> = emptySet(), // 녹음 완료된 문제 번호
-    val canStop: Boolean = false // 녹음 5초 후 Stop 가능
+    val canStop: Boolean = false, // 녹음 5초 후 Stop 가능
+    val sttListening: Boolean = false,
+    val audioPaths: Map<Int, String> = emptyMap() // questionId → 녹음 파일 경로
 )
 
 /**
@@ -144,21 +146,23 @@ class TestViewModel @Inject constructor(
         val q = state.questions[state.currentIndex]
 
         // 오디오 파일 검색 → TTS 폴백
-        val assetPath = audioFileResolver.resolve(q.questionAudio)
-        if (assetPath != null) {
-            audioPlayer.playFromAssets(assetPath) { onPlaybackFinished() }
-        } else if (!q.questionText.isNullOrBlank()) {
-            // TTS 폴백
-            viewModelScope.launch {
-                val ttsPath = ttsManager.generateToFile(q.questionText)
-                if (ttsPath != null) {
-                    audioPlayer.playFromFile(ttsPath) { onPlaybackFinished() }
-                } else {
-                    onPlaybackFinished()
+        when (val source = audioFileResolver.resolve(q.questionAudio)) {
+            is com.opic.android.audio.AudioSource.AssetPath ->
+                audioPlayer.playFromAssets(source.path) { onPlaybackFinished() }
+            is com.opic.android.audio.AudioSource.FilePath ->
+                audioPlayer.playFromFile(source.path) { onPlaybackFinished() }
+            null -> if (!q.questionText.isNullOrBlank()) {
+                viewModelScope.launch {
+                    val ttsPath = ttsManager.generateToFile(q.questionText)
+                    if (ttsPath != null) {
+                        audioPlayer.playFromFile(ttsPath) { onPlaybackFinished() }
+                    } else {
+                        onPlaybackFinished()
+                    }
                 }
+            } else {
+                onPlaybackFinished()
             }
-        } else {
-            onPlaybackFinished()
         }
     }
 
@@ -167,18 +171,16 @@ class TestViewModel @Inject constructor(
         // Beep → 150ms 대기 → 자동 녹음 시작
         viewModelScope.launch {
             try {
-                // beep.wav가 assets/Sound에 있으면 재생
-                val beepPath = audioFileResolver.resolve("beep")
-                if (beepPath != null) {
-                    audioPlayer.playFromAssets(beepPath) {
-                        viewModelScope.launch {
-                            delay(150)
-                            startRecording()
+                when (val beepSource = audioFileResolver.resolve("beep")) {
+                    is com.opic.android.audio.AudioSource.AssetPath ->
+                        audioPlayer.playFromAssets(beepSource.path) {
+                            viewModelScope.launch { delay(150); startRecording() }
                         }
-                    }
-                } else {
-                    delay(300)
-                    startRecording()
+                    is com.opic.android.audio.AudioSource.FilePath ->
+                        audioPlayer.playFromFile(beepSource.path) {
+                            viewModelScope.launch { delay(150); startRecording() }
+                        }
+                    null -> { delay(300); startRecording() }
                 }
             } catch (_: Exception) {
                 delay(300)
@@ -197,11 +199,14 @@ class TestViewModel @Inject constructor(
         val filename = "TestRec_${q.questionId}_$timestamp.wav"
         val outputFile = File(recordingDir, filename)
 
-        // user_audio_path 업데이트
-        _uiState.value.questions[state.currentIndex].userAudioPath = outputFile.absolutePath
-
         _uiState.update {
-            it.copy(phase = TestPhase.RECORDING, countdownSeconds = 120, micLevel = 0f, canStop = false)
+            it.copy(
+                phase = TestPhase.RECORDING,
+                countdownSeconds = 120,
+                micLevel = 0f,
+                canStop = false,
+                audioPaths = it.audioPaths + (q.questionId to outputFile.absolutePath)
+            )
         }
 
         // 5초 후 Stop 버튼 활성화
@@ -233,8 +238,10 @@ class TestViewModel @Inject constructor(
         // STT 동시 실행 (딜레이 후)
         viewModelScope.launch {
             delay(500)
+            _uiState.update { it.copy(sttListening = true) }
             sttManager.startListening(
                 onResult = { text ->
+                    _uiState.update { it.copy(sttListening = false) }
                     // DB에 STT 결과 바로 저장
                     viewModelScope.launch {
                         try {
@@ -246,6 +253,7 @@ class TestViewModel @Inject constructor(
                     }
                 },
                 onError = { error ->
+                    _uiState.update { it.copy(sttListening = false) }
                     // STT 실패해도 녹음은 계속
                     Log.w(TAG, "Test STT failed (recording continues): $error")
                 }
@@ -257,6 +265,7 @@ class TestViewModel @Inject constructor(
         if (_uiState.value.phase != TestPhase.RECORDING) return
         audioRecorder.stop()
         sttManager.stopListening()
+        _uiState.update { it.copy(sttListening = false) }
     }
 
     private fun onRecordingFinished(outputFile: File) {
@@ -342,7 +351,9 @@ class TestViewModel @Inject constructor(
         super.onCleared()
         audioPlayer.stop()
         audioRecorder.stop()
+        sttManager.stopListening()
         recordingJob?.cancel()
         countdownJob?.cancel()
+        _uiState.update { it.copy(sttListening = false) }
     }
 }

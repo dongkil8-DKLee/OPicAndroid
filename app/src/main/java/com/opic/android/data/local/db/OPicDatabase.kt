@@ -28,7 +28,7 @@ import com.opic.android.data.local.entity.UserEntity
         TestResultEntity::class,
         ApiKeyEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class OPicDatabase : RoomDatabase() {

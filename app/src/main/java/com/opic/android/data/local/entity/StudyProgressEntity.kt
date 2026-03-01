@@ -34,9 +34,9 @@ import androidx.room.PrimaryKey
     ]
 )
 data class StudyProgressEntity(
-    @PrimaryKey
+    @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "progress_id")
-    val progressId: Int,
+    val progressId: Int = 0,
 
     @ColumnInfo(name = "user_id")
     val userId: Int?,

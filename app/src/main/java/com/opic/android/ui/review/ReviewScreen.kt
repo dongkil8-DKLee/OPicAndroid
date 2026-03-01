@@ -117,16 +117,17 @@ private fun ReviewContent(
                 .padding(horizontal = 12.dp, vertical = 4.dp)
         )
 
-        // --- 중앙: 전체폭 스크립트 (스크롤) ---
+        // --- 중앙: 비율 고정, 내부 스크롤 ---
+        val hasAnalysis = !state.sttText.isNullOrBlank() || state.analysisResult != null
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 12.dp)
         ) {
-            // --- Answer Script ---
+            // --- Answer Script (내부 스크롤) ---
             ScriptSection(
+                modifier = Modifier.weight(if (hasAnalysis) 2f else 1f),
                 label = "Answer Script",
                 scriptText = currentResult.answerScript,
                 isPlaying = state.playingTarget == PlayTarget.ANSWER,
@@ -135,9 +136,9 @@ private fun ReviewContent(
                 onStop = { viewModel.stopAudio() }
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // --- User Audio (인라인) ---
+            // --- User Audio (인라인, 고정 높이) ---
             UserAudioRow(
                 isPlaying = state.playingTarget == PlayTarget.USER,
                 hasAudio = state.hasUserAudio,
@@ -146,10 +147,11 @@ private fun ReviewContent(
                 onStop = { viewModel.stopAudio() }
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // --- STT 분석 ---
-            AnalysisSection(state = state)
+            // --- STT 분석 (내부 스크롤, 조건부) ---
+            if (hasAnalysis) {
+                Spacer(modifier = Modifier.height(8.dp))
+                AnalysisSection(modifier = Modifier.weight(1f), state = state)
+            }
         }
 
         // --- 하단: Navigation ---
@@ -275,14 +277,16 @@ private fun ScriptSection(
     isPlaying: Boolean,
     canPlay: Boolean,
     onPlay: () -> Unit,
-    onStop: () -> Unit
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
+        // 헤더 고정
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -303,15 +307,21 @@ private fun ScriptSection(
             }
         }
 
-        // 스크립트 항상 표시
+        // 텍스트 내부 스크롤
         if (!scriptText.isNullOrBlank()) {
-            Text(
-                text = scriptText,
-                fontSize = 14.sp,
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-            )
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = scriptText,
+                    fontSize = 14.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                )
+            }
         } else {
             Text(
                 text = "스크립트 없음",
@@ -372,7 +382,7 @@ private fun QuestionTextCard(
 // ==================== 분석 섹션 (저장된 STT 결과 + 자동 분석) ====================
 
 @Composable
-private fun AnalysisSection(state: ReviewUiState) {
+private fun AnalysisSection(state: ReviewUiState, modifier: Modifier = Modifier) {
     val currentResult = state.results.getOrNull(state.currentIndex) ?: return
     val sttText = state.sttText
     val analysisResult = state.analysisResult
@@ -380,36 +390,44 @@ private fun AnalysisSection(state: ReviewUiState) {
     if (sttText.isNullOrBlank() && analysisResult == null) return
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
+        // 헤더 고정
         Text("STT Analysis", fontWeight = FontWeight.Bold, fontSize = 14.sp)
 
-        // STT Result
-        if (!sttText.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text("STT:", fontSize = 12.sp, color = Color.Gray)
-            Text(
-                text = sttText,
-                fontSize = 14.sp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, Color(0xFF3498DB), RoundedCornerShape(4.dp))
-                    .padding(8.dp)
-            )
-        }
+        // 내용 내부 스크롤
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+        ) {
+            // STT Result
+            if (!sttText.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("STT:", fontSize = 12.sp, color = Color.Gray)
+                Text(
+                    text = sttText,
+                    fontSize = 14.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Color(0xFF3498DB), RoundedCornerShape(4.dp))
+                        .padding(8.dp)
+                )
+            }
 
-        // Analysis result
-        if (analysisResult != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            SpeechAnalysisPanel(
-                result = analysisResult,
-                expectedText = currentResult.answerScript ?: "",
-                actualText = sttText ?: "",
-                fontSize = 14
-            )
+            // Analysis result
+            if (analysisResult != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                SpeechAnalysisPanel(
+                    result = analysisResult,
+                    expectedText = currentResult.answerScript ?: "",
+                    actualText = sttText ?: "",
+                    fontSize = 14
+                )
+            }
         }
     }
 }

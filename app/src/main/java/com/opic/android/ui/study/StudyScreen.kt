@@ -647,7 +647,25 @@ private fun UserScriptSection(
             Spacer(modifier = Modifier.height(4.dp))
         }
 
-        // 편집/STT 영역 (항상 내부 스크롤)
+        // 편집/STT 영역
+        if (isExpanded && state.editingUserScript) {
+            // 확대+편집: TextField가 남은 공간 전체를 채움
+            OutlinedTextField(
+                value = state.userScriptDraft,
+                onValueChange = { viewModel.updateUserScriptDraft(it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = state.fontSize.sp),
+                placeholder = {
+                    Text(
+                        "나만의 스크립트를 작성하세요.",
+                        fontSize = 13.sp,
+                        color = OPicColors.DisabledBg
+                    )
+                }
+            )
+        } else {
         Column(
             modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())
         ) {
@@ -744,7 +762,8 @@ private fun UserScriptSection(
                 }
             }
         }
-        } // 편집/STT 영역 Column
+        } // 편집/STT 영역 Column (else)
+        } // isExpanded+editing else
     }
 }
 

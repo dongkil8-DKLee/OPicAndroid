@@ -138,42 +138,25 @@ private fun PracticeContent(
         // ===== 타이틀 네비게이터 =====
         PracticeTitleRow(state, viewModel)
 
-        // ===== << 학습 종료 =====
+        // ===== < Back =====
         TextButton(
             onClick = onBack,
             modifier = Modifier.align(Alignment.Start)
         ) {
-            Text("<< 학습 종료", fontSize = 13.sp, color = OPicColors.Primary, fontWeight = FontWeight.Bold)
+            Text("< Back", fontSize = 13.sp, color = OPicColors.Primary, fontWeight = FontWeight.Bold)
         }
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // ===== 스크롤 영역 =====
+        // ===== 비율 고정 영역 (외부 스크롤 없음) =====
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState()),
+            modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // ===== Answer 섹션 =====
-            if (expandedSection == null || expandedSection == "answer") {
-                AnswerSection(
-                    answerScript = state.answerScript,
-                    selectedSentenceText = currentSentenceText,
-                    isPlayingTts = state.isPlayingOriginal,
-                    canPlay = !isBusy,
-                    isExpanded = expandedSection == "answer",
-                    onPlay = { viewModel.playOriginal() },
-                    onStop = { viewModel.stopOriginal() },
-                    onExpandToggle = {
-                        expandedSection = if (expandedSection == "answer") null else "answer"
-                    }
-                )
-            }
-
             // ===== 녹음/문장연습 섹션 =====
             if (expandedSection == null || expandedSection == "practice") {
                 PracticeSentenceSection(
+                    modifier = Modifier.weight(if (expandedSection == null) 2f else 1f),
                     state = state,
                     viewModel = viewModel,
                     isBusy = isBusy,
@@ -181,13 +164,15 @@ private fun PracticeContent(
                     showSentenceTable = !showFilter,
                     onExpandToggle = {
                         expandedSection = if (expandedSection == "practice") null else "practice"
-                    }
+                    },
+                    onAnalyze = { viewModel.analyzeCurrentSentence() }
                 )
             }
 
             // ===== Result 섹션 =====
             if (expandedSection == null || expandedSection == "result") {
                 ResultSection(
+                    modifier = Modifier.weight(1f),
                     sttText = currentSentenceState?.sttText,
                     analysisResult = currentSentenceState?.analysisResult,
                     expectedText = currentSentenceText,
@@ -416,18 +401,20 @@ private fun HighlightedAnswerText(fullText: String, highlightedSentence: String)
 
 @Composable
 private fun PracticeSentenceSection(
+    modifier: Modifier = Modifier,
     state: PracticeUiState,
     viewModel: PracticeViewModel,
     isBusy: Boolean,
     isExpanded: Boolean,
     showSentenceTable: Boolean = true,
-    onExpandToggle: () -> Unit
+    onExpandToggle: () -> Unit,
+    onAnalyze: () -> Unit = {}
 ) {
     val currentSentence = state.sentences.getOrNull(state.currentIndex)
     val hasUserRecording = currentSentence?.userRecordingPath != null
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
@@ -485,18 +472,12 @@ private fun PracticeSentenceSection(
                 }
             }
 
-            // Rec+STT 통합
-            if (!state.isCombinedRecording) {
-                TextButton(
-                    onClick = { viewModel.startRecordAndStt() },
-                    enabled = !isBusy
-                ) {
-                    Text("Rec+STT", fontSize = 11.sp, color = Color(0xFF8E44AD))
-                }
-            } else {
-                TextButton(onClick = { viewModel.stopRecordAndStt() }) {
-                    Text("Stop All", fontSize = 11.sp, color = OPicColors.RecordActive)
-                }
+            // Result 버튼
+            TextButton(
+                onClick = onAnalyze,
+                enabled = currentSentence?.sttText != null && !isBusy
+            ) {
+                Text("Result", fontSize = 11.sp, color = Color(0xFF2ECC71), fontWeight = FontWeight.Bold)
             }
 
             Spacer(modifier = Modifier.weight(1f))
@@ -530,11 +511,13 @@ private fun PracticeSentenceSection(
             Spacer(modifier = Modifier.height(4.dp))
         }
 
-        // 문장 테이블 (FilterList 토글 시 숨김)
+        // 문장 테이블 (FilterList 토글 시 숨김, 내부 스크롤)
         if (showSentenceTable) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
                     .border(1.dp, OPicColors.Border, RoundedCornerShape(4.dp))
             ) {
                 state.sentences.forEachIndexed { index, sentenceState ->
@@ -616,6 +599,7 @@ private fun SentenceTableRow(
 
 @Composable
 private fun ResultSection(
+    modifier: Modifier = Modifier,
     sttText: String?,
     analysisResult: com.opic.android.util.AnalysisResult?,
     expectedText: String,
@@ -624,12 +608,12 @@ private fun ResultSection(
     onAnalyze: () -> Unit
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
-        // 헤더
+        // 헤더 고정
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -647,24 +631,53 @@ private fun ResultSection(
             }
         }
 
-        if (analysisResult != null) {
-            // 정확도 % 크게 표시
-            Text(
-                text = "정확도: ${analysisResult.accuracyPercent.toInt()}%",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = when {
-                    analysisResult.accuracyPercent >= 80 -> Color(0xFF2ECC71)
-                    analysisResult.accuracyPercent >= 50 -> OPicColors.TimerOrange
-                    else -> OPicColors.TimerRed
+        // 내용 내부 스크롤
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+        ) {
+            if (analysisResult != null) {
+                // 정확도 % 크게 표시
+                Text(
+                    text = "정확도: ${analysisResult.accuracyPercent.toInt()}%",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = when {
+                        analysisResult.accuracyPercent >= 80 -> Color(0xFF2ECC71)
+                        analysisResult.accuracyPercent >= 50 -> OPicColors.TimerOrange
+                        else -> OPicColors.TimerRed
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // STT 텍스트
+                if (!sttText.isNullOrBlank()) {
+                    Text("내 발화:", fontSize = 12.sp, color = Color.Gray)
+                    Text(
+                        text = sttText,
+                        fontSize = 13.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, Color(0xFF3498DB), RoundedCornerShape(4.dp))
+                            .padding(6.dp)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Diff 표시
+                    if (expectedText.isNotBlank()) {
+                        Text("단어 비교:", fontSize = 12.sp, color = Color.Gray)
+                        DiffText(
+                            expected = expectedText,
+                            actual = sttText,
+                            fontSize = 13
+                        )
+                    }
                 }
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // STT 텍스트
-            if (!sttText.isNullOrBlank()) {
-                Text("내 발화:", fontSize = 12.sp, color = Color.Gray)
+            } else if (!sttText.isNullOrBlank()) {
+                // STT 결과는 있지만 분석 전
+                Text("STT 결과:", fontSize = 12.sp, color = Color.Gray)
                 Text(
                     text = sttText,
                     fontSize = 13.sp,
@@ -673,43 +686,21 @@ private fun ResultSection(
                         .border(1.dp, Color(0xFF3498DB), RoundedCornerShape(4.dp))
                         .padding(6.dp)
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("분석 버튼을 눌러 정확도를 확인하세요.", fontSize = 12.sp, color = Color.Gray)
 
-                // Diff 표시
-                if (expectedText.isNotBlank()) {
-                    Text("단어 비교:", fontSize = 12.sp, color = Color.Gray)
-                    DiffText(
-                        expected = expectedText,
-                        actual = sttText,
-                        fontSize = 13
-                    )
+                // Analyze 버튼
+                TextButton(onClick = onAnalyze) {
+                    Text("분석하기", fontSize = 12.sp, color = Color(0xFF2ECC71), fontWeight = FontWeight.Bold)
                 }
+            } else {
+                Text(
+                    text = "STT 녹음 후 Result 버튼으로 정확도를 확인하세요.",
+                    color = OPicColors.DisabledBg,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
             }
-        } else if (!sttText.isNullOrBlank()) {
-            // STT 결과는 있지만 분석 전
-            Text("STT 결과:", fontSize = 12.sp, color = Color.Gray)
-            Text(
-                text = sttText,
-                fontSize = 13.sp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, Color(0xFF3498DB), RoundedCornerShape(4.dp))
-                    .padding(6.dp)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text("분석 버튼을 눌러 정확도를 확인하세요.", fontSize = 12.sp, color = Color.Gray)
-
-            // Analyze 버튼
-            TextButton(onClick = onAnalyze) {
-                Text("분석하기", fontSize = 12.sp, color = Color(0xFF2ECC71), fontWeight = FontWeight.Bold)
-            }
-        } else {
-            Text(
-                text = "Rec+STT 버튼으로 녹음하고 발화 결과를 확인하세요.",
-                color = OPicColors.DisabledBg,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
         }
     }
 }

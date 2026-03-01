@@ -179,10 +179,17 @@ class ReviewViewModel @Inject constructor(
     }
 
     private fun playAudioOrTts(audioLink: String?, text: String?) {
-        val assetPath = if (audioLink != null) audioFileResolver.resolve(audioLink) else null
-        if (assetPath != null) {
-            audioPlayer.playFromAssets(assetPath) { onPlaybackFinished() }
-            return
+        val audioSource = if (audioLink != null) audioFileResolver.resolve(audioLink) else null
+        when (audioSource) {
+            is com.opic.android.audio.AudioSource.AssetPath -> {
+                audioPlayer.playFromAssets(audioSource.path) { onPlaybackFinished() }
+                return
+            }
+            is com.opic.android.audio.AudioSource.FilePath -> {
+                audioPlayer.playFromFile(audioSource.path) { onPlaybackFinished() }
+                return
+            }
+            null -> { /* TTS 폴백으로 진행 */ }
         }
 
         if (!text.isNullOrBlank()) {

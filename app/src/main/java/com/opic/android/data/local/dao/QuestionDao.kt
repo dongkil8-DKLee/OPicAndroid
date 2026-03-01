@@ -138,6 +138,18 @@ interface QuestionDao {
     """)
     suspend fun getAllQuestionsWithProgress(userId: Int): List<QuestionSummary>
 
+    /** 단건 QuestionSummary 조회 (refreshSummaryCache 부분 갱신용) */
+    @Query("""
+        SELECT q.question_id, q.title, q."set" AS q_set, q.type AS q_type,
+               IFNULL(usp.study_count, 0) AS study_count,
+               IFNULL(usp.is_favorite, 0) AS is_favorite,
+               usp.last_modified
+        FROM Questions q
+        LEFT JOIN User_Study_Progress usp ON q.question_id = usp.question_id AND usp.user_id = :userId
+        WHERE q.question_id = :questionId LIMIT 1
+    """)
+    suspend fun getQuestionSummaryById(userId: Int, questionId: Int): QuestionSummary?
+
     /** 타이틀로 문제 상세 + 학습 진도 로드 */
     @Query("""
         SELECT q.question_id, q.title, q."set" AS q_set, q.type AS q_type, q.combo,

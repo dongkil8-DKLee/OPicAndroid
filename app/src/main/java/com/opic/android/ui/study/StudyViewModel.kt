@@ -431,10 +431,17 @@ class StudyViewModel @Inject constructor(
 
     private fun playAudioOrTts(audioLink: String?, text: String?, onFinish: (() -> Unit)? = null) {
         val finishCallback = onFinish ?: { onPlaybackFinished() }
-        val assetPath = if (audioLink != null) audioFileResolver.resolve(audioLink) else null
-        if (assetPath != null) {
-            audioPlayer.playFromAssets(assetPath) { finishCallback() }
-            return
+        val audioSource = if (audioLink != null) audioFileResolver.resolve(audioLink) else null
+        when (audioSource) {
+            is com.opic.android.audio.AudioSource.AssetPath -> {
+                audioPlayer.playFromAssets(audioSource.path) { finishCallback() }
+                return
+            }
+            is com.opic.android.audio.AudioSource.FilePath -> {
+                audioPlayer.playFromFile(audioSource.path) { finishCallback() }
+                return
+            }
+            null -> { /* TTS 폴백으로 진행 */ }
         }
 
         if (!text.isNullOrBlank()) {
@@ -959,15 +966,19 @@ class StudyViewModel @Inject constructor(
         }
     }
 
-    /** 필터 체인 캐시 갱신 (study_count/is_favorite 변경 시) */
+    /** 필터 체인 캐시 갱신 (study_count/is_favorite 변경 시) — 단건 갱신 */
     private suspend fun refreshSummaryCache(questionId: Int) {
-        allSummaries = questionDao.getAllQuestionsWithProgress(USER_ID)
+        val updated = questionDao.getQuestionSummaryById(USER_ID, questionId)
+        if (updated != null) {
+            allSummaries = allSummaries.map { if (it.questionId == questionId) updated else it }
+        }
     }
 
     override fun onCleared() {
         super.onCleared()
         audioPlayer.stop()
         audioRecorder.stop()
+        sttManager.stopListening()
         recordingJob?.cancel()
         groupPlayJob?.cancel()
         positionPollingJob?.cancel()
