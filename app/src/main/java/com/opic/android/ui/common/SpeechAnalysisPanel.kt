@@ -20,12 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,7 +54,6 @@ fun SpeechAnalysisPanel(
     actualText: String,
     fontSize: Int = 16
 ) {
-    var showDiff by remember { mutableStateOf(false) }
     val animatedAccuracy by animateFloatAsState(
         targetValue = result.accuracyPercent / 100f,
         animationSpec = tween(durationMillis = 800),
@@ -160,16 +155,8 @@ fun SpeechAnalysisPanel(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Diff toggle
-        TextButton(onClick = { showDiff = !showDiff }) {
-            Text(
-                if (showDiff) "Hide Diff" else "Show Diff",
-                fontSize = 12.sp,
-                color = Color(0xFF3498DB)
-            )
-        }
-
-        if (showDiff && expectedText.isNotBlank() && actualText.isNotBlank()) {
+        // Diff (항상 표시)
+        if (expectedText.isNotBlank() && actualText.isNotBlank()) {
             DiffText(
                 expected = expectedText,
                 actual = actualText,

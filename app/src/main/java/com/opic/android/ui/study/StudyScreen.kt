@@ -165,14 +165,9 @@ private fun StudyContent(
         }
 
         // ===== 스크립트 영역 (비율 고정, 내부 스크롤) =====
-        AnimatedVisibility(
-            visible = expandedScript == null || expandedScript == "question",
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut(),
-            modifier = if (expandedScript == null) Modifier.weight(2f) else Modifier.weight(1f)
-        ) {
+        if (expandedScript == null || expandedScript == "question") {
             ScriptSection(
-                modifier = Modifier,
+                modifier = Modifier.weight(if (expandedScript == null) 2f else 1f),
                 label = "Question",
                 scriptText = state.currentQuestion?.questionText,
                 highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.QUESTION) state.highlightedWordIndex else -1,
@@ -196,14 +191,9 @@ private fun StudyContent(
 
         if (expandedScript == null) Spacer(modifier = Modifier.height(4.dp))
 
-        AnimatedVisibility(
-            visible = expandedScript == null || expandedScript == "answer",
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut(),
-            modifier = if (expandedScript == null) Modifier.weight(2.5f) else Modifier.weight(1f)
-        ) {
+        if (expandedScript == null || expandedScript == "answer") {
             ScriptSection(
-                modifier = Modifier,
+                modifier = Modifier.weight(if (expandedScript == null) 2.5f else 1f),
                 label = "Answer",
                 scriptText = state.currentQuestion?.answerScript,
                 highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.ANSWER) state.highlightedWordIndex else -1,

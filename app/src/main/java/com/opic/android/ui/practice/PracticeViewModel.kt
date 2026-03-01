@@ -64,10 +64,7 @@ data class PracticeUiState(
     val hasOriginalAudio: Boolean = false,
     val assetPath: com.opic.android.audio.AudioSource? = null,
 
-    // UserScript 관련 상태 (Study에서 이동)
-    val editingUserScript: Boolean = false,
-    val userScriptDraft: String = "",
-    val userScriptText: String? = null,
+    // 발화 연습 관련 상태
     val hasUserAudio: Boolean = false,
     val userAudioPath: String? = null,
     val isRecordingUserScript: Boolean = false,
@@ -158,7 +155,6 @@ class PracticeViewModel @Inject constructor(
                         currentSegment = sentenceStates.firstOrNull()?.segment,
                         hasOriginalAudio = assetPath != null,
                         assetPath = assetPath,
-                        userScriptText = question.userScript,
                         hasUserAudio = userAudio != null,
                         userAudioPath = userAudio
                     )
@@ -213,11 +209,14 @@ class PracticeViewModel @Inject constructor(
         val sentences = _uiState.value.sentences
         if (index < 0 || index >= sentences.size) return
         stopAll()
+        stopUserScriptAll()
         _uiState.update {
             it.copy(
                 currentIndex = index,
                 currentSentenceText = sentences[index].segment.text,
-                currentSegment = sentences[index].segment
+                currentSegment = sentences[index].segment,
+                userScriptSttText = null,
+                userScriptAnalysisResult = null
             )
         }
     }
@@ -541,49 +540,30 @@ class PracticeViewModel @Inject constructor(
         sttManager.stopListening()
     }
 
+    /** 선택된 문장 기준으로 STT 결과 분석 → 문장 테이블 % 반영 */
     fun analyzeUserScript() {
         val state = _uiState.value
         val sttText = state.userScriptSttText ?: return
-        val answerScript = state.answerScript
-        if (sttText.isBlank() || answerScript.isBlank()) return
+        val idx = state.currentIndex
+        val sentence = state.sentences.getOrNull(idx) ?: return
+        val expectedText = sentence.segment.text
+        if (sttText.isBlank() || expectedText.isBlank()) return
 
-        val result = SpeechAnalyzer.analyze(answerScript, sttText)
-        _uiState.update { it.copy(userScriptAnalysisResult = result) }
-        Log.d(TAG, "UserScript analysis: ${result.grade} (${result.accuracyPercent}%)")
-    }
-
-    fun toggleEditUserScript() {
-        val state = _uiState.value
-        if (state.editingUserScript) {
-            _uiState.update { it.copy(editingUserScript = false, userScriptDraft = "") }
-        } else {
-            _uiState.update {
-                it.copy(editingUserScript = true, userScriptDraft = state.userScriptText ?: "")
-            }
-        }
-    }
-
-    fun cancelEditUserScript() {
-        _uiState.update { it.copy(editingUserScript = false, userScriptDraft = "") }
-    }
-
-    fun updateUserScriptDraft(text: String) {
-        _uiState.update { it.copy(userScriptDraft = text) }
-    }
-
-    fun saveUserScript() {
-        val state = _uiState.value
-        val draft = state.userScriptDraft
-        viewModelScope.launch {
-            questionDao.updateUserScript(state.questionId, draft)
-            _uiState.update {
-                it.copy(
-                    userScriptText = draft,
-                    editingUserScript = false,
-                    userScriptDraft = ""
+        val result = SpeechAnalyzer.analyze(expectedText, sttText)
+        _uiState.update { s ->
+            val updated = s.sentences.toMutableList()
+            if (idx < updated.size) {
+                updated[idx] = updated[idx].copy(
+                    analysisResult = result,
+                    status = SentenceStatus.COMPLETED
                 )
             }
+            s.copy(
+                userScriptAnalysisResult = result,
+                sentences = updated
+            )
         }
+        Log.d(TAG, "UserScript analysis for sentence $idx: ${result.grade} (${result.accuracyPercent}%)")
     }
 
     // ==================== 누락 단어 → 단어장 추가 ====================
@@ -650,6 +630,20 @@ class PracticeViewModel @Inject constructor(
                 isRecording = false,
                 micLevel = 0f,
                 sttListening = false
+            )
+        }
+    }
+
+    private fun stopUserScriptAll() {
+        if (_uiState.value.isRecordingUserScript) audioRecorder.stop()
+        if (_uiState.value.isPlayingUserAudio) audioPlayer.stop()
+        if (_uiState.value.userScriptSttListening) sttManager.stopListening()
+        _uiState.update {
+            it.copy(
+                isRecordingUserScript = false,
+                userScriptMicLevel = 0f,
+                isPlayingUserAudio = false,
+                userScriptSttListening = false
             )
         }
     }
