@@ -2,6 +2,7 @@ package com.opic.android.di
 
 import android.content.Context
 import androidx.room.Room
+import com.opic.android.data.local.db.MIGRATION_1_2
 import com.opic.android.data.local.db.OPicDatabase
 import dagger.Module
 import dagger.Provides
@@ -19,7 +20,7 @@ object AppModule {
     fun provideOPicDatabase(@ApplicationContext context: Context): OPicDatabase {
         return Room.databaseBuilder(context, OPicDatabase::class.java, "opic.db")
             .createFromAsset("opic.db")
-            .fallbackToDestructiveMigration()
+            .addMigrations(MIGRATION_1_2)
             .build()
     }
 
