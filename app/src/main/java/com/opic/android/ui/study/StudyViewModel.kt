@@ -91,6 +91,9 @@ data class StudyUiState(
     // 설정
     val fontSize: Int = 18,
 
+    // 등급 필터 (Report 등급 분포에서 진입 시)
+    val gradeFilter: String? = null,
+
     // 속도/자막/집중모드
     val playbackSpeed: Float = 1.0f,
     val highlightedWordIndex: Int = -1,   // -1 = 하이라이트 없음
@@ -258,6 +261,14 @@ class StudyViewModel @Inject constructor(
         }
     }
 
+    fun setGradeFilter(grade: String?) {
+        _uiState.update { it.copy(gradeFilter = grade) }
+        viewModelScope.launch {
+            updateTitleList()
+            selectFirstTitle()
+        }
+    }
+
     fun onStudyFilterChanged(filter: String) {
         _uiState.update { it.copy(selectedStudyFilter = filter) }
         prefs.studyFilter = filter
@@ -303,6 +314,13 @@ class StudyViewModel @Inject constructor(
         if (state.selectedType != "전체") {
             filtered = filtered.filter { it.type == state.selectedType }
         }
+        // 등급 필터 (Report에서 진입 시)
+        val gradeFilter = state.gradeFilter
+        if (gradeFilter != null) {
+            val matchingIds = analysisGrades.filter { it.value == gradeFilter }.keys
+            filtered = filtered.filter { it.questionId in matchingIds }
+        }
+
         // study 필터
         when (state.selectedStudyFilter) {
             "전체" -> { /* no filter */ }

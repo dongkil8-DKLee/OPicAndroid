@@ -1,23 +1,15 @@
 package com.opic.android.ui.navigation
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,182 +21,125 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.opic.android.ui.theme.OPicColors
 
-private val BarBackground = Color(0xFFCCFFFF)
-private val ActiveTabColor = Color(0xFF0033FF)
-private val DefaultTabColor = Color.Black
-private val ArrowEnabledColor = Color.Black
-private val ArrowDisabledColor = Color.Gray
+/** 활성 주황색 */
+private val EnabledBg = OPicColors.Primary          // 0xFFFF5733
+/** 비활성 연한 주황색 */
+private val DisabledBg = Color(0xFFFFAB91)
+private val ButtonText = Color.White
 
-/** Survey / SelfAssessment / Test 라우트에서는 하단 탭바 대신 Back/Home/Next 표시 */
-private val hiddenRoutes = setOf(
-    Screen.Survey.route,
-    Screen.SelfAssessment.route,
-    Screen.Test.route
-)
-
-private fun isHiddenRoute(route: String?): Boolean {
-    if (route == null) return false
-    return hiddenRoutes.any { pattern ->
-        route == pattern || route.startsWith(pattern.substringBefore("{"))
-    }
-}
-
+/**
+ * 모든 화면 공통 하단바: < Back | Study | Home | Test | Next >
+ * - < Back, Next > 는 항상 좌/우 고정
+ * - 주황색 배경 + 흰색 글씨, 비활성화 시 연한 주황색
+ */
 @Composable
 fun OPicBottomBar(navController: NavHostController) {
-    // visibleEntries: 전환 애니메이션 중 보이는 모든 화면 포함
-    val visibleEntries by navController.visibleEntries.collectAsState()
-    val hasHiddenVisible = visibleEntries.any { isHiddenRoute(it.destination.route) }
-
+    val bottomNavState = LocalBottomNavState.current
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val isHidden = hasHiddenVisible || isHiddenRoute(currentRoute)
 
-    if (isHidden) {
-        // ===== 테스트 플로우: < Back | Home | Next > =====
-        TestFlowBottomBar()
-    } else {
-        // ===== 일반: ← Report Study Test → =====
-        TabBottomBar(navController, currentRoute)
-    }
-}
+    val isOnHome = currentRoute == Screen.Report.route
 
-// ==================== 테스트 플로우 하단바 ====================
+    // < Back 활성 여부: 커스텀 backAction이 있거나, Home이 아닌 화면에서 뒤로 갈 수 있을 때
+    val canGoBack = bottomNavState.backAction != null ||
+            (!isOnHome && navController.previousBackStackEntry != null)
 
-@Composable
-private fun TestFlowBottomBar() {
-    val bottomNavState = LocalBottomNavState.current
+    // Next > 활성 여부
+    val canGoNext = bottomNavState.nextAction != null && bottomNavState.nextEnabled
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(48.dp)
-            .background(BarBackground),
+            .height(48.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceEvenly
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        // < Back
-        Button(
-            onClick = { bottomNavState.backAction?.invoke() },
-            enabled = bottomNavState.backAction != null,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = OPicColors.Primary,
-                contentColor = OPicColors.PrimaryText
-            ),
-            shape = RoundedCornerShape(8.dp),
-            modifier = Modifier.height(40.dp)
-        ) {
-            Text("< Back", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-        }
-
-        // Home (homeAction이 있을 때만 표시)
-        if (bottomNavState.homeAction != null) {
-            Button(
-                onClick = { bottomNavState.homeAction?.invoke() },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = OPicColors.Secondary,
-                    contentColor = OPicColors.TextOnLight
-                ),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.height(40.dp)
-            ) {
-                Icon(Icons.Filled.Home, contentDescription = null, Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Home", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            }
-        }
-
-        // Next >
-        Button(
-            onClick = { bottomNavState.nextAction?.invoke() },
-            enabled = bottomNavState.nextAction != null && bottomNavState.nextEnabled,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = OPicColors.Primary,
-                contentColor = OPicColors.PrimaryText
-            ),
-            shape = RoundedCornerShape(8.dp),
-            modifier = Modifier.height(40.dp)
-        ) {
-            Text("Next >", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-        }
-    }
-}
-
-// ==================== 일반 탭 하단바 ====================
-
-@Composable
-private fun TabBottomBar(navController: NavHostController, currentRoute: String?) {
-    val bottomNavState = LocalBottomNavState.current
-
-    data class TabItem(val label: String, val route: String, val matchPrefix: String = route)
-
-    val tabs = listOf(
-        TabItem("Report", Screen.Report.route),
-        TabItem("Study", Screen.Study.createRoute(), matchPrefix = "StudyScreen"),
-        TabItem("Test", Screen.Survey.route)
-    )
-
-    // ← 가능 여부: Report(시작화면)이 아니면 뒤로 갈 수 있음
-    val canGoBack = currentRoute != null && currentRoute != Screen.Report.route
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .background(BarBackground),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        // ← 버튼
-        TextButton(
-            onClick = { navController.popBackStack() },
+        // ===== < Back (좌측 고정) =====
+        BarButton(
+            text = "< Back",
             enabled = canGoBack,
-            modifier = Modifier.weight(0.8f)
-        ) {
-            Text(
-                text = "←",
-                fontSize = 16.sp,
-                fontWeight = if (canGoBack) FontWeight.Bold else FontWeight.Normal,
-                color = if (canGoBack) ArrowEnabledColor else ArrowDisabledColor
-            )
-        }
+            onClick = {
+                bottomNavState.backAction?.invoke()
+                    ?: navController.popBackStack()
+            },
+            modifier = Modifier.weight(1f)
+        )
 
-        // 탭 버튼들
-        tabs.forEach { tab ->
-            val isActive = currentRoute == tab.route ||
-                    (currentRoute != null && currentRoute.startsWith(tab.matchPrefix))
-            TextButton(
-                onClick = {
-                    if (!isActive) {
-                        navController.navigate(tab.route) {
-                            popUpTo(Screen.Report.route) { inclusive = false }
-                            launchSingleTop = true
-                        }
-                    }
-                },
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = tab.label,
-                    fontSize = 11.sp,
-                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                    color = if (isActive) ActiveTabColor else DefaultTabColor
-                )
-            }
-        }
+        // ===== Study =====
+        BarButton(
+            text = "Study",
+            enabled = true,
+            onClick = {
+                navController.navigate(Screen.Study.createRoute()) {
+                    popUpTo(Screen.Report.route) { inclusive = false }
+                    launchSingleTop = true
+                }
+            },
+            modifier = Modifier.weight(1f)
+        )
 
-        // → 버튼
-        val hasForward = bottomNavState.forwardAction != null
-        TextButton(
-            onClick = { bottomNavState.forwardAction?.invoke() },
-            enabled = hasForward,
-            modifier = Modifier.weight(0.8f)
-        ) {
-            Text(
-                text = "→",
-                fontSize = 16.sp,
-                fontWeight = if (hasForward) FontWeight.Bold else FontWeight.Normal,
-                color = if (hasForward) ArrowEnabledColor else ArrowDisabledColor
-            )
-        }
+        // ===== Home =====
+        BarButton(
+            text = "Home",
+            enabled = true,
+            onClick = {
+                if (bottomNavState.homeAction != null) {
+                    bottomNavState.homeAction?.invoke()
+                } else {
+                    navController.popBackStack(Screen.Report.route, inclusive = false)
+                }
+            },
+            modifier = Modifier.weight(1f)
+        )
+
+        // ===== Test =====
+        BarButton(
+            text = "Test",
+            enabled = true,
+            onClick = {
+                navController.navigate(Screen.Survey.route) {
+                    popUpTo(Screen.Report.route) { inclusive = false }
+                    launchSingleTop = true
+                }
+            },
+            modifier = Modifier.weight(1f)
+        )
+
+        // ===== Next > (우측 고정) =====
+        BarButton(
+            text = "Next >",
+            enabled = canGoNext,
+            onClick = { bottomNavState.nextAction?.invoke() },
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun BarButton(
+    text: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = EnabledBg,
+            contentColor = ButtonText,
+            disabledContainerColor = DisabledBg,
+            disabledContentColor = ButtonText.copy(alpha = 0.7f)
+        ),
+        shape = RoundedCornerShape(6.dp),
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+        modifier = modifier.height(40.dp)
+    ) {
+        Text(
+            text = text,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            maxLines = 1
+        )
     }
 }

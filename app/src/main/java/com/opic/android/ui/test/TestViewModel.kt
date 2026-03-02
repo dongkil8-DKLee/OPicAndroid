@@ -13,6 +13,8 @@ import com.opic.android.audio.TtsManager
 import com.opic.android.data.local.dao.TestDao
 import com.opic.android.data.local.entity.TestResultEntity
 import com.opic.android.data.local.entity.TestSessionEntity
+import com.opic.android.data.prefs.AppPreferences
+import com.opic.android.domain.LevelCalculator
 import com.opic.android.domain.QuestionGenerator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -48,7 +50,9 @@ data class TestUiState(
     val answeredIndices: Set<Int> = emptySet(), // 녹음 완료된 문제 번호
     val canStop: Boolean = false, // 녹음 5초 후 Stop 가능
     val sttListening: Boolean = false,
-    val audioPaths: Map<Int, String> = emptyMap() // questionId → 녹음 파일 경로
+    val audioPaths: Map<Int, String> = emptyMap(), // questionId → 녹음 파일 경로
+    val level: Int = 1,
+    val levelImageDir: String = ""
 )
 
 /**
@@ -66,7 +70,9 @@ class TestViewModel @Inject constructor(
     private val audioRecorder: AudioRecorder,
     private val audioFileResolver: AudioFileResolver,
     private val ttsManager: TtsManager,
-    private val sttManager: SttManager
+    private val sttManager: SttManager,
+    private val levelCalculator: LevelCalculator,
+    private val appPrefs: AppPreferences
 ) : ViewModel() {
 
     companion object {
@@ -89,6 +95,18 @@ class TestViewModel @Inject constructor(
 
     init {
         generateTest()
+        loadLevelInfo()
+    }
+
+    private fun loadLevelInfo() {
+        viewModelScope.launch {
+            try {
+                val info = levelCalculator.calculate()
+                _uiState.update {
+                    it.copy(level = info.level, levelImageDir = appPrefs.levelImageDir)
+                }
+            } catch (_: Exception) { /* fallback to default level 1 */ }
+        }
     }
 
     // ==================== 문제 생성 + 세션 저장 ====================

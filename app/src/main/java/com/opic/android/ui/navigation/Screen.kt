@@ -17,9 +17,13 @@ sealed class Screen(val route: String) {
     data object Review : Screen("ReviewScreen/{sessionId}") {
         fun createRoute(sessionId: Int) = "ReviewScreen/$sessionId"
     }
-    data object Study : Screen("StudyScreen?type={type}") {
-        fun createRoute(type: String? = null): String =
-            if (type != null) "StudyScreen?type=$type" else "StudyScreen"
+    data object Study : Screen("StudyScreen?type={type}&grade={grade}") {
+        fun createRoute(type: String? = null, grade: String? = null): String {
+            val params = mutableListOf<String>()
+            if (type != null) params.add("type=$type")
+            if (grade != null) params.add("grade=$grade")
+            return if (params.isEmpty()) "StudyScreen" else "StudyScreen?${params.joinToString("&")}"
+        }
     }
     data object Practice : Screen("PracticeScreen/{questionId}") {
         fun createRoute(questionId: Int) = "PracticeScreen/$questionId"

@@ -1,6 +1,7 @@
 package com.opic.android.ui.test
 
 import androidx.activity.compose.BackHandler
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -45,6 +46,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -52,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.opic.android.R
+import java.io.File
 import com.opic.android.ui.navigation.LocalBottomNavState
 import com.opic.android.ui.theme.OPicColors
 
@@ -80,7 +84,7 @@ fun TestScreen(
     // 이전 화면의 onDispose가 새 화면이 설정한 액션을 지워버리는 문제 방지
     DisposableEffect(Unit) {
         bottomNavState.backAction = { showHomeDialog = true }
-        bottomNavState.homeAction = null   // TestScreen에는 Home 버튼 없음
+        bottomNavState.homeAction = { showHomeDialog = true }  // 테스트 중 Home → 확인 다이얼로그
         bottomNavState.nextAction = { viewModel.onNext() }
         onDispose { }
     }
@@ -163,12 +167,8 @@ private fun TestContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // EVA 이미지
-                Image(
-                    painter = painterResource(id = R.drawable.eva),
-                    contentDescription = "EVA",
-                    modifier = Modifier.size(120.dp)
-                )
+                // 레벨 이미지 (Report 연동)
+                LevelImage(level = state.level, externalDir = state.levelImageDir)
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -308,4 +308,48 @@ private fun TestContent(
 
         Spacer(modifier = Modifier.weight(1f))
     }
+}
+
+/** 레벨 이미지: 외부 폴더 우선, 없으면 drawable fallback */
+@Composable
+private fun LevelImage(level: Int, externalDir: String) {
+    val bitmap = remember(level, externalDir) {
+        if (externalDir.isNotBlank()) {
+            val file = File(externalDir, "level_$level.png")
+            if (file.exists()) {
+                try { BitmapFactory.decodeFile(file.absolutePath) }
+                catch (_: Exception) { null }
+            } else null
+        } else null
+    }
+
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = "Level $level",
+            modifier = Modifier.size(120.dp),
+            contentScale = ContentScale.Fit
+        )
+    } else {
+        Image(
+            painter = painterResource(id = levelDrawable(level)),
+            contentDescription = "Level $level",
+            modifier = Modifier.size(120.dp),
+            contentScale = ContentScale.Fit
+        )
+    }
+}
+
+private fun levelDrawable(level: Int): Int = when (level) {
+    1 -> R.drawable.level_1
+    2 -> R.drawable.level_2
+    3 -> R.drawable.level_3
+    4 -> R.drawable.level_4
+    5 -> R.drawable.level_5
+    6 -> R.drawable.level_6
+    7 -> R.drawable.level_7
+    8 -> R.drawable.level_8
+    9 -> R.drawable.level_9
+    10 -> R.drawable.level_10
+    else -> R.drawable.level_1
 }

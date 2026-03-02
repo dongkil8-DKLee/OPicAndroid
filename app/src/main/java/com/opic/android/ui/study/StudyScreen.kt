@@ -85,6 +85,7 @@ import com.opic.android.ui.theme.OPicColors
 @Composable
 fun StudyScreen(
     initialTopicType: String? = null,
+    initialGrade: String? = null,
     onPractice: (Int) -> Unit = {},
     onSettings: () -> Unit = {},
     viewModel: StudyViewModel = hiltViewModel()
@@ -96,6 +97,11 @@ fun StudyScreen(
         if (!initialTopicType.isNullOrBlank()) {
             viewModel.onTypeChanged(initialTopicType)
         }
+    }
+
+    // initialGrade → 등급 필터 자동 적용
+    LaunchedEffect(initialGrade) {
+        viewModel.setGradeFilter(initialGrade)
     }
 
     Surface(modifier = Modifier.fillMaxSize()) {
@@ -384,7 +390,7 @@ private fun SpeedAndControlRow(
             Icon(
                 Icons.Filled.Settings,
                 contentDescription = "Settings",
-                tint = Color.Gray,
+                tint = OPicColors.Primary,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -567,7 +573,6 @@ private fun SentenceAutoScrollText(
 
     // 각 문장의 Y좌표/높이 측정
     val sentencePositions = remember { mutableStateMapOf<Int, Pair<Int, Int>>() } // idx → (y, height)
-    val density = LocalDensity.current
 
     // 활성 문장 변경 시 스크롤
     LaunchedEffect(activeSentenceIndex) {
@@ -579,52 +584,15 @@ private fun SentenceAutoScrollText(
         scrollState.animateScrollTo(target)
     }
 
-    // 단어 인덱스 매핑: 전체 텍스트에서 각 문장 시작 단어 인덱스
-    val sentenceStartWordIndices = remember(sentenceWordCounts) {
-        val starts = mutableListOf<Int>()
-        var cumulative = 0
-        for (count in sentenceWordCounts) {
-            starts.add(cumulative)
-            cumulative += count
-        }
-        starts
-    }
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
     ) {
         sentences.forEachIndexed { sentenceIdx, sentence ->
-            val isActive = sentenceIdx == activeSentenceIndex
-            val words = remember(sentence) { sentence.split("\\s+".toRegex()).filter { it.isNotBlank() } }
-            val startWordIdx = sentenceStartWordIndices.getOrElse(sentenceIdx) { 0 }
-
-            val annotatedString = remember(sentence, highlightedWordIndex, startWordIdx) {
-                buildAnnotatedString {
-                    words.forEachIndexed { localIdx, word ->
-                        val globalIdx = startWordIdx + localIdx
-                        if (globalIdx == highlightedWordIndex) {
-                            withStyle(
-                                SpanStyle(
-                                    background = Color(0xFFFFEB3B),
-                                    fontWeight = FontWeight.Bold
-                                )
-                            ) {
-                                append(word)
-                            }
-                        } else {
-                            append(word)
-                        }
-                        if (localIdx < words.size - 1) append(" ")
-                    }
-                }
-            }
-
             Text(
-                text = annotatedString,
+                text = sentence,
                 fontSize = fontSize.sp,
-                color = if (isActive) Color.Black else Color.DarkGray,
                 modifier = Modifier
                     .fillMaxWidth()
                     .onGloballyPositioned { coordinates ->

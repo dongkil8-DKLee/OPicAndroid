@@ -88,12 +88,19 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                         type = NavType.StringType
                         nullable = true
                         defaultValue = null
+                    },
+                    navArgument("grade") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
                     }
                 )
             ) { backStackEntry ->
                 val initialTopicType = backStackEntry.arguments?.getString("type")
+                val initialGrade = backStackEntry.arguments?.getString("grade")
                 StudyScreen(
                     initialTopicType = initialTopicType,
+                    initialGrade = initialGrade,
                     onPractice = { questionId ->
                         navController.navigate(Screen.Practice.createRoute(questionId))
                     },
@@ -125,7 +132,13 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                         }
                     },
                     onTopicClick = { type ->
-                        navController.navigate(Screen.Study.createRoute(type)) {
+                        navController.navigate(Screen.Study.createRoute(type = type)) {
+                            popUpTo(Screen.Report.route) { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    },
+                    onGradeClick = { grade ->
+                        navController.navigate(Screen.Study.createRoute(grade = grade)) {
                             popUpTo(Screen.Report.route) { inclusive = false }
                             launchSingleTop = true
                         }

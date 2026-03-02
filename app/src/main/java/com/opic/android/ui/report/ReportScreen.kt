@@ -72,6 +72,7 @@ fun ReportScreen(
     onSessionClick: (Int) -> Unit = {},
     onVocabClick: () -> Unit = {},
     onTopicClick: (String) -> Unit = {},
+    onGradeClick: (String) -> Unit = {},
     viewModel: ReportViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -101,8 +102,8 @@ fun ReportScreen(
                 // 섹션 2: Weekly Activity
                 WeeklyActivitySection(state)
 
-                // 섹션 3: Grade Distribution
-                GradeDistributionSection(state)
+                // 섹션 3: Grade Distribution (클릭 → StudyScreen)
+                GradeDistributionSection(state, onGradeClick)
 
                 // 섹션 4: Topic Weakness (클릭 → StudyScreen)
                 TopicWeaknessSection(state, onTopicClick)
@@ -333,7 +334,7 @@ private fun WeeklyActivitySection(state: ReportUiState) {
 // ==================== 섹션 3: Grade Distribution ====================
 
 @Composable
-private fun GradeDistributionSection(state: ReportUiState) {
+private fun GradeDistributionSection(state: ReportUiState, onGradeClick: (String) -> Unit) {
     val grades = listOf("A", "B", "C", "D", "F")
     val maxCount = state.gradeDistribution.values.maxOrNull()?.coerceAtLeast(1) ?: 1
 
@@ -350,6 +351,8 @@ private fun GradeDistributionSection(state: ReportUiState) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { if (count > 0) onGradeClick(grade) }
                         .padding(vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
