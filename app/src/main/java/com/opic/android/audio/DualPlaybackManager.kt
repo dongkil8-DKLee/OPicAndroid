@@ -2,6 +2,7 @@ package com.opic.android.audio
 
 import android.content.Context
 import android.media.MediaPlayer
+import android.media.PlaybackParams
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -29,6 +30,7 @@ class DualPlaybackManager @Inject constructor(
     private var rangeStopRunnable: Runnable? = null
     private var onComplete: (() -> Unit)? = null
     private var isPlaying = false
+    private var currentSpeed: Float = 1.0f
 
     /**
      * 원본 + 사용자 녹음 동시 재생.
@@ -49,10 +51,12 @@ class DualPlaybackManager @Inject constructor(
         userFilePath: String,
         userStartMs: Long = 0L,
         initialBalance: Float = 0.5f,
+        speed: Float = 1.0f,
         onPositionUpdate: ((Float, Float) -> Unit)? = null,
         onComplete: (() -> Unit)? = null
     ) {
         stop()
+        currentSpeed = speed
         this.onComplete = onComplete
 
         runCatching {
@@ -95,6 +99,11 @@ class DualPlaybackManager @Inject constructor(
             runCatching { origPlayer.start() }
             runCatching { usrPlayer.start() }
             isPlaying = true
+            // 속도 적용
+            if (speed != 1.0f) {
+                runCatching { origPlayer.playbackParams = PlaybackParams().setSpeed(speed) }
+                runCatching { usrPlayer.playbackParams = PlaybackParams().setSpeed(speed) }
+            }
 
             // 원본 구간 종료 예약 (사용자 녹음은 트리밍 후 실질 길이)
             val userTotalDuration = runCatching { usrPlayer.duration.toLong() }.getOrElse { origDurationMs }
@@ -202,8 +211,18 @@ class DualPlaybackManager @Inject constructor(
 
     private fun scheduleStop(durationMs: Long) {
         cancelScheduledStop()
+        val delayMs = (durationMs / currentSpeed).toLong() + 200L // 속도 보정 + 200ms 버퍼
         rangeStopRunnable = Runnable { handleCompletion() }
-        handler.postDelayed(rangeStopRunnable!!, durationMs + 200) // 200ms 버퍼
+        handler.postDelayed(rangeStopRunnable!!, delayMs)
+    }
+
+    /**
+     * 재생 중 속도 변경.
+     */
+    fun setSpeed(speed: Float) {
+        currentSpeed = speed
+        runCatching { originalPlayer?.playbackParams = PlaybackParams().setSpeed(speed) }
+        runCatching { userPlayer?.playbackParams = PlaybackParams().setSpeed(speed) }
     }
 
     private fun cancelScheduledStop() {

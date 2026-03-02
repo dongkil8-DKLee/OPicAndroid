@@ -89,7 +89,10 @@ data class PracticeUiState(
     val isComparisonPlaying: Boolean = false,
     val comparisonOriginalProgress: Float = 0f,
     val comparisonUserProgress: Float = 0f,
-    val comparisonBalance: Float = 0.5f
+    val comparisonBalance: Float = 0.5f,
+    val comparisonSpeed: Float = 1.0f,
+    // PLAY 단독 재생 진행률
+    val userPlayProgress: Float = 0f
 )
 
 @HiltViewModel
@@ -526,10 +529,21 @@ class PracticeViewModel @Inject constructor(
         val path = state.userAudioPath ?: return
         if (state.isPlayingUserAudio || state.isComparisonPlaying) return
 
-        _uiState.update { it.copy(isPlayingUserAudio = true) }
+        _uiState.update { it.copy(isPlayingUserAudio = true, userPlayProgress = 0f) }
         // PLAY 버튼은 항상 처음(0)부터 재생, userStartFraction은 동시재생에만 적용
         audioPlayer.playFromFile(path) {
-            _uiState.update { it.copy(isPlayingUserAudio = false) }
+            _uiState.update { it.copy(isPlayingUserAudio = false, userPlayProgress = 0f) }
+        }
+        // 진행 바 폴링 (50ms 간격)
+        viewModelScope.launch {
+            while (_uiState.value.isPlayingUserAudio) {
+                val pos = audioPlayer.currentPosition
+                val dur = audioPlayer.duration
+                if (dur > 0) {
+                    _uiState.update { it.copy(userPlayProgress = (pos.toFloat() / dur).coerceIn(0f, 1f)) }
+                }
+                kotlinx.coroutines.delay(50)
+            }
         }
     }
 
@@ -773,6 +787,7 @@ class PracticeViewModel @Inject constructor(
             userFilePath = userPath,
             userStartMs = userStartMs,
             initialBalance = state.comparisonBalance,
+            speed = state.comparisonSpeed,
             onPositionUpdate = { origProgress, userProgress ->
                 _uiState.update {
                     it.copy(
@@ -807,6 +822,13 @@ class PracticeViewModel @Inject constructor(
     fun setComparisonBalance(balance: Float) {
         _uiState.update { it.copy(comparisonBalance = balance) }
         dualPlaybackManager.setBalance(balance)
+    }
+
+    fun setComparisonSpeed(speed: Float) {
+        _uiState.update { it.copy(comparisonSpeed = speed) }
+        if (_uiState.value.isComparisonPlaying) {
+            dualPlaybackManager.setSpeed(speed)
+        }
     }
 
     fun setUserStartFraction(fraction: Float) {

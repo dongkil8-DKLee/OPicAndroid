@@ -36,11 +36,14 @@ import com.opic.android.ui.theme.OPicColors
  * @param userWaveform 사용자 녹음 파형 데이터
  * @param isPlaying 동시 재생 중 여부
  * @param originalProgress 원본 재생 진행률
- * @param userProgress 사용자 재생 진행률
+ * @param userProgress 사용자 재생 진행률 (0~1, userStartFraction 이후 구간 기준)
  * @param balance 볼륨 밸런스 (0.0=원본만, 0.5=둘다, 1.0=녹음만)
  * @param enabled 비활성화 여부 (다른 오디오 활동 중)
  * @param onTogglePlayback 동시 재생 토글
  * @param onBalanceChange 밸런스 변경
+ * @param userPlayProgress PLAY 단독 재생 진행률 (0~1)
+ * @param comparisonSpeed 동시재생 속도
+ * @param onComparisonSpeedChange 속도 변경 콜백
  */
 @Composable
 fun WaveformComparisonPanel(
@@ -55,6 +58,9 @@ fun WaveformComparisonPanel(
     onBalanceChange: (Float) -> Unit,
     userStartFraction: Float = 0f,
     onUserStartFractionChange: (Float) -> Unit = {},
+    userPlayProgress: Float = 0f,
+    comparisonSpeed: Float = 1.0f,
+    onComparisonSpeedChange: (Float) -> Unit = {},
     // REC / PLAY 버튼 (선택적)
     isRecordingUser: Boolean = false,
     isPlayingUser: Boolean = false,
@@ -177,9 +183,15 @@ fun WaveformComparisonPanel(
         WaveformView(
             samples = userWaveform,
             waveformColor = OPicColors.TimerGreen,
-            playbackProgress = if (isPlaying) userProgress else null,
-            startMarkerFraction = if (!isPlaying) userStartFraction else null,
-            onStartMarkerChange = if (!isPlaying) onUserStartFractionChange else null,
+            playbackProgress = when {
+                // 동시재생: userProgress(0~1)를 userStartFraction 기준 캔버스 좌표로 변환
+                isPlaying -> (userStartFraction + userProgress * (1f - userStartFraction)).coerceIn(0f, 1f)
+                // 단독 PLAY: 전체 파형 기준 진행 바
+                isPlayingUser -> userPlayProgress
+                else -> null
+            },
+            startMarkerFraction = if (!isPlaying && !isPlayingUser) userStartFraction else null,
+            onStartMarkerChange = if (!isPlaying && !isPlayingUser) onUserStartFractionChange else null,
             height = 40.dp
         )
 
@@ -203,6 +215,29 @@ fun WaveformComparisonPanel(
                 )
             )
             Text("내 녹음", fontSize = 10.sp, color = Color.Gray)
+        }
+
+        // 속도 조절 버튼
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("속도", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(start = 2.dp))
+            Spacer(modifier = Modifier.width(4.dp))
+            listOf(0.75f, 1.0f, 1.25f, 1.5f).forEach { speed ->
+                val selected = comparisonSpeed == speed
+                TextButton(
+                    onClick = { onComparisonSpeedChange(speed) },
+                    modifier = Modifier.padding(horizontal = 1.dp)
+                ) {
+                    Text(
+                        text = if (speed == 1.0f) "1x" else "${speed}x",
+                        fontSize = 10.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (selected) OPicColors.Primary else Color.Gray
+                    )
+                }
+            }
         }
     }
 }
