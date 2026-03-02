@@ -57,6 +57,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.opic.android.R
 import java.io.File
 import com.opic.android.ui.navigation.LocalBottomNavState
+import com.opic.android.ui.navigation.Screen
 import com.opic.android.ui.theme.OPicColors
 
 /**
@@ -79,14 +80,18 @@ fun TestScreen(
         if (state.phase == TestPhase.FINISHED) onFinish(viewModel.sessionId)
     }
 
-    // 하단바에 Back/Next 액션 설정 (Home 없음)
-    // onDispose에서 액션을 null로 초기화하지 않음 — 화면 전환 애니메이션 중
-    // 이전 화면의 onDispose가 새 화면이 설정한 액션을 지워버리는 문제 방지
+    // 하단바에 Back/Next 액션 설정 (ownerRoute 기반으로 stale 액션 방지)
+    // 초기 진입 순간 Next 오작동 방지: nextEnabled = false로 잠금 후,
+    // 아래 LaunchedEffect에서 조건 충족 시에만 true로 업데이트
     DisposableEffect(Unit) {
-        bottomNavState.backAction = { showHomeDialog = true }
-        bottomNavState.homeAction = null   // 테스트 플로우에서 Home 버튼은 비활성화됨
-        bottomNavState.nextAction = { viewModel.onNext() }
-        onDispose { }
+        bottomNavState.setOwnerActions(
+            ownerRoute = Screen.Test.route,
+            back = { showHomeDialog = true },
+            home = null,
+            next = { viewModel.onNext() },
+            nextEnabled = false
+        )
+        onDispose { bottomNavState.clearOwnerActions(Screen.Test.route) }
     }
 
     // nextEnabled: 상태에 따라 업데이트

@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.opic.android.ui.navigation.LocalBottomNavState
+import com.opic.android.ui.navigation.Screen
 import com.opic.android.ui.theme.OPicColors
 
 /**
@@ -60,21 +61,22 @@ fun SelfAssessmentScreen(
     var showWarning by remember { mutableStateOf(false) }
     val bottomNavState = LocalBottomNavState.current
 
-    // 하단바에 Back/Home/Next 액션 설정
-    // onDispose에서 액션을 null로 초기화하지 않음 — 화면 전환 애니메이션 중
-    // 이전 화면의 onDispose가 새 화면이 설정한 액션을 지워버리는 문제 방지
+    // 하단바에 Back/Home/Next 액션 설정 (ownerRoute 기반으로 stale 액션 방지)
     DisposableEffect(Unit) {
-        bottomNavState.backAction = onBack
-        bottomNavState.homeAction = onHome
-        bottomNavState.nextAction = {
-            if (selectedDifficulty == -1) {
-                showWarning = true
-            } else {
-                onNext(selectedDifficulty)
-            }
-        }
-        bottomNavState.nextEnabled = true
-        onDispose { }
+        bottomNavState.setOwnerActions(
+            ownerRoute = Screen.SelfAssessment.route,
+            back = onBack,
+            home = onHome,
+            next = {
+                if (selectedDifficulty == -1) {
+                    showWarning = true
+                } else {
+                    onNext(selectedDifficulty)
+                }
+            },
+            nextEnabled = true
+        )
+        onDispose { bottomNavState.clearOwnerActions(Screen.SelfAssessment.route) }
     }
 
     // 경고 다이얼로그

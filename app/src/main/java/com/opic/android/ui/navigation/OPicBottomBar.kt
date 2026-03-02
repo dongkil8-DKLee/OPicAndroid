@@ -65,10 +65,10 @@ fun OPicBottomBar(navController: NavHostController) {
 
     val isOnHome = currentRoute == Screen.Report.route
 
-    // ★ stale 액션 방지: 테스트 플로우에서만 BottomNavState의 backAction/nextAction 사용
-    // 테스트 플로우 밖에서는 이전 화면의 잔존 액션이 실행되지 않도록 무시
-    val effectiveBackAction = if (isTestFlow) bottomNavState.backAction else null
-    val effectiveNextAction = if (isTestFlow) bottomNavState.nextAction else null
+    // ★ stale 액션 방지: ownerRoute가 현재 화면과 일치할 때만 액션 사용
+    val isOwner = bottomNavState.isOwnerRoute(currentRoute)
+    val effectiveBackAction = if (isOwner) bottomNavState.backAction else null
+    val effectiveNextAction = if (isOwner) bottomNavState.nextAction else null
 
     // < Back 활성 여부
     val canGoBack = effectiveBackAction != null ||

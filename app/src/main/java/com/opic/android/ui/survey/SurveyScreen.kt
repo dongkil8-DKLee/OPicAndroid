@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.opic.android.ui.navigation.LocalBottomNavState
+import com.opic.android.ui.navigation.Screen
 
 /**
  * Python SurveyPage 1:1 이식.
@@ -46,15 +47,16 @@ fun SurveyScreen(
     val state by viewModel.uiState.collectAsState()
     val bottomNavState = LocalBottomNavState.current
 
-    // 하단바에 Back/Home/Next 액션 설정
-    // onDispose에서 액션을 null로 초기화하지 않음 — 화면 전환 애니메이션 중
-    // 이전 화면의 onDispose가 새 화면이 설정한 액션을 지워버리는 문제 방지
+    // 하단바에 Back/Home/Next 액션 설정 (ownerRoute 기반으로 stale 액션 방지)
     DisposableEffect(Unit) {
-        bottomNavState.backAction = { if (viewModel.goBack()) onBack() }
-        bottomNavState.homeAction = onHome
-        bottomNavState.nextAction = { if (viewModel.goNext()) onNext() }
-        bottomNavState.nextEnabled = true
-        onDispose { }
+        bottomNavState.setOwnerActions(
+            ownerRoute = Screen.Survey.route,
+            back = { if (viewModel.goBack()) onBack() },
+            home = onHome,
+            next = { if (viewModel.goNext()) onNext() },
+            nextEnabled = true
+        )
+        onDispose { bottomNavState.clearOwnerActions(Screen.Survey.route) }
     }
 
     Surface(modifier = Modifier.fillMaxSize()) {
