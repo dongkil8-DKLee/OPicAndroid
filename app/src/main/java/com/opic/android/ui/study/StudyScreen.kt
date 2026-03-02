@@ -336,11 +336,10 @@ private fun SpeedAndControlRow(
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("속도:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-
+        // 좌측: 속도 컨트롤
+        Text("속도:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
         speedOptions.forEach { speed ->
             val label = if (speed == speed.toInt().toFloat()) "${speed.toInt()}x" else "${speed}x"
             val isSelected = state.playbackSpeed == speed
@@ -349,49 +348,48 @@ private fun SpeedAndControlRow(
                 colors = ButtonDefaults.textButtonColors(
                     contentColor = if (isSelected) OPicColors.Primary else Color.Gray
                 ),
-                contentPadding = PaddingValues(horizontal = 4.dp),
-                modifier = Modifier.height(32.dp)
+                contentPadding = PaddingValues(horizontal = 2.dp),
+                modifier = Modifier.height(30.dp)
             ) {
                 Text(
                     text = label,
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                 )
             }
         }
 
-        Spacer(modifier = Modifier.width(4.dp))
+        // 중간 여백 → 오른쪽 항목 항상 보이도록
+        Spacer(modifier = Modifier.weight(1f))
 
-        // 학습 카운트
+        // 우측: 학습 카운트 + 별표 + 설정
         Text(
-            text = "학습: ${state.studyCount}/7",
+            text = "${state.studyCount}/7",
             fontWeight = FontWeight.Bold,
-            fontSize = 12.sp,
+            fontSize = 11.sp,
             modifier = Modifier
                 .border(1.dp, OPicColors.Border, RoundedCornerShape(4.dp))
-                .padding(horizontal = 6.dp, vertical = 2.dp)
+                .padding(horizontal = 4.dp, vertical = 2.dp)
         )
 
-        // 별표
-        IconButton(onClick = { viewModel.toggleFavorite() }, modifier = Modifier.size(32.dp)) {
+        IconButton(onClick = { viewModel.toggleFavorite() }, modifier = Modifier.size(28.dp)) {
             Icon(
                 imageVector = if (state.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
                 contentDescription = "Favorite",
                 tint = if (state.isFavorite) OPicColors.TimerOrange else OPicColors.DisabledBg,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(18.dp)
             )
         }
 
-        // 설정 아이콘
         IconButton(
             onClick = onSettings,
-            modifier = Modifier.size(32.dp)
+            modifier = Modifier.size(28.dp)
         ) {
             Icon(
                 Icons.Filled.Settings,
                 contentDescription = "Settings",
                 tint = OPicColors.Primary,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(18.dp)
             )
         }
     }

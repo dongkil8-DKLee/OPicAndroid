@@ -84,7 +84,7 @@ fun TestScreen(
     // 이전 화면의 onDispose가 새 화면이 설정한 액션을 지워버리는 문제 방지
     DisposableEffect(Unit) {
         bottomNavState.backAction = { showHomeDialog = true }
-        bottomNavState.homeAction = { showHomeDialog = true }  // 테스트 중 Home → 확인 다이얼로그
+        bottomNavState.homeAction = null   // 테스트 플로우에서 Home 버튼은 비활성화됨
         bottomNavState.nextAction = { viewModel.onNext() }
         onDispose { }
     }
