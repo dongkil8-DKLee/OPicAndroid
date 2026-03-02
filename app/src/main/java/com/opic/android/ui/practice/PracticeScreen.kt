@@ -234,7 +234,14 @@ private fun PracticeContent(
                             onTogglePlayback = { viewModel.toggleComparisonPlayback() },
                             onBalanceChange = { viewModel.setComparisonBalance(it) },
                             userStartFraction = state.userStartFraction,
-                            onUserStartFractionChange = { viewModel.setUserStartFraction(it) }
+                            onUserStartFractionChange = { viewModel.setUserStartFraction(it) },
+                            isRecordingUser = state.isRecordingUserScript,
+                            isPlayingUser = state.isPlayingUserAudio,
+                            hasUserAudio = state.hasUserAudio,
+                            onStartRecording = { viewModel.toggleUserScriptRecording() },
+                            onStopRecording = { viewModel.stopUserScriptRecording() },
+                            onPlayUser = { viewModel.playUserScriptAudio() },
+                            onStopUser = { viewModel.stopUserScriptAudio() }
                         )
                     } else {
                         // ===== 발화 연습 섹션 (2분할) =====
@@ -469,43 +476,11 @@ private fun UserScriptSection(
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
-        // 헤더: REC / PLAY / STT + 확대/축소 (제목 제거)
+        // 헤더: STT + 확대/축소
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Rec
-            if (state.isRecordingUserScript) {
-                TextButton(onClick = { viewModel.stopUserScriptRecording() }) {
-                    Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(16.dp), tint = OPicColors.RecordActive)
-                    Text(" Stop Rec", fontSize = 11.sp, color = OPicColors.RecordActive)
-                }
-            } else {
-                TextButton(
-                    onClick = { viewModel.toggleUserScriptRecording() },
-                    enabled = !isBusy
-                ) {
-                    Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text(" Rec", fontSize = 11.sp)
-                }
-            }
-
-            // Play
-            if (state.isPlayingUserAudio) {
-                TextButton(onClick = { viewModel.stopUserScriptAudio() }) {
-                    Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text(" Stop", fontSize = 11.sp)
-                }
-            } else {
-                TextButton(
-                    onClick = { viewModel.playUserScriptAudio() },
-                    enabled = state.hasUserAudio && !isBusy
-                ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text(" Play", fontSize = 11.sp)
-                }
-            }
-
             // STT
             if (state.userScriptSttListening) {
                 TextButton(onClick = { viewModel.stopUserScriptStt() }) {

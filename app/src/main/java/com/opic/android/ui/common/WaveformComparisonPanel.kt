@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
@@ -54,6 +55,14 @@ fun WaveformComparisonPanel(
     onBalanceChange: (Float) -> Unit,
     userStartFraction: Float = 0f,
     onUserStartFractionChange: (Float) -> Unit = {},
+    // REC / PLAY 버튼 (선택적)
+    isRecordingUser: Boolean = false,
+    isPlayingUser: Boolean = false,
+    hasUserAudio: Boolean = false,
+    onStartRecording: (() -> Unit)? = null,
+    onStopRecording: (() -> Unit)? = null,
+    onPlayUser: (() -> Unit)? = null,
+    onStopUser: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -62,7 +71,7 @@ fun WaveformComparisonPanel(
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
-        // 헤더: 아이콘 + 제목 + 동시재생 버튼
+        // 헤더: REC + PLAY + 동시재생
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -74,15 +83,46 @@ fun WaveformComparisonPanel(
                 tint = OPicColors.LevelGauge
             )
             Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = "음성 비교",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = OPicColors.TextOnLight
-            )
+
+            // REC 버튼
+            if (onStartRecording != null) {
+                if (isRecordingUser) {
+                    TextButton(onClick = { onStopRecording?.invoke() }) {
+                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(16.dp), tint = OPicColors.RecordActive)
+                        Text(" Stop", fontSize = 11.sp, color = OPicColors.RecordActive)
+                    }
+                } else {
+                    TextButton(
+                        onClick = onStartRecording,
+                        enabled = !isPlayingUser && !isPlaying
+                    ) {
+                        Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Text(" Rec", fontSize = 11.sp)
+                    }
+                }
+            }
+
+            // PLAY 버튼 (내 녹음 단독 재생, 항상 처음부터)
+            if (onPlayUser != null) {
+                if (isPlayingUser) {
+                    TextButton(onClick = { onStopUser?.invoke() }) {
+                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Text(" Stop", fontSize = 11.sp)
+                    }
+                } else {
+                    TextButton(
+                        onClick = onPlayUser,
+                        enabled = hasUserAudio && !isRecordingUser && !isPlaying
+                    ) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Text(" Play", fontSize = 11.sp)
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 
+            // 동시재생 버튼
             if (isPlaying) {
                 TextButton(onClick = onTogglePlayback) {
                     Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(16.dp), tint = OPicColors.RecordActive)
@@ -93,7 +133,7 @@ fun WaveformComparisonPanel(
                     onClick = onTogglePlayback,
                     enabled = enabled && userWaveform.isNotEmpty()
                 ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null, modifier = Modifier.size(16.dp))
                     Text(" 동시재생", fontSize = 11.sp)
                 }
             }

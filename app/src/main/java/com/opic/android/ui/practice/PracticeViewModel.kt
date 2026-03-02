@@ -527,18 +527,9 @@ class PracticeViewModel @Inject constructor(
         if (state.isPlayingUserAudio || state.isComparisonPlaying) return
 
         _uiState.update { it.copy(isPlayingUserAudio = true) }
-        val startMs = if (state.userAudioDurationMs > 0) {
-            (state.userStartFraction * state.userAudioDurationMs).toLong()
-        } else 0L
-
-        if (startMs > 0 && state.userAudioDurationMs > 0) {
-            audioPlayer.playRangeFromFile(path, startMs, state.userAudioDurationMs) {
-                _uiState.update { it.copy(isPlayingUserAudio = false) }
-            }
-        } else {
-            audioPlayer.playFromFile(path) {
-                _uiState.update { it.copy(isPlayingUserAudio = false) }
-            }
+        // PLAY 버튼은 항상 처음(0)부터 재생, userStartFraction은 동시재생에만 적용
+        audioPlayer.playFromFile(path) {
+            _uiState.update { it.copy(isPlayingUserAudio = false) }
         }
     }
 
