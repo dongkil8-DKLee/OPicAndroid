@@ -81,8 +81,19 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                 ReviewScreen()
             }
 
-            composable(Screen.Study.route) {
+            composable(
+                route = Screen.Study.route,
+                arguments = listOf(
+                    navArgument("type") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
+            ) { backStackEntry ->
+                val initialTopicType = backStackEntry.arguments?.getString("type")
                 StudyScreen(
+                    initialTopicType = initialTopicType,
                     onPractice = { questionId ->
                         navController.navigate(Screen.Practice.createRoute(questionId))
                     },
@@ -106,6 +117,18 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                 ReportScreen(
                     onSessionClick = { sessionId ->
                         navController.navigate(Screen.Review.createRoute(sessionId))
+                    },
+                    onVocabClick = {
+                        navController.navigate(Screen.Vocabulary.route) {
+                            popUpTo(Screen.Report.route) { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    },
+                    onTopicClick = { type ->
+                        navController.navigate(Screen.Study.createRoute(type)) {
+                            popUpTo(Screen.Report.route) { inclusive = false }
+                            launchSingleTop = true
+                        }
                     }
                 )
             }

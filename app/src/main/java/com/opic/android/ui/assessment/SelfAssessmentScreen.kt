@@ -1,7 +1,6 @@
 package com.opic.android.ui.assessment
 
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,14 +15,13 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -34,12 +32,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.opic.android.ui.common.HomeButton
+import com.opic.android.ui.navigation.LocalBottomNavState
 import com.opic.android.ui.theme.OPicColors
 
 /**
  * Python SelfAssessmentPage 1:1 이식.
  * 난이도 1~6 Radio 선택 → 미선택 시 경고 → 선택 시 BeginTestPage로 이동.
+ * 하단 Back/Home/Next 버튼은 OPicBottomBar에서 표시.
  */
 
 private val DIFFICULTY_DESCRIPTIONS = listOf(
@@ -59,6 +58,24 @@ fun SelfAssessmentScreen(
 ) {
     var selectedDifficulty by remember { mutableIntStateOf(-1) }
     var showWarning by remember { mutableStateOf(false) }
+    val bottomNavState = LocalBottomNavState.current
+
+    // 하단바에 Back/Home/Next 액션 설정
+    // onDispose에서 액션을 null로 초기화하지 않음 — 화면 전환 애니메이션 중
+    // 이전 화면의 onDispose가 새 화면이 설정한 액션을 지워버리는 문제 방지
+    DisposableEffect(Unit) {
+        bottomNavState.backAction = onBack
+        bottomNavState.homeAction = onHome
+        bottomNavState.nextAction = {
+            if (selectedDifficulty == -1) {
+                showWarning = true
+            } else {
+                onNext(selectedDifficulty)
+            }
+        }
+        bottomNavState.nextEnabled = true
+        onDispose { }
+    }
 
     // 경고 다이얼로그
     if (showWarning) {
@@ -135,44 +152,6 @@ fun SelfAssessmentScreen(
                             modifier = Modifier.weight(1f)
                         )
                     }
-                }
-            }
-
-            // --- 하단: Back / Home / Next ---
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Button(
-                    onClick = onBack,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = OPicColors.Primary,
-                        contentColor = OPicColors.PrimaryText
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("< Back", fontWeight = FontWeight.Bold)
-                }
-
-                HomeButton(onClick = onHome)
-
-                Button(
-                    onClick = {
-                        if (selectedDifficulty == -1) {
-                            showWarning = true
-                        } else {
-                            onNext(selectedDifficulty)
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = OPicColors.Primary,
-                        contentColor = OPicColors.PrimaryText
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Next >", fontWeight = FontWeight.Bold)
                 }
             }
         }

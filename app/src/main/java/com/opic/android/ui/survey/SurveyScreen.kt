@@ -13,16 +13,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -30,14 +28,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.opic.android.ui.common.HomeButton
-import com.opic.android.ui.theme.OPicColors
+import com.opic.android.ui.navigation.LocalBottomNavState
 
 /**
  * Python SurveyPage 1:1 이식.
  * 4파트 설문 (Part 1~4) + Back/Next 네비게이션.
+ * 하단 Back/Home/Next 버튼은 OPicBottomBar에서 표시.
  */
 @Composable
 fun SurveyScreen(
@@ -47,6 +44,18 @@ fun SurveyScreen(
     viewModel: SurveyViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val bottomNavState = LocalBottomNavState.current
+
+    // 하단바에 Back/Home/Next 액션 설정
+    // onDispose에서 액션을 null로 초기화하지 않음 — 화면 전환 애니메이션 중
+    // 이전 화면의 onDispose가 새 화면이 설정한 액션을 지워버리는 문제 방지
+    DisposableEffect(Unit) {
+        bottomNavState.backAction = { if (viewModel.goBack()) onBack() }
+        bottomNavState.homeAction = onHome
+        bottomNavState.nextAction = { if (viewModel.goNext()) onNext() }
+        bottomNavState.nextEnabled = true
+        onDispose { }
+    }
 
     Surface(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -70,42 +79,6 @@ fun SurveyScreen(
                     1 -> Part2Content(state, viewModel)
                     2 -> Part3Content(state, viewModel)
                     3 -> Part4Content(state, viewModel)
-                }
-            }
-
-            // --- 하단: Back / Home / Next ---
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Button(
-                    onClick = {
-                        if (viewModel.goBack()) onBack()
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = OPicColors.Primary,
-                        contentColor = OPicColors.PrimaryText
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("< Back", fontWeight = FontWeight.Bold)
-                }
-
-                HomeButton(onClick = onHome)
-
-                Button(
-                    onClick = {
-                        if (viewModel.goNext()) onNext()
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = OPicColors.Primary,
-                        contentColor = OPicColors.PrimaryText
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Next >", fontWeight = FontWeight.Bold)
                 }
             }
         }

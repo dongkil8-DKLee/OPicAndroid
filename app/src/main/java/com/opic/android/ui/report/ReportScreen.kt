@@ -18,16 +18,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +70,8 @@ private fun gradeColor(grade: String): Color = when (grade) {
 @Composable
 fun ReportScreen(
     onSessionClick: (Int) -> Unit = {},
+    onVocabClick: () -> Unit = {},
+    onTopicClick: (String) -> Unit = {},
     viewModel: ReportViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -81,11 +92,11 @@ fun ReportScreen(
                 // 헤더: 레벨 아바타 + Level N + 게이지
                 LevelHeaderSection(state)
 
-                // 단어장 요약 카드
-                VocabSummarySection(state)
-
                 // 섹션 1: Overall Stats
                 OverallStatsSection(state)
+
+                // 단어장 요약 카드 (클릭 → VocabularyScreen)
+                VocabSummarySection(state, onVocabClick)
 
                 // 섹션 2: Weekly Activity
                 WeeklyActivitySection(state)
@@ -93,11 +104,11 @@ fun ReportScreen(
                 // 섹션 3: Grade Distribution
                 GradeDistributionSection(state)
 
-                // 섹션 4: Topic Weakness
-                TopicWeaknessSection(state)
+                // 섹션 4: Topic Weakness (클릭 → StudyScreen)
+                TopicWeaknessSection(state, onTopicClick)
 
-                // 섹션 5: Recent Tests (clickable)
-                RecentTestsSection(state, onSessionClick)
+                // 섹션 5: Recent Tests (잠금/삭제 메뉴)
+                RecentTestsSection(state, viewModel, onSessionClick)
             }
         }
     }
@@ -199,11 +210,14 @@ private fun levelDrawable(level: Int): Int {
     }
 }
 
-// ==================== 단어장 요약 ====================
+// ==================== 단어장 요약 (클릭 → VocabularyScreen) ====================
 
 @Composable
-private fun VocabSummarySection(state: ReportUiState) {
-    SectionCard(title = "단어장 현황") {
+private fun VocabSummarySection(state: ReportUiState, onVocabClick: () -> Unit) {
+    SectionCard(
+        title = "단어장 현황",
+        modifier = Modifier.clickable { onVocabClick() }
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
@@ -374,10 +388,10 @@ private fun GradeDistributionSection(state: ReportUiState) {
     }
 }
 
-// ==================== 섹션 4: Topic Weakness ====================
+// ==================== 섹션 4: Topic Weakness (클릭 → StudyScreen) ====================
 
 @Composable
-private fun TopicWeaknessSection(state: ReportUiState) {
+private fun TopicWeaknessSection(state: ReportUiState, onTopicClick: (String) -> Unit) {
     SectionCard(title = "주제별 약점") {
         if (state.topicWeakness.isEmpty()) {
             Text(
@@ -390,6 +404,8 @@ private fun TopicWeaknessSection(state: ReportUiState) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { onTopicClick(topic.type) }
                         .padding(vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -425,10 +441,14 @@ private fun TopicWeaknessSection(state: ReportUiState) {
     }
 }
 
-// ==================== 섹션 5: Recent Tests (clickable) ====================
+// ==================== 섹션 5: Recent Tests (잠금/삭제 메뉴) ====================
 
 @Composable
-private fun RecentTestsSection(state: ReportUiState, onSessionClick: (Int) -> Unit) {
+private fun RecentTestsSection(
+    state: ReportUiState,
+    viewModel: ReportViewModel,
+    onSessionClick: (Int) -> Unit
+) {
     SectionCard(title = "최근 테스트") {
         if (state.recentTests.isEmpty()) {
             Text(
@@ -438,6 +458,9 @@ private fun RecentTestsSection(state: ReportUiState, onSessionClick: (Int) -> Un
             )
         } else {
             state.recentTests.forEach { session ->
+                val isLocked = session.sessionId in state.lockedSessions
+                var showMenu by remember { mutableStateOf(false) }
+
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -449,16 +472,27 @@ private fun RecentTestsSection(state: ReportUiState, onSessionClick: (Int) -> Un
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Session #${session.sessionId}",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = OPicColors.TextOnLight
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (isLocked) {
+                                Icon(
+                                    Icons.Filled.Lock,
+                                    contentDescription = "잠금",
+                                    modifier = Modifier.size(14.dp),
+                                    tint = OPicColors.Primary
+                                )
+                                Spacer(Modifier.width(4.dp))
+                            }
+                            Text(
+                                text = "Session #${session.sessionId}",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = OPicColors.TextOnLight
+                            )
+                        }
                         Text(
                             text = "${session.questionCount}문제",
                             fontSize = 13.sp,
@@ -469,6 +503,45 @@ private fun RecentTestsSection(state: ReportUiState, onSessionClick: (Int) -> Un
                             fontSize = 11.sp,
                             color = OPicColors.DisabledBg
                         )
+
+                        Box {
+                            IconButton(
+                                onClick = { showMenu = true },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.MoreVert,
+                                    contentDescription = "메뉴",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = Color.Gray
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(if (isLocked) "잠금 해제" else "잠금")
+                                    },
+                                    onClick = {
+                                        viewModel.toggleLock(session.sessionId)
+                                        showMenu = false
+                                    }
+                                )
+                                if (!isLocked) {
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text("삭제", color = Color.Red)
+                                        },
+                                        onClick = {
+                                            viewModel.deleteSession(session.sessionId)
+                                            showMenu = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -479,9 +552,13 @@ private fun RecentTestsSection(state: ReportUiState, onSessionClick: (Int) -> Un
 // ==================== 공통 컴포넌트 ====================
 
 @Composable
-private fun SectionCard(title: String, content: @Composable () -> Unit) {
+private fun SectionCard(
+    title: String,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         shape = RoundedCornerShape(10.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)

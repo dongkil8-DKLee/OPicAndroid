@@ -25,8 +25,6 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,6 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -53,11 +52,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.opic.android.R
+import com.opic.android.ui.navigation.LocalBottomNavState
 import com.opic.android.ui.theme.OPicColors
 
 /**
  * OPIc 시험 화면 (2차 UI 개선).
  * 2열 레이아웃: 좌(EVA+타이머+버튼), 우(번호그리드 3열).
+ * 하단 Back/Next 버튼은 OPicBottomBar에서 표시.
  */
 @Composable
 fun TestScreen(
@@ -67,10 +68,27 @@ fun TestScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     var showHomeDialog by remember { mutableStateOf(false) }
+    val bottomNavState = LocalBottomNavState.current
 
     // 시험 완료 → Review(sessionId)
     LaunchedEffect(state.phase) {
         if (state.phase == TestPhase.FINISHED) onFinish(viewModel.sessionId)
+    }
+
+    // 하단바에 Back/Next 액션 설정 (Home 없음)
+    // onDispose에서 액션을 null로 초기화하지 않음 — 화면 전환 애니메이션 중
+    // 이전 화면의 onDispose가 새 화면이 설정한 액션을 지워버리는 문제 방지
+    DisposableEffect(Unit) {
+        bottomNavState.backAction = { showHomeDialog = true }
+        bottomNavState.homeAction = null   // TestScreen에는 Home 버튼 없음
+        bottomNavState.nextAction = { viewModel.onNext() }
+        onDispose { }
+    }
+
+    // nextEnabled: 상태에 따라 업데이트
+    LaunchedEffect(state.phase, state.canStop) {
+        bottomNavState.nextEnabled = state.phase == TestPhase.RECORDED ||
+                (state.phase == TestPhase.RECORDING && state.canStop)
     }
 
     // Back 키 → Home 확인
@@ -98,7 +116,7 @@ fun TestScreen(
     Surface(modifier = Modifier.fillMaxSize()) {
         when (state.phase) {
             TestPhase.LOADING -> LoadingScreen()
-            else -> TestContent(state, viewModel, onHome = { showHomeDialog = true })
+            else -> TestContent(state, viewModel)
         }
     }
 }
@@ -118,8 +136,7 @@ private fun LoadingScreen() {
 @Composable
 private fun TestContent(
     state: TestUiState,
-    viewModel: TestViewModel,
-    onHome: () -> Unit
+    viewModel: TestViewModel
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
 
@@ -290,37 +307,5 @@ private fun TestContent(
         }
 
         Spacer(modifier = Modifier.weight(1f))
-
-        // --- 하단: < Back (시험 중단 확인) / Next ---
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Button(
-                onClick = onHome,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = OPicColors.Primary,
-                    contentColor = OPicColors.PrimaryText
-                ),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("< Back", fontWeight = FontWeight.Bold)
-            }
-
-            Button(
-                onClick = { viewModel.onNext() },
-                enabled = state.phase == TestPhase.RECORDED ||
-                          (state.phase == TestPhase.RECORDING && state.canStop),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = OPicColors.Primary,
-                    contentColor = OPicColors.PrimaryText
-                ),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("Next >", fontWeight = FontWeight.Bold)
-            }
-        }
     }
 }

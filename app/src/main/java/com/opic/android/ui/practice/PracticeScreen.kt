@@ -315,8 +315,6 @@ private fun SentenceTableRow(
         Text(
             text = text,
             fontSize = 13.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
 

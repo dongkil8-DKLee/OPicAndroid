@@ -6,12 +6,12 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -54,8 +54,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -63,7 +66,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -74,15 +80,23 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.opic.android.ui.theme.OPicColors
 
 /**
- * StudyScreen (리팩토링: Fullscreen 복원, Play/Edit ScriptSection 내부, 아이콘 행 3개).
+ * StudyScreen (리팩토링: 자동스크롤, SpeedRow 통합, FilterSection 2행).
  */
 @Composable
 fun StudyScreen(
+    initialTopicType: String? = null,
     onPractice: (Int) -> Unit = {},
     onSettings: () -> Unit = {},
     viewModel: StudyViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+
+    // initialTopicType → 유형 필터 자동 적용
+    LaunchedEffect(initialTopicType) {
+        if (!initialTopicType.isNullOrBlank()) {
+            viewModel.onTypeChanged(initialTopicType)
+        }
+    }
 
     Surface(modifier = Modifier.fillMaxSize()) {
         if (state.loading) {
@@ -99,7 +113,7 @@ fun StudyScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun StudyContent(
     state: StudyUiState,
@@ -127,10 +141,6 @@ private fun StudyContent(
             Column {
                 Spacer(modifier = Modifier.height(4.dp))
                 FilterSection(state, viewModel)
-                Spacer(modifier = Modifier.height(4.dp))
-                GroupPlayRow(state, viewModel)
-                Spacer(modifier = Modifier.height(4.dp))
-                StudyControlRow(state, viewModel, context)
                 Spacer(modifier = Modifier.height(4.dp))
             }
         }
@@ -204,8 +214,8 @@ private fun StudyContent(
             Spacer(modifier = Modifier.height(4.dp))
         }
 
-        // ===== 속도 행 =====
-        SpeedRow(state = state, viewModel = viewModel, onSettings = onSettings)
+        // ===== 속도 + 학습/별표/설정 통합 행 =====
+        SpeedAndControlRow(state = state, viewModel = viewModel, onSettings = onSettings)
 
         Spacer(modifier = Modifier.height(4.dp))
 
@@ -308,10 +318,10 @@ private fun IconButtonRow(
     }
 }
 
-// ==================== 속도 행 ====================
+// ==================== 속도 + 학습/별표/설정 통합 행 ====================
 
 @Composable
-private fun SpeedRow(
+private fun SpeedAndControlRow(
     state: StudyUiState,
     viewModel: StudyViewModel,
     onSettings: () -> Unit
@@ -321,7 +331,7 @@ private fun SpeedRow(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text("속도:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
 
@@ -333,6 +343,7 @@ private fun SpeedRow(
                 colors = ButtonDefaults.textButtonColors(
                     contentColor = if (isSelected) OPicColors.Primary else Color.Gray
                 ),
+                contentPadding = PaddingValues(horizontal = 4.dp),
                 modifier = Modifier.height(32.dp)
             ) {
                 Text(
@@ -343,7 +354,27 @@ private fun SpeedRow(
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.width(4.dp))
+
+        // 학습 카운트
+        Text(
+            text = "학습: ${state.studyCount}/7",
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            modifier = Modifier
+                .border(1.dp, OPicColors.Border, RoundedCornerShape(4.dp))
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        )
+
+        // 별표
+        IconButton(onClick = { viewModel.toggleFavorite() }, modifier = Modifier.size(32.dp)) {
+            Icon(
+                imageVector = if (state.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                contentDescription = "Favorite",
+                tint = if (state.isFavorite) OPicColors.TimerOrange else OPicColors.DisabledBg,
+                modifier = Modifier.size(20.dp)
+            )
+        }
 
         // 설정 아이콘
         IconButton(
@@ -353,53 +384,97 @@ private fun SpeedRow(
             Icon(
                 Icons.Filled.Settings,
                 contentDescription = "Settings",
-                tint = Color.Gray
+                tint = Color.Gray,
+                modifier = Modifier.size(20.dp)
             )
         }
     }
 }
 
-// ==================== 필터 섹션 ====================
+// ==================== 필터 섹션 (2행 구조) ====================
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FilterSection(state: StudyUiState, viewModel: StudyViewModel) {
-    FlowRow(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        CompactDropdown(
-            label = "주제",
-            selected = state.selectedSet,
-            options = listOf("전체") + state.sets,
-            onSelected = { viewModel.onSetChanged(it) },
-            modifier = Modifier.width(130.dp)
-        )
+        // Row 1: 주제 | 유형 | 정렬
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            CompactDropdown(
+                label = "주제",
+                selected = state.selectedSet,
+                options = listOf("전체") + state.sets,
+                onSelected = { viewModel.onSetChanged(it) },
+                modifier = Modifier.weight(1.3f)
+            )
 
-        CompactDropdown(
-            label = "유형",
-            selected = state.selectedType,
-            options = listOf("전체") + state.types,
-            onSelected = { viewModel.onTypeChanged(it) },
-            modifier = Modifier.width(100.dp)
-        )
+            CompactDropdown(
+                label = "유형",
+                selected = state.selectedType,
+                options = listOf("전체") + state.types,
+                onSelected = { viewModel.onTypeChanged(it) },
+                modifier = Modifier.weight(1f)
+            )
 
-        CompactDropdown(
-            label = "정렬",
-            selected = state.selectedSort,
-            options = listOf("주제 순서", "오래된 순"),
-            onSelected = { viewModel.onSortChanged(it) },
-            modifier = Modifier.width(110.dp)
-        )
+            CompactDropdown(
+                label = "정렬",
+                selected = state.selectedSort,
+                options = listOf("주제 순서", "오래된 순"),
+                onSelected = { viewModel.onSortChanged(it) },
+                modifier = Modifier.weight(1.1f)
+            )
+        }
 
-        CompactDropdown(
-            label = "학습",
-            selected = state.selectedStudyFilter,
-            options = listOf("전체", "\uD83D\uDCCC", "저득점", "최근오답", "0", "1", "2", "3", "4", "5", "6", "7"),
-            onSelected = { viewModel.onStudyFilterChanged(it) },
-            modifier = Modifier.width(90.dp)
-        )
+        // Row 2: Group Play 버튼 | 모드 | 학습
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Button(
+                onClick = { viewModel.toggleGroupPlay() },
+                enabled = !state.isRecording,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (state.groupPlaying) OPicColors.RecordActive else OPicColors.PlayButton,
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.height(52.dp)
+            ) {
+                Icon(
+                    if (state.groupPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(2.dp))
+                Text(
+                    if (state.groupPlaying) "Stop" else "Group Play",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            CompactDropdown(
+                label = "모드",
+                selected = state.groupPlayMode,
+                options = listOf("목록 재생", "질문 재생", "답변 재생"),
+                onSelected = { viewModel.onGroupPlayModeChanged(it) },
+                modifier = Modifier.weight(1f)
+            )
+
+            CompactDropdown(
+                label = "학습",
+                selected = state.selectedStudyFilter,
+                options = listOf("전체", "\uD83D\uDCCC", "저득점", "최근오답", "0", "1", "2", "3", "4", "5", "6", "7"),
+                onSelected = { viewModel.onStudyFilterChanged(it) },
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }
 
@@ -459,118 +534,109 @@ private fun TitleSelector(
     }
 }
 
-// ==================== 학습 컨트롤 ====================
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun StudyControlRow(
-    state: StudyUiState,
-    viewModel: StudyViewModel,
-    context: android.content.Context
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(
-            text = "학습: ${state.studyCount}/7",
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-            modifier = Modifier
-                .border(1.dp, OPicColors.Border, RoundedCornerShape(4.dp))
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-        )
-
-        IconButton(onClick = { viewModel.toggleFavorite() }, modifier = Modifier.size(36.dp)) {
-            Icon(
-                imageVector = if (state.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                contentDescription = "Favorite",
-                tint = if (state.isFavorite) OPicColors.TimerOrange else OPicColors.DisabledBg
-            )
-        }
-    }
-}
-
-// ==================== 그룹재생 컨트롤 ====================
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun GroupPlayRow(state: StudyUiState, viewModel: StudyViewModel) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Button(
-            onClick = { viewModel.toggleGroupPlay() },
-            enabled = !state.isRecording,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (state.groupPlaying) OPicColors.RecordActive else OPicColors.PlayButton,
-                contentColor = Color.White
-            ),
-            shape = RoundedCornerShape(6.dp),
-            modifier = Modifier.height(36.dp)
-        ) {
-            Icon(
-                if (state.groupPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(2.dp))
-            Text(
-                if (state.groupPlaying) "Stop" else "Group Play",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        CompactDropdown(
-            label = "모드",
-            selected = state.groupPlayMode,
-            options = listOf("목록 재생", "질문 재생", "답변 재생"),
-            onSelected = { viewModel.onGroupPlayModeChanged(it) },
-            modifier = Modifier.width(105.dp)
-        )
-    }
-}
-
-// ==================== 하이라이트된 스크립트 텍스트 ====================
+// ==================== 문장 단위 자동 스크롤 텍스트 ====================
 
 @Composable
-private fun HighlightedScriptText(
+private fun SentenceAutoScrollText(
     text: String,
     highlightedWordIndex: Int,
-    fontSize: Int
+    fontSize: Int,
+    scrollState: ScrollState
 ) {
-    val words = remember(text) { text.split("\\s+".toRegex()).filter { it.isNotBlank() } }
-    val annotatedString = remember(text, highlightedWordIndex) {
-        buildAnnotatedString {
-            words.forEachIndexed { index, word ->
-                if (index == highlightedWordIndex) {
-                    withStyle(
-                        SpanStyle(
-                            background = Color(0xFFFFEB3B),
-                            fontWeight = FontWeight.Bold
-                        )
-                    ) {
-                        append(word)
-                    }
-                } else {
-                    append(word)
-                }
-                if (index < words.size - 1) append(" ")
+    // 문장 분리
+    val sentences = remember(text) {
+        text.split("(?<=[.?!])\\s+".toRegex()).filter { it.isNotBlank() }
+    }
+
+    // 각 문장의 누적 단어 수 → 문장 인덱스 매핑
+    val sentenceWordCounts = remember(sentences) {
+        sentences.map { it.split("\\s+".toRegex()).filter { w -> w.isNotBlank() }.size }
+    }
+
+    val activeSentenceIndex = remember(highlightedWordIndex, sentenceWordCounts) {
+        if (highlightedWordIndex < 0) -1
+        else {
+            var cumulative = 0
+            for (i in sentenceWordCounts.indices) {
+                cumulative += sentenceWordCounts[i]
+                if (highlightedWordIndex < cumulative) return@remember i
             }
+            sentenceWordCounts.lastIndex
         }
     }
 
-    Text(
-        text = annotatedString,
-        fontSize = fontSize.sp,
+    // 각 문장의 Y좌표/높이 측정
+    val sentencePositions = remember { mutableStateMapOf<Int, Pair<Int, Int>>() } // idx → (y, height)
+    val density = LocalDensity.current
+
+    // 활성 문장 변경 시 스크롤
+    LaunchedEffect(activeSentenceIndex) {
+        if (activeSentenceIndex < 0) return@LaunchedEffect
+        val pos = sentencePositions[activeSentenceIndex] ?: return@LaunchedEffect
+        val (y, h) = pos
+        // 센터로 스크롤: 문장 중심이 뷰포트 중심에 오도록
+        val target = (y + h / 2 - 200).coerceIn(0, scrollState.maxValue)
+        scrollState.animateScrollTo(target)
+    }
+
+    // 단어 인덱스 매핑: 전체 텍스트에서 각 문장 시작 단어 인덱스
+    val sentenceStartWordIndices = remember(sentenceWordCounts) {
+        val starts = mutableListOf<Int>()
+        var cumulative = 0
+        for (count in sentenceWordCounts) {
+            starts.add(cumulative)
+            cumulative += count
+        }
+        starts
+    }
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
-    )
+    ) {
+        sentences.forEachIndexed { sentenceIdx, sentence ->
+            val isActive = sentenceIdx == activeSentenceIndex
+            val words = remember(sentence) { sentence.split("\\s+".toRegex()).filter { it.isNotBlank() } }
+            val startWordIdx = sentenceStartWordIndices.getOrElse(sentenceIdx) { 0 }
+
+            val annotatedString = remember(sentence, highlightedWordIndex, startWordIdx) {
+                buildAnnotatedString {
+                    words.forEachIndexed { localIdx, word ->
+                        val globalIdx = startWordIdx + localIdx
+                        if (globalIdx == highlightedWordIndex) {
+                            withStyle(
+                                SpanStyle(
+                                    background = Color(0xFFFFEB3B),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            ) {
+                                append(word)
+                            }
+                        } else {
+                            append(word)
+                        }
+                        if (localIdx < words.size - 1) append(" ")
+                    }
+                }
+            }
+
+            Text(
+                text = annotatedString,
+                fontSize = fontSize.sp,
+                color = if (isActive) Color.Black else Color.DarkGray,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { coordinates ->
+                        sentencePositions[sentenceIdx] = Pair(
+                            coordinates.positionInParent().y.toInt(),
+                            coordinates.size.height
+                        )
+                    }
+                    .padding(vertical = 2.dp)
+            )
+        }
+    }
 }
 
 // ==================== 공용 스크립트 섹션 (Play + Edit + Fullscreen 포함) ====================
@@ -595,6 +661,8 @@ private fun ScriptSection(
     isExpanded: Boolean,
     onExpandToggle: () -> Unit
 ) {
+    val scrollState = rememberScrollState()
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -662,12 +730,13 @@ private fun ScriptSection(
                 textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = fontSize.sp)
             )
         } else if (!scriptText.isNullOrBlank()) {
-            Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            Column(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {
                 if (highlightedWordIndex >= 0) {
-                    HighlightedScriptText(
+                    SentenceAutoScrollText(
                         text = scriptText,
                         highlightedWordIndex = highlightedWordIndex,
-                        fontSize = fontSize
+                        fontSize = fontSize,
+                        scrollState = scrollState
                     )
                 } else {
                     Text(
