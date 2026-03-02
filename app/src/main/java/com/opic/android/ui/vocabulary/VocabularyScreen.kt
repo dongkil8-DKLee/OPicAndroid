@@ -71,13 +71,14 @@ fun VocabularyScreen(
     // TTS 초기화
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     DisposableEffect(Unit) {
-        val engine = TextToSpeech(context) { status ->
+        var engine: TextToSpeech? = null
+        engine = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
-                tts?.language = Locale.US
+                engine?.language = Locale.US
             }
         }
         tts = engine
-        onDispose { engine.shutdown() }
+        onDispose { engine?.shutdown() }
     }
 
     Surface(modifier = Modifier.fillMaxSize()) {

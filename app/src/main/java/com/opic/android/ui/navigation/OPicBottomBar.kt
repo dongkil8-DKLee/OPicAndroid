@@ -64,12 +64,17 @@ fun OPicBottomBar(navController: NavHostController) {
 
     val isOnHome = currentRoute == Screen.Report.route
 
+    // ★ stale 액션 방지: 테스트 플로우에서만 BottomNavState의 backAction/nextAction 사용
+    // 테스트 플로우 밖에서는 이전 화면의 잔존 액션이 실행되지 않도록 무시
+    val effectiveBackAction = if (isTestFlow) bottomNavState.backAction else null
+    val effectiveNextAction = if (isTestFlow) bottomNavState.nextAction else null
+
     // < Back 활성 여부
-    val canGoBack = bottomNavState.backAction != null ||
+    val canGoBack = effectiveBackAction != null ||
             (!isOnHome && !isTestFlow && navController.previousBackStackEntry != null)
 
     // Next > 활성 여부
-    val canGoNext = bottomNavState.nextAction != null && bottomNavState.nextEnabled
+    val canGoNext = effectiveNextAction != null && bottomNavState.nextEnabled
 
     // 현재 화면이 어떤 탭인지 (현재 탭 = 검은 글씨)
     val isOnStudy = currentRoute?.startsWith("StudyScreen") == true
@@ -91,7 +96,7 @@ fun OPicBottomBar(navController: NavHostController) {
             enabled = canGoBack,
             isCurrentTab = false,
             onClick = {
-                bottomNavState.backAction?.invoke()
+                effectiveBackAction?.invoke()
                     ?: navController.popBackStack()
             },
             modifier = Modifier.weight(1f)
@@ -141,7 +146,7 @@ fun OPicBottomBar(navController: NavHostController) {
             text = "Next >",
             enabled = canGoNext,
             isCurrentTab = false,
-            onClick = { bottomNavState.nextAction?.invoke() },
+            onClick = { effectiveNextAction?.invoke() },
             modifier = Modifier.weight(1f)
         )
     }
