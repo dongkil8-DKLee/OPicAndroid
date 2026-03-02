@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -83,6 +84,16 @@ fun OPicBottomBar(navController: NavHostController) {
     // 테스트 플로우에서는 Study/Home/Test 비활성화
     val middleEnabled = !isTestFlow
 
+    // 빠른 연속 클릭 방지 (300ms 디바운스)
+    val lastClickTime = remember { longArrayOf(0L) }
+    fun debounced(action: () -> Unit): () -> Unit = {
+        val now = System.currentTimeMillis()
+        if (now - lastClickTime[0] > 300) {
+            lastClickTime[0] = now
+            action()
+        }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -95,7 +106,7 @@ fun OPicBottomBar(navController: NavHostController) {
             text = "< Back",
             enabled = canGoBack,
             isCurrentTab = false,
-            onClick = {
+            onClick = debounced {
                 effectiveBackAction?.invoke()
                     ?: navController.popBackStack()
             },
@@ -107,7 +118,7 @@ fun OPicBottomBar(navController: NavHostController) {
             text = "Study",
             enabled = middleEnabled,
             isCurrentTab = isOnStudy && middleEnabled,
-            onClick = {
+            onClick = debounced {
                 navController.navigate(Screen.Study.createRoute()) {
                     popUpTo(Screen.Report.route) { inclusive = false }
                     launchSingleTop = true
@@ -121,7 +132,7 @@ fun OPicBottomBar(navController: NavHostController) {
             text = "Home",
             enabled = middleEnabled,
             isCurrentTab = isOnHome && middleEnabled,
-            onClick = {
+            onClick = debounced {
                 navController.popBackStack(Screen.Report.route, inclusive = false)
             },
             modifier = Modifier.weight(1f)
@@ -132,7 +143,7 @@ fun OPicBottomBar(navController: NavHostController) {
             text = "Test",
             enabled = middleEnabled,
             isCurrentTab = isOnTest && middleEnabled,
-            onClick = {
+            onClick = debounced {
                 navController.navigate(Screen.Survey.route) {
                     popUpTo(Screen.Report.route) { inclusive = false }
                     launchSingleTop = true
@@ -146,7 +157,7 @@ fun OPicBottomBar(navController: NavHostController) {
             text = "Next >",
             enabled = canGoNext,
             isCurrentTab = false,
-            onClick = { effectiveNextAction?.invoke() },
+            onClick = debounced { effectiveNextAction?.invoke() },
             modifier = Modifier.weight(1f)
         )
     }
