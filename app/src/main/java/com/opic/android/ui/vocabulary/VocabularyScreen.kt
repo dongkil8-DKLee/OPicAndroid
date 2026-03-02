@@ -68,17 +68,23 @@ fun VocabularyScreen(
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
-    // TTS 초기화
+    // TTS 초기화 (안정화: 언어 fallback + dispose 방어)
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     DisposableEffect(Unit) {
         var engine: TextToSpeech? = null
         engine = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
-                engine?.language = Locale.US
+                val res = engine?.setLanguage(Locale.US)
+                if (res == TextToSpeech.LANG_MISSING_DATA || res == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    engine?.language = Locale.ENGLISH
+                }
             }
         }
         tts = engine
-        onDispose { engine?.shutdown() }
+        onDispose {
+            runCatching { engine?.stop() }
+            runCatching { engine?.shutdown() }
+        }
     }
 
     Surface(modifier = Modifier.fillMaxSize()) {
@@ -150,9 +156,15 @@ fun VocabularyScreen(
                             onDelete = { viewModel.deleteWord(word) },
                             onYouglish = {
                                 val url = "https://youglish.com/pronounce/${word.word}/english"
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                runCatching {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                }
                             },
-                            onTts = { tts?.speak(word.word, TextToSpeech.QUEUE_FLUSH, null, null) }
+                            onTts = {
+                                runCatching {
+                                    tts?.speak(word.word, TextToSpeech.QUEUE_FLUSH, null, "vocab_${word.wordId}")
+                                }
+                            }
                         )
                     }
                 }

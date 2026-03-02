@@ -107,8 +107,11 @@ fun OPicBottomBar(navController: NavHostController) {
             enabled = canGoBack,
             isCurrentTab = false,
             onClick = debounced {
-                effectiveBackAction?.invoke()
-                    ?: navController.popBackStack()
+                if (effectiveBackAction != null) {
+                    effectiveBackAction.invoke()
+                } else if (navController.previousBackStackEntry != null) {
+                    navController.popBackStack()
+                }
             },
             modifier = Modifier.weight(1f)
         )
