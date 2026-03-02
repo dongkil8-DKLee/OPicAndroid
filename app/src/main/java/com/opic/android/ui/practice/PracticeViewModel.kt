@@ -9,8 +9,11 @@ import androidx.lifecycle.viewModelScope
 import com.opic.android.audio.AudioFileResolver
 import com.opic.android.audio.AudioPlayer
 import com.opic.android.audio.AudioRecorder
+import com.opic.android.audio.AudioSource
+import com.opic.android.audio.DualPlaybackManager
 import com.opic.android.audio.SttManager
 import com.opic.android.audio.TtsManager
+import com.opic.android.util.WavSampleReader
 import com.opic.android.data.local.dao.QuestionDao
 import com.opic.android.data.local.dao.VocabularyDao
 import com.opic.android.data.local.entity.VocabularyEntity
@@ -75,7 +78,18 @@ data class PracticeUiState(
     val userScriptAnalysisResult: AnalysisResult? = null,
 
     // 단어 추가 피드백
-    val wordAddedMessage: String? = null
+    val wordAddedMessage: String? = null,
+
+    // 파형 비교 + 동시 재생
+    val originalWaveform: FloatArray = FloatArray(0),
+    val userWaveform: FloatArray = FloatArray(0),
+    val userAudioSilenceTrimMs: Long = 0L,
+    val userAudioDurationMs: Long = 0L,
+    val userStartFraction: Float = 0f,
+    val isComparisonPlaying: Boolean = false,
+    val comparisonOriginalProgress: Float = 0f,
+    val comparisonUserProgress: Float = 0f,
+    val comparisonBalance: Float = 0.5f
 )
 
 @HiltViewModel
@@ -88,7 +102,8 @@ class PracticeViewModel @Inject constructor(
     private val audioRecorder: AudioRecorder,
     private val audioFileResolver: AudioFileResolver,
     private val ttsManager: TtsManager,
-    private val sttManager: SttManager
+    private val sttManager: SttManager,
+    private val dualPlaybackManager: DualPlaybackManager
 ) : ViewModel() {
 
     companion object {
@@ -159,6 +174,7 @@ class PracticeViewModel @Inject constructor(
                         userAudioPath = userAudio
                     )
                 }
+                if (userAudio != null) loadWaveforms()
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load question", e)
                 _uiState.update { it.copy(loading = false, error = "Load failed: ${e.message}") }
@@ -208,6 +224,7 @@ class PracticeViewModel @Inject constructor(
     fun goToSentence(index: Int) {
         val sentences = _uiState.value.sentences
         if (index < 0 || index >= sentences.size) return
+        stopComparisonPlayback()
         stopAll()
         stopUserScriptAll()
         _uiState.update {
@@ -216,9 +233,12 @@ class PracticeViewModel @Inject constructor(
                 currentSentenceText = sentences[index].segment.text,
                 currentSegment = sentences[index].segment,
                 userScriptSttText = null,
-                userScriptAnalysisResult = null
+                userScriptAnalysisResult = null,
+                originalWaveform = FloatArray(0),
+                userWaveform = FloatArray(0)
             )
         }
+        loadWaveforms()
     }
 
     fun nextSentence() {
@@ -233,7 +253,7 @@ class PracticeViewModel @Inject constructor(
 
     fun playOriginal() {
         val state = _uiState.value
-        if (state.isPlayingOriginal || state.isPlayingUser || state.isRecording) return
+        if (state.isPlayingOriginal || state.isPlayingUser || state.isRecording || state.isComparisonPlaying) return
         val segment = state.currentSegment ?: return
 
         _uiState.update { it.copy(isPlayingOriginal = true) }
@@ -270,7 +290,7 @@ class PracticeViewModel @Inject constructor(
 
     fun playUserRecording() {
         val state = _uiState.value
-        if (state.isPlayingOriginal || state.isPlayingUser || state.isRecording) return
+        if (state.isPlayingOriginal || state.isPlayingUser || state.isRecording || state.isComparisonPlaying) return
         val idx = state.currentIndex
         val path = state.sentences.getOrNull(idx)?.userRecordingPath ?: return
 
@@ -297,7 +317,7 @@ class PracticeViewModel @Inject constructor(
 
     private fun startRecording() {
         val state = _uiState.value
-        if (state.isPlayingOriginal || state.isPlayingUser) return
+        if (state.isPlayingOriginal || state.isPlayingUser || state.isComparisonPlaying) return
         val idx = state.currentIndex
 
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
@@ -470,6 +490,7 @@ class PracticeViewModel @Inject constructor(
 
     private fun startUserScriptRecording() {
         val state = _uiState.value
+        if (state.isComparisonPlaying) return
         val qId = state.questionId
         if (qId <= 0) return
 
@@ -492,6 +513,7 @@ class PracticeViewModel @Inject constructor(
                 )
             }
             Log.d(TAG, "UserScript recording done: ${outputFile.name}")
+            loadWaveforms()
         }
     }
 
@@ -502,11 +524,21 @@ class PracticeViewModel @Inject constructor(
     fun playUserScriptAudio() {
         val state = _uiState.value
         val path = state.userAudioPath ?: return
-        if (state.isPlayingUserAudio) return
+        if (state.isPlayingUserAudio || state.isComparisonPlaying) return
 
         _uiState.update { it.copy(isPlayingUserAudio = true) }
-        audioPlayer.playFromFile(path) {
-            _uiState.update { it.copy(isPlayingUserAudio = false) }
+        val startMs = if (state.userAudioDurationMs > 0) {
+            (state.userStartFraction * state.userAudioDurationMs).toLong()
+        } else 0L
+
+        if (startMs > 0 && state.userAudioDurationMs > 0) {
+            audioPlayer.playRangeFromFile(path, startMs, state.userAudioDurationMs) {
+                _uiState.update { it.copy(isPlayingUserAudio = false) }
+            }
+        } else {
+            audioPlayer.playFromFile(path) {
+                _uiState.update { it.copy(isPlayingUserAudio = false) }
+            }
         }
     }
 
@@ -621,6 +653,7 @@ class PracticeViewModel @Inject constructor(
 
     private fun stopAll() {
         audioPlayer.stop()
+        dualPlaybackManager.stop()
         if (_uiState.value.isRecording) audioRecorder.stop()
         if (_uiState.value.sttListening) sttManager.stopListening()
         _uiState.update {
@@ -629,7 +662,10 @@ class PracticeViewModel @Inject constructor(
                 isPlayingUser = false,
                 isRecording = false,
                 micLevel = 0f,
-                sttListening = false
+                sttListening = false,
+                isComparisonPlaying = false,
+                comparisonOriginalProgress = 0f,
+                comparisonUserProgress = 0f
             )
         }
     }
@@ -643,14 +679,153 @@ class PracticeViewModel @Inject constructor(
                 isRecordingUserScript = false,
                 userScriptMicLevel = 0f,
                 isPlayingUserAudio = false,
-                userScriptSttListening = false
+                userScriptSttListening = false,
+                isComparisonPlaying = false,
+                comparisonOriginalProgress = 0f,
+                comparisonUserProgress = 0f
             )
         }
+    }
+
+    // ==================== 파형 비교 + 동시 재생 ====================
+
+    private fun loadWaveforms() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val state = _uiState.value
+            val segment = state.currentSegment
+
+            // 원본 파형 로드 (WAV 직접 파싱 → MP3 등은 MediaCodec 디코딩)
+            val origWaveform = when (val source = state.assetPath) {
+                is AudioSource.AssetPath -> {
+                    WavSampleReader.readFromAssets(
+                        context, source.path, 300,
+                        segment?.startMs, segment?.endMs
+                    )
+                }
+                is AudioSource.FilePath -> {
+                    WavSampleReader.readFromFile(
+                        source.path, 300,
+                        segment?.startMs, segment?.endMs
+                    )
+                }
+                null -> FloatArray(0)
+            }
+
+            // 사용자 녹음: 선행 묵음 감지 → 트리밍하여 파형 로드
+            val userPath = state.userAudioPath
+            val silenceTrimMs = if (userPath != null) {
+                WavSampleReader.detectLeadingSilenceMs(userPath)
+            } else 0L
+
+            val userWaveform = if (userPath != null) {
+                WavSampleReader.readFromFile(
+                    userPath, 300,
+                    startMs = if (silenceTrimMs > 0) silenceTrimMs else null
+                )
+            } else FloatArray(0)
+
+            // 사용자 오디오 전체 길이 측정
+            val userDurationMs: Long = if (userPath != null) {
+                var mp: android.media.MediaPlayer? = null
+                try {
+                    mp = android.media.MediaPlayer().apply {
+                        setDataSource(userPath)
+                        prepare()
+                    }
+                    mp.duration.toLong()
+                } catch (e: Exception) { 0L }
+                finally { try { mp?.release() } catch (_: Exception) {} }
+            } else 0L
+
+            // 초기 시작 위치: 자동 감지된 묵음 끝 지점
+            val initialStartFraction = if (userDurationMs > 0 && silenceTrimMs > 0) {
+                (silenceTrimMs.toFloat() / userDurationMs).coerceIn(0f, 0.5f)
+            } else 0f
+
+            _uiState.update {
+                it.copy(
+                    originalWaveform = origWaveform,
+                    userWaveform = userWaveform,
+                    userAudioSilenceTrimMs = silenceTrimMs,
+                    userAudioDurationMs = userDurationMs,
+                    userStartFraction = initialStartFraction
+                )
+            }
+        }
+    }
+
+    fun toggleComparisonPlayback() {
+        if (_uiState.value.isComparisonPlaying) {
+            stopComparisonPlayback()
+            return
+        }
+
+        val state = _uiState.value
+        if (state.isPlayingOriginal || state.isPlayingUser || state.isRecording ||
+            state.isRecordingUserScript || state.isPlayingUserAudio) return
+
+        val userPath = state.userAudioPath ?: return
+        val segment = state.currentSegment ?: return
+
+        _uiState.update { it.copy(isComparisonPlaying = true, comparisonOriginalProgress = 0f, comparisonUserProgress = 0f) }
+
+        val userStartMs = if (state.userAudioDurationMs > 0) {
+            (state.userStartFraction * state.userAudioDurationMs).toLong()
+        } else {
+            state.userAudioSilenceTrimMs
+        }
+
+        dualPlaybackManager.playSimultaneous(
+            originalSource = state.assetPath,
+            originalStartMs = segment.startMs,
+            originalEndMs = segment.endMs,
+            userFilePath = userPath,
+            userStartMs = userStartMs,
+            initialBalance = state.comparisonBalance,
+            onPositionUpdate = { origProgress, userProgress ->
+                _uiState.update {
+                    it.copy(
+                        comparisonOriginalProgress = origProgress,
+                        comparisonUserProgress = userProgress
+                    )
+                }
+            },
+            onComplete = {
+                _uiState.update {
+                    it.copy(
+                        isComparisonPlaying = false,
+                        comparisonOriginalProgress = 0f,
+                        comparisonUserProgress = 0f
+                    )
+                }
+            }
+        )
+    }
+
+    fun stopComparisonPlayback() {
+        dualPlaybackManager.stop()
+        _uiState.update {
+            it.copy(
+                isComparisonPlaying = false,
+                comparisonOriginalProgress = 0f,
+                comparisonUserProgress = 0f
+            )
+        }
+    }
+
+    fun setComparisonBalance(balance: Float) {
+        _uiState.update { it.copy(comparisonBalance = balance) }
+        dualPlaybackManager.setBalance(balance)
+    }
+
+    fun setUserStartFraction(fraction: Float) {
+        _uiState.update { it.copy(userStartFraction = fraction.coerceIn(0f, 1f)) }
     }
 
     override fun onCleared() {
         super.onCleared()
         audioPlayer.stop()
+        dualPlaybackManager.stop()
         audioRecorder.stop()
         sttManager.stopListening()
         recordingJob?.cancel()

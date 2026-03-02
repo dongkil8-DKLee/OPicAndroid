@@ -7,7 +7,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,6 +62,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -132,6 +138,8 @@ private fun StudyContent(
     var showFilter by remember { mutableStateOf(false) }
     // 전체화면 토글: null=기본, "question"=Q 전체화면, "answer"=A 전체화면
     var expandedScript by remember { mutableStateOf<String?>(null) }
+    // 두 스크립트 창 비율 (0.0~1.0, Question 비율)
+    var splitFraction by remember { mutableFloatStateOf(0.44f) }
 
     Column(
         modifier = Modifier
@@ -167,10 +175,81 @@ private fun StudyContent(
             )
         }
 
-        // ===== 스크립트 영역 (전체화면 토글 지원) =====
-        if (expandedScript == null || expandedScript == "question") {
+        // ===== 스크립트 영역 (전체화면 토글 + 드래그 크기 조절 지원) =====
+        if (expandedScript == null) {
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                val totalHeightPx = with(LocalDensity.current) { maxHeight.toPx() }
+                Column(modifier = Modifier.fillMaxSize()) {
+                    ScriptSection(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(splitFraction),
+                        label = "Question",
+                        scriptText = state.currentQuestion?.questionText,
+                        highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.QUESTION) state.highlightedWordIndex else -1,
+                        isEditing = state.editingQuestion,
+                        draft = state.questionDraft,
+                        onToggleEdit = { viewModel.toggleEditQuestion() },
+                        onCancelEdit = { viewModel.cancelEditQuestion() },
+                        onDraftChange = { viewModel.updateQuestionDraft(it) },
+                        onSave = { viewModel.saveQuestionScript() },
+                        fontSize = state.fontSize,
+                        isPlaying = state.playingTarget == StudyPlayTarget.QUESTION,
+                        canPlay = !isBusy && state.currentQuestion != null,
+                        onPlay = { viewModel.playQuestionAudio() },
+                        onStop = { viewModel.stopAudio() },
+                        isExpanded = false,
+                        onExpandToggle = { expandedScript = "question" }
+                    )
+                    // 드래그 핸들
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(12.dp)
+                            .draggable(
+                                state = rememberDraggableState { delta ->
+                                    splitFraction = (splitFraction + delta / totalHeightPx).coerceIn(0.15f, 0.85f)
+                                },
+                                orientation = Orientation.Vertical
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(width = 40.dp, height = 4.dp)
+                                .background(Color.Gray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                        )
+                    }
+                    ScriptSection(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f - splitFraction),
+                        label = "Answer",
+                        scriptText = state.currentQuestion?.answerScript,
+                        highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.ANSWER) state.highlightedWordIndex else -1,
+                        isEditing = state.editingAnswer,
+                        draft = state.answerDraft,
+                        onToggleEdit = { viewModel.toggleEditAnswer() },
+                        onCancelEdit = { viewModel.cancelEditAnswer() },
+                        onDraftChange = { viewModel.updateAnswerDraft(it) },
+                        onSave = { viewModel.saveAnswerScript() },
+                        fontSize = state.fontSize,
+                        isPlaying = state.playingTarget == StudyPlayTarget.ANSWER,
+                        canPlay = !isBusy && state.currentQuestion != null,
+                        onPlay = { viewModel.playAnswerAudio() },
+                        onStop = { viewModel.stopAudio() },
+                        isExpanded = false,
+                        onExpandToggle = { expandedScript = "answer" }
+                    )
+                }
+            }
+        } else if (expandedScript == "question") {
             ScriptSection(
-                modifier = Modifier.weight(if (expandedScript == null) 2f else 1f),
+                modifier = Modifier.weight(1f),
                 label = "Question",
                 scriptText = state.currentQuestion?.questionText,
                 highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.QUESTION) state.highlightedWordIndex else -1,
@@ -185,18 +264,12 @@ private fun StudyContent(
                 canPlay = !isBusy && state.currentQuestion != null,
                 onPlay = { viewModel.playQuestionAudio() },
                 onStop = { viewModel.stopAudio() },
-                isExpanded = expandedScript == "question",
-                onExpandToggle = {
-                    expandedScript = if (expandedScript == "question") null else "question"
-                }
+                isExpanded = true,
+                onExpandToggle = { expandedScript = null }
             )
-
-            Spacer(modifier = Modifier.height(4.dp))
-        }
-
-        if (expandedScript == null || expandedScript == "answer") {
+        } else {
             ScriptSection(
-                modifier = Modifier.weight(if (expandedScript == null) 2.5f else 1f),
+                modifier = Modifier.weight(1f),
                 label = "Answer",
                 scriptText = state.currentQuestion?.answerScript,
                 highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.ANSWER) state.highlightedWordIndex else -1,
@@ -211,14 +284,12 @@ private fun StudyContent(
                 canPlay = !isBusy && state.currentQuestion != null,
                 onPlay = { viewModel.playAnswerAudio() },
                 onStop = { viewModel.stopAudio() },
-                isExpanded = expandedScript == "answer",
-                onExpandToggle = {
-                    expandedScript = if (expandedScript == "answer") null else "answer"
-                }
+                isExpanded = true,
+                onExpandToggle = { expandedScript = null }
             )
-
-            Spacer(modifier = Modifier.height(4.dp))
         }
+
+        Spacer(modifier = Modifier.height(4.dp))
 
         // ===== 속도 + 학습/별표/설정 통합 행 =====
         SpeedAndControlRow(state = state, viewModel = viewModel, onSettings = onSettings)

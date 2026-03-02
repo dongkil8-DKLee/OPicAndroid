@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.opic.android.ui.common.SpeechAnalysisPanel
+import com.opic.android.ui.common.WaveformComparisonPanel
 import com.opic.android.ui.theme.OPicColors
 
 /**
@@ -159,6 +160,28 @@ private fun PracticeContent(
             }
         }
 
+        // ===== 음성 비교 섹션 (녹음 존재 시만) =====
+        if (state.hasUserAudio && expandedSection == null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            val isBusyForComparison = state.isPlayingOriginal || state.isPlayingUser ||
+                    state.isRecording || state.isRecordingUserScript ||
+                    state.isPlayingUserAudio || state.sttListening ||
+                    state.userScriptSttListening
+            WaveformComparisonPanel(
+                originalWaveform = state.originalWaveform,
+                userWaveform = state.userWaveform,
+                isPlaying = state.isComparisonPlaying,
+                originalProgress = state.comparisonOriginalProgress,
+                userProgress = state.comparisonUserProgress,
+                balance = state.comparisonBalance,
+                enabled = !isBusyForComparison,
+                onTogglePlayback = { viewModel.toggleComparisonPlayback() },
+                onBalanceChange = { viewModel.setComparisonBalance(it) },
+                userStartFraction = state.userStartFraction,
+                onUserStartFractionChange = { viewModel.setUserStartFraction(it) }
+            )
+        }
+
     }
 }
 
@@ -217,7 +240,7 @@ private fun PracticeSentenceSection(
     onExpandToggle: () -> Unit
 ) {
     val isBusy = state.isPlayingOriginal || state.isRecordingUserScript ||
-            state.isPlayingUserAudio || state.userScriptSttListening
+            state.isPlayingUserAudio || state.userScriptSttListening || state.isComparisonPlaying
 
     Column(
         modifier = modifier
@@ -345,7 +368,7 @@ private fun UserScriptSection(
     isExpanded: Boolean,
     onExpandToggle: () -> Unit
 ) {
-    val isBusy = state.isRecordingUserScript || state.isPlayingUserAudio || state.userScriptSttListening
+    val isBusy = state.isRecordingUserScript || state.isPlayingUserAudio || state.userScriptSttListening || state.isComparisonPlaying
     val currentSentence = state.sentences.getOrNull(state.currentIndex)
 
     Column(
