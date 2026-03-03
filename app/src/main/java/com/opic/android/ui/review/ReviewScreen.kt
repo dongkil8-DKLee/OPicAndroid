@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,6 +48,7 @@ import com.opic.android.ui.theme.OPicColors
 
 @Composable
 fun ReviewScreen(
+    onNavigateToStudy: (type: String?) -> Unit = {},
     viewModel: ReviewViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -55,7 +57,7 @@ fun ReviewScreen(
         when {
             state.loading -> LoadingContent()
             state.results.isEmpty() -> EmptyContent()
-            else -> ReviewContent(state, viewModel)
+            else -> ReviewContent(state, viewModel, onNavigateToStudy)
         }
     }
 }
@@ -82,14 +84,15 @@ private fun EmptyContent() {
 @Composable
 private fun ReviewContent(
     state: ReviewUiState,
-    viewModel: ReviewViewModel
+    viewModel: ReviewViewModel,
+    onNavigateToStudy: (type: String?) -> Unit
 ) {
     val currentResult = state.results[state.currentIndex]
     val isPlaying = state.playingTarget != null
 
     Column(modifier = Modifier.fillMaxSize()) {
 
-        // --- 상단: Question X of N + Play All ---
+        // --- 상단: Question X of N | ▶ Play | Spacer | Study 🔗 ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -99,11 +102,12 @@ private fun ReviewContent(
             Text(
                 text = "Question ${state.currentIndex + 1} of ${state.totalQuestions}",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
+                fontWeight = FontWeight.Bold
             )
 
-            // Play All / Stop 버튼
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // Play All / Stop 버튼 (텍스트 바로 오른쪽)
             if (state.playAllActive) {
                 IconButton(onClick = { viewModel.togglePlayAll() }, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Filled.Stop, contentDescription = "Stop All", tint = OPicColors.RecordActive)
@@ -120,6 +124,21 @@ private fun ReviewContent(
                         tint = if (!isPlaying) OPicColors.PlayButton else Color.Gray
                     )
                 }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Study 바로가기 버튼
+            TextButton(
+                onClick = { onNavigateToStudy(currentResult.type) },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Text(
+                    text = "Study 🔗",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = OPicColors.Primary
+                )
             }
         }
 

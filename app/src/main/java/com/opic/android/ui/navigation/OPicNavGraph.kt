@@ -78,7 +78,14 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                 route = Screen.Review.route,
                 arguments = listOf(navArgument("sessionId") { type = NavType.IntType })
             ) {
-                ReviewScreen()
+                ReviewScreen(
+                    onNavigateToStudy = { type ->
+                        navController.navigate(Screen.Study.createRoute(type = type)) {
+                            popUpTo(Screen.Report.route) { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    }
+                )
             }
 
             composable(
