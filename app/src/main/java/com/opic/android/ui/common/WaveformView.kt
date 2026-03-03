@@ -109,6 +109,7 @@ fun WaveformView(
         Modifier.pointerInput(Unit) {
             val touchSlop = viewConfiguration.touchSlop
             var lastTapTime = 0L
+            var savedAnchorLeft = true  // ★ 확대 상태에서 앵커 방향 기억
 
             awaitEachGesture {
                 // 첫 번째 포인터 다운 감지
@@ -128,10 +129,10 @@ fun WaveformView(
                     return@awaitEachGesture
                 }
 
-                var moved           = false
-                var anchorLeft      = true  // true=시작마커(오른쪽스와이프), false=종료마커(왼쪽스와이프)
+                var moved            = false
+                var anchorLeft       = savedAnchorLeft  // ★ 기본값: 이전 앵커
                 var anchorDetermined = false
-                var accDeltaX       = 0f
+                var accDeltaX        = 0f
 
                 while (true) {
                     val event = awaitPointerEvent()
@@ -152,9 +153,16 @@ fun WaveformView(
                     val deltaX = ptr.position.x - ptr.previousPosition.x
                     accDeltaX += deltaX
 
-                    // 첫 유의미한 이동 방향 → 앵커 결정
+                    // ★ 앵커 결정 로직: 1x 상태에서만 첫 방향으로 앵커 갱신
                     if (!anchorDetermined && abs(accDeltaX) > touchSlop) {
-                        anchorLeft       = accDeltaX > 0  // 오른쪽 이동 = 시작 마커 앵커
+                        if (latestZoomScale <= 1f) {
+                            // 1x 상태: 첫 방향으로 앵커 결정 및 저장
+                            anchorLeft      = accDeltaX > 0  // 오른쪽 = 시작마커, 왼쪽 = 종료마커
+                            savedAnchorLeft = anchorLeft
+                        } else {
+                            // 확대 상태: 이전 앵커 유지
+                            anchorLeft = savedAnchorLeft
+                        }
                         anchorDetermined = true
                         moved            = true
                     }
@@ -169,14 +177,16 @@ fun WaveformView(
                             latestEndMarkerFraction ?: 1f
                         }
 
-                        // 확대: 앵커와 같은 방향 스와이프 → factor > 1
-                        // 축소: 반대 방향 스와이프 → factor < 1
-                        val zoomDelta = if (anchorLeft) deltaX else -deltaX
+                        // ★ zoomDelta: 1x→앵커방향 기준, 확대→우측=확대/좌측=축소
+                        val zoomDelta = if (latestZoomScale <= 1f) {
+                            if (anchorLeft) deltaX else -deltaX
+                        } else {
+                            deltaX  // 우측=양수=확대, 좌측=음수=축소
+                        }
                         val factor    = 1f + zoomDelta / size.width * 4f
                         val newScale  = (latestZoomScale * factor).coerceIn(1f, 8f)
                         val ws        = 1f / newScale
 
-                        // 앵커 마커가 화면 중앙으로 부드럽게 이동
                         val newWindowStart = (anchorFrac - ws / 2f).coerceIn(0f, 1f - ws)
 
                         zoomScale       = newScale

@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
@@ -24,6 +26,7 @@ import com.opic.android.ui.navigation.BottomNavState
 import com.opic.android.ui.navigation.LocalBottomNavState
 import com.opic.android.ui.navigation.OPicBottomBar
 import com.opic.android.ui.navigation.OPicNavGraph
+import com.opic.android.ui.theme.OPicColors
 import com.opic.android.ui.theme.OPicTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -46,13 +49,13 @@ class MainActivity : ComponentActivity() {
         requestStoragePermissionsIfNeeded()
         enableEdgeToEdge()
         setContent {
-            val themeMode = appPrefs.themeMode
-            val darkTheme = when (themeMode) {
-                "dark" -> true
-                "light" -> false
-                else -> false // system default → light for now
-            }
-            OPicTheme(darkTheme = darkTheme) {
+            val themeMode by appPrefs.themeModeFlow.collectAsState()
+            val isDark = themeMode == "dark"
+
+            // 테마 색상 즉시 적용 (recompose 트리거)
+            if (isDark) OPicColors.applyDark() else OPicColors.applyLight()
+
+            OPicTheme(darkTheme = isDark) {
                 val navController = rememberNavController()
                 val bottomNavState = remember { BottomNavState() }
 

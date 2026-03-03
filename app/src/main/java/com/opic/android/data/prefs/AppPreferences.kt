@@ -3,6 +3,9 @@ package com.opic.android.data.prefs
 import android.content.Context
 import android.content.SharedPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,6 +18,11 @@ class AppPreferences @Inject constructor(
 ) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("opic_app_settings", Context.MODE_PRIVATE)
+
+    private val _themeModeFlow = MutableStateFlow(
+        prefs.getString("theme_mode", "light") ?: "light"
+    )
+    val themeModeFlow: StateFlow<String> = _themeModeFlow.asStateFlow()
 
     var textSize: Int
         get() = prefs.getInt("text_size", 18)
@@ -38,5 +46,8 @@ class AppPreferences @Inject constructor(
 
     var themeMode: String
         get() = prefs.getString("theme_mode", "light") ?: "light"
-        set(v) = prefs.edit().putString("theme_mode", v).apply()
+        set(v) {
+            prefs.edit().putString("theme_mode", v).apply()
+            _themeModeFlow.value = v
+        }
 }

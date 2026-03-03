@@ -15,20 +15,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.opic.android.ui.theme.OPicColors
-
-/** 활성 주황색 */
-private val EnabledBg = OPicColors.Primary          // 0xFFFF5733
-/** 비활성 연한 주황색 */
-private val DisabledBg = Color(0xFFFFAB91)
-private val ButtonTextWhite = Color.White
-private val ButtonTextBlack = Color.Black
 
 /** 테스트 플로우 라우트 (Survey, SelfAssessment, Test) */
 private val testFlowRoutes = setOf(
@@ -48,9 +40,11 @@ private fun isTestFlowRoute(route: String?): Boolean {
  * 모든 화면 공통 하단바: < Back | Study | Home | Test | Next >
  *
  * - < Back, Next > 항상 좌/우 고정
- * - 테스트 플로우: Study, Home, Test 비활성화 (연한 주황색)
- * - 일반 화면: 현재 탭 = 주황 배경 + 검은 글씨, 나머지 = 주황 배경 + 흰 글씨
- * - 비활성화 = 연한 주황 배경
+ * - 테스트 플로우: Study, Home, Test 비활성화
+ * - 현재 탭 = NavTextSelected(Light:검정/Dark:골드), 나머지 = NavTextNormal
+ * - Study 탭: StudyScreen + PracticeScreen
+ * - Test 탭: SurveyPage + SelfAssessmentPage + BeginTestPage + TestScreen
+ * - Home 탭: ReportScreen
  */
 @Composable
 fun OPicBottomBar(navController: NavHostController) {
@@ -63,7 +57,13 @@ fun OPicBottomBar(navController: NavHostController) {
     val isTestFlow = visibleEntries.any { isTestFlowRoute(it.destination.route) }
             || isTestFlowRoute(currentRoute)
 
-    val isOnHome = currentRoute == Screen.Report.route
+    val isOnHome  = currentRoute == Screen.Report.route
+    val isOnStudy = currentRoute?.startsWith("StudyScreen") == true
+            || currentRoute?.startsWith("PracticeScreen") == true
+    val isOnTest  = isTestFlowRoute(currentRoute)
+            || currentRoute?.startsWith("TestScreen") == true
+            || currentRoute?.startsWith("BeginTestPage") == true
+            || currentRoute == Screen.SelfAssessment.route
 
     // ★ stale 액션 방지: ownerRoute가 현재 화면과 일치할 때만 액션 사용
     val isOwner = bottomNavState.isOwnerRoute(currentRoute)
@@ -76,10 +76,6 @@ fun OPicBottomBar(navController: NavHostController) {
 
     // Next > 활성 여부
     val canGoNext = effectiveNextAction != null && bottomNavState.nextEnabled
-
-    // 현재 화면이 어떤 탭인지 (현재 탭 = 검은 글씨)
-    val isOnStudy = currentRoute?.startsWith("StudyScreen") == true
-    val isOnTest = currentRoute == Screen.Survey.route  // Test 탭 = Survey 진입점
 
     // 테스트 플로우에서는 Study/Home/Test 비활성화
     val middleEnabled = !isTestFlow
@@ -130,7 +126,7 @@ fun OPicBottomBar(navController: NavHostController) {
             modifier = Modifier.weight(1f)
         )
 
-        // ===== Home (= 이전 Report 탭, 항상 Report로 직접 네비게이션) =====
+        // ===== Home =====
         BarButton(
             text = "Home",
             enabled = middleEnabled,
@@ -178,10 +174,10 @@ private fun BarButton(
         onClick = onClick,
         enabled = enabled,
         colors = ButtonDefaults.buttonColors(
-            containerColor = EnabledBg,
-            contentColor = if (isCurrentTab) ButtonTextBlack else ButtonTextWhite,
-            disabledContainerColor = DisabledBg,
-            disabledContentColor = ButtonTextWhite.copy(alpha = 0.7f)
+            containerColor        = OPicColors.NavBarBg,
+            contentColor          = if (isCurrentTab) OPicColors.NavTextSelected else OPicColors.NavTextNormal,
+            disabledContainerColor = OPicColors.NavDisabledBg,
+            disabledContentColor  = OPicColors.NavTextNormal.copy(alpha = 0.5f)
         ),
         shape = RoundedCornerShape(6.dp),
         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),

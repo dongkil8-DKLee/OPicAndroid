@@ -2,13 +2,9 @@ package com.opic.android.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import android.os.Build
 
 // OPIc brand colors
 val OPicBlue = Color(0xFF1565C0)
@@ -39,45 +35,46 @@ private val LightColorScheme = lightColorScheme(
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFD8E3F8),
     onSecondaryContainer = Color(0xFF111C2B),
-    background = Color(0xFFFAFAFF),
-    surface = Color(0xFFFAFAFF),
-    onBackground = Color(0xFF1A1C1E),
-    onSurface = Color(0xFF1A1C1E),
+    background = Color(0xFFF8FAFF),
+    surface = Color(0xFFF8FAFF),
+    onBackground = Color(0xFF0F172A),
+    onSurface = Color(0xFF0F172A),
     error = OPicRed,
     onError = Color.White
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFFA3C4FF),
-    onPrimary = Color(0xFF003062),
-    primaryContainer = Color(0xFF00469B),
-    onPrimaryContainer = Color(0xFFD3E4FF),
-    secondary = Color(0xFFBBC7DB),
-    onSecondary = Color(0xFF253140),
-    secondaryContainer = Color(0xFF3C4858),
-    onSecondaryContainer = Color(0xFFD8E3F8),
-    background = Color(0xFF1A1C1E),
-    surface = Color(0xFF1A1C1E),
-    onBackground = Color(0xFFE2E2E6),
-    onSurface = Color(0xFFE2E2E6),
-    error = Color(0xFFFFB4AB),
-    onError = Color(0xFF690005)
+    primary = Color(0xFF3B82F6),
+    onPrimary = Color(0xFFF1F5F9),
+    primaryContainer = Color(0xFF1E293B),
+    onPrimaryContainer = Color(0xFFF1F5F9),
+    secondary = Color(0xFF94A3B8),
+    onSecondary = Color(0xFF0F172A),
+    secondaryContainer = Color(0xFF1E293B),
+    onSecondaryContainer = Color(0xFFF1F5F9),
+    background = Color(0xFF0F172A),
+    surface = Color(0xFF0F172A),
+    onBackground = Color(0xFFF1F5F9),
+    onSurface = Color(0xFFF1F5F9),
+    error = Color(0xFFF87171),
+    onError = Color(0xFF0F172A)
 )
 
 @Composable
 fun OPicTheme(
     darkTheme: Boolean = false,
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,  // 커스텀 색상 우선 적용 — dynamic color 사용 안 함
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
+    val bgColor    = if (darkTheme) Color(0xFF0F172A) else Color(0xFFF8FAFF)
+    val onBgColor  = if (darkTheme) Color(0xFFF1F5F9) else Color(0xFF0F172A)
+
+    val colorScheme = (if (darkTheme) DarkColorScheme else LightColorScheme).copy(
+        background   = bgColor,
+        surface      = bgColor,
+        onBackground = onBgColor,
+        onSurface    = onBgColor
+    )
 
     MaterialTheme(
         colorScheme = colorScheme,
