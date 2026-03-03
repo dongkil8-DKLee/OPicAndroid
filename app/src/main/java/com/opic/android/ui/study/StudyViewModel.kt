@@ -252,6 +252,30 @@ class StudyViewModel @Inject constructor(
         }
     }
 
+    /** Review → Study 바로가기: type + set 동시 적용 (loading 완료 후 호출 전제) */
+    fun initFilters(type: String, set: String?) {
+        _uiState.update { it.copy(selectedType = type) }
+        prefs.type = type
+
+        viewModelScope.launch {
+            val filteredSets = if (type == "전체") {
+                allSummaries.mapNotNull { it.set }.distinct().sorted()
+            } else {
+                allSummaries.filter { it.type == type }.mapNotNull { it.set }.distinct().sorted()
+            }
+
+            if (!set.isNullOrBlank() && set in filteredSets) {
+                _uiState.update { it.copy(sets = filteredSets, selectedSet = set) }
+                prefs.set = set
+            } else {
+                _uiState.update { it.copy(sets = filteredSets, selectedSet = "전체") }
+            }
+
+            updateTitleList()
+            selectFirstTitle()
+        }
+    }
+
     fun onSortChanged(sort: String) {
         _uiState.update { it.copy(selectedSort = sort) }
         prefs.sort = sort

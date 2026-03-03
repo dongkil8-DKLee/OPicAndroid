@@ -17,11 +17,12 @@ sealed class Screen(val route: String) {
     data object Review : Screen("ReviewScreen/{sessionId}") {
         fun createRoute(sessionId: Int) = "ReviewScreen/$sessionId"
     }
-    data object Study : Screen("StudyScreen?type={type}&grade={grade}") {
-        fun createRoute(type: String? = null, grade: String? = null): String {
+    data object Study : Screen("StudyScreen?type={type}&grade={grade}&set={set}") {
+        fun createRoute(type: String? = null, grade: String? = null, set: String? = null): String {
             val params = mutableListOf<String>()
             if (type != null) params.add("type=$type")
             if (grade != null) params.add("grade=$grade")
+            if (set != null) params.add("set=$set")
             return if (params.isEmpty()) "StudyScreen" else "StudyScreen?${params.joinToString("&")}"
         }
     }

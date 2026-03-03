@@ -48,7 +48,7 @@ import com.opic.android.ui.theme.OPicColors
 
 @Composable
 fun ReviewScreen(
-    onNavigateToStudy: (type: String?) -> Unit = {},
+    onNavigateToStudy: (type: String?, set: String?) -> Unit = { _, _ -> },
     viewModel: ReviewViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -57,7 +57,7 @@ fun ReviewScreen(
         when {
             state.loading -> LoadingContent()
             state.results.isEmpty() -> EmptyContent()
-            else -> ReviewContent(state, viewModel, onNavigateToStudy)
+            else -> ReviewContent(state, viewModel, onNavigateToStudy = onNavigateToStudy)
         }
     }
 }
@@ -85,7 +85,7 @@ private fun EmptyContent() {
 private fun ReviewContent(
     state: ReviewUiState,
     viewModel: ReviewViewModel,
-    onNavigateToStudy: (type: String?) -> Unit
+    onNavigateToStudy: (type: String?, set: String?) -> Unit
 ) {
     val currentResult = state.results[state.currentIndex]
     val isPlaying = state.playingTarget != null
@@ -130,7 +130,7 @@ private fun ReviewContent(
 
             // Study 바로가기 버튼
             TextButton(
-                onClick = { onNavigateToStudy(currentResult.type) },
+                onClick = { onNavigateToStudy(currentResult.type, currentResult.set) },
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
             ) {
                 Text(

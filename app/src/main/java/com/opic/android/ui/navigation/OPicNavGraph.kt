@@ -79,9 +79,9 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                 arguments = listOf(navArgument("sessionId") { type = NavType.IntType })
             ) {
                 ReviewScreen(
-                    onNavigateToStudy = { type ->
-                        navController.navigate(Screen.Study.createRoute(type = type)) {
-                            popUpTo(Screen.Report.route) { inclusive = false }
+                    onNavigateToStudy = { type, set ->
+                        // popUpTo 없음 → Back 시 Review로 복귀
+                        navController.navigate(Screen.Study.createRoute(type = type, set = set)) {
                             launchSingleTop = true
                         }
                     }
@@ -100,13 +100,20 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                         type = NavType.StringType
                         nullable = true
                         defaultValue = null
+                    },
+                    navArgument("set") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
                     }
                 )
             ) { backStackEntry ->
                 val initialTopicType = backStackEntry.arguments?.getString("type")
-                val initialGrade = backStackEntry.arguments?.getString("grade")
+                val initialTopicSet  = backStackEntry.arguments?.getString("set")
+                val initialGrade     = backStackEntry.arguments?.getString("grade")
                 StudyScreen(
                     initialTopicType = initialTopicType,
+                    initialTopicSet  = initialTopicSet,
                     initialGrade = initialGrade,
                     onPractice = { questionId ->
                         navController.navigate(Screen.Practice.createRoute(questionId))

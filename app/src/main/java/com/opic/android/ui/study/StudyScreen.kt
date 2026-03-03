@@ -91,6 +91,7 @@ import com.opic.android.ui.theme.OPicColors
 @Composable
 fun StudyScreen(
     initialTopicType: String? = null,
+    initialTopicSet: String? = null,
     initialGrade: String? = null,
     onPractice: (Int) -> Unit = {},
     onSettings: () -> Unit = {},
@@ -98,10 +99,11 @@ fun StudyScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    // initialTopicType → 유형 필터 자동 적용
-    LaunchedEffect(initialTopicType) {
-        if (!initialTopicType.isNullOrBlank()) {
-            viewModel.onTypeChanged(initialTopicType)
+    // initialTopicType+Set → loading 완료 후 적용 (레이스 컨디션 방지)
+    // loading 중에 적용하면 loadInitialData()가 완료되며 selectedType을 덮어씀
+    LaunchedEffect(initialTopicType, state.loading) {
+        if (!state.loading && !initialTopicType.isNullOrBlank()) {
+            viewModel.initFilters(initialTopicType, initialTopicSet)
         }
     }
 
