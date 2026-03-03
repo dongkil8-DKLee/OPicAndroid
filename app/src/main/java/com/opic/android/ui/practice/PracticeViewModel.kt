@@ -93,9 +93,20 @@ data class PracticeUiState(
     val comparisonSpeed: Float = 1.0f,
     // PLAY 단독 재생 진행률
     val userPlayProgress: Float = 0f,
-    // 문장 경계 보정
+
+    // ─── 문장 경계 보정 ───────────────────────────────────────────────
+    // 끝 여유시간: 모든 문장 endMs에 추가 (0 ~ 500ms)
     val endBufferMs: Long = 150L,
-    val sentenceOffsets: Map<Int, Long> = emptyMap(),
+    // 파형 확장 표시 범위: 구간 앞/뒤로 얼마나 더 보여줄지 (ms)
+    // ★ 기본값 변경: expandBeforeMs / expandAfterMs 수정
+    val expandBeforeMs: Long = 1000L,   // 구간 시작 앞쪽 확장 (기본 1초)
+    val expandAfterMs:  Long = 1000L,   // 구간 끝   뒤쪽 확장 (기본 1초)
+    // 문장별 시작/끝 조정 (드래그 저장값, ms 오프셋)
+    val sentenceStartOffsets: Map<Int, Long> = emptyMap(),
+    val sentenceEndOffsets:   Map<Int, Long> = emptyMap(),
+    // 현재 로드된 파형의 실제 ms 범위 (마커↔ms 변환에 사용)
+    val originalWaveformStartMs: Long = 0L,
+    val originalWaveformEndMs:   Long = 0L,
     val showTimingPanel: Boolean = false
 )
 
@@ -133,8 +144,18 @@ class PracticeViewModel @Inject constructor(
 
     init {
         val questionId = savedStateHandle.get<Int>("questionId") ?: 0
-        val savedBuffer = prefs.getLong("end_buffer_ms", 150L)
-        _uiState.update { it.copy(endBufferMs = savedBuffer) }
+        // 저장된 전역 설정 복원
+        val savedBuffer       = prefs.getLong("end_buffer_ms",    150L)
+        // ★ 기본값: expand_before/after_ms → 여기서도 기본값 일치시킬 것
+        val savedExpandBefore = prefs.getLong("expand_before_ms", 1000L)
+        val savedExpandAfter  = prefs.getLong("expand_after_ms",  1000L)
+        _uiState.update {
+            it.copy(
+                endBufferMs   = savedBuffer,
+                expandBeforeMs = savedExpandBefore,
+                expandAfterMs  = savedExpandAfter
+            )
+        }
         if (questionId > 0) {
             loadQuestion(questionId)
         } else {
@@ -171,6 +192,14 @@ class PracticeViewModel @Inject constructor(
                 // UserScript 녹음 파일 검색
                 val userAudio = findUserRecording(questionId)
 
+                // 저장된 문장별 경계 오프셋 복원 (0인 경우 맵에서 제외하여 깔끔하게 유지)
+                val savedStartOffsets = sentenceStates.indices
+                    .associate { i -> i to prefs.getLong("start_off_${questionId}_$i", 0L) }
+                    .filter { it.value != 0L }
+                val savedEndOffsets = sentenceStates.indices
+                    .associate { i -> i to prefs.getLong("end_off_${questionId}_$i", 0L) }
+                    .filter { it.value != 0L }
+
                 _uiState.update {
                     it.copy(
                         loading = false,
@@ -181,6 +210,8 @@ class PracticeViewModel @Inject constructor(
                         currentIndex = 0,
                         currentSentenceText = sentenceStates.firstOrNull()?.segment?.text ?: "",
                         currentSegment = sentenceStates.firstOrNull()?.segment,
+                        sentenceStartOffsets = savedStartOffsets,
+                        sentenceEndOffsets   = savedEndOffsets,
                         hasOriginalAudio = assetPath != null,
                         assetPath = assetPath,
                         hasUserAudio = userAudio != null,
@@ -248,7 +279,9 @@ class PracticeViewModel @Inject constructor(
                 userScriptSttText = null,
                 userScriptAnalysisResult = null,
                 originalWaveform = FloatArray(0),
-                userWaveform = FloatArray(0)
+                userWaveform = FloatArray(0),
+                originalWaveformStartMs = 0L,
+                originalWaveformEndMs   = 0L
             )
         }
         loadWaveforms()
@@ -267,19 +300,20 @@ class PracticeViewModel @Inject constructor(
     fun playOriginal() {
         val state = _uiState.value
         if (state.isPlayingOriginal || state.isPlayingUser || state.isRecording || state.isComparisonPlaying) return
-        val segment = state.currentSegment ?: return
-        val effectiveEnd = effectiveSegmentEndMs(segment)
+        val segment      = state.currentSegment ?: return
+        val effectiveStart = effectiveSegmentStartMs(segment)
+        val effectiveEnd   = effectiveSegmentEndMs(segment)
 
         _uiState.update { it.copy(isPlayingOriginal = true) }
         markInProgressIfNeeded()
 
         when (val source = state.assetPath) {
             is com.opic.android.audio.AudioSource.AssetPath ->
-                audioPlayer.playRangeFromAssets(source.path, segment.startMs, effectiveEnd) {
+                audioPlayer.playRangeFromAssets(source.path, effectiveStart, effectiveEnd) {
                     _uiState.update { it.copy(isPlayingOriginal = false) }
                 }
             is com.opic.android.audio.AudioSource.FilePath ->
-                audioPlayer.playRangeFromFile(source.path, segment.startMs, effectiveEnd) {
+                audioPlayer.playRangeFromFile(source.path, effectiveStart, effectiveEnd) {
                     _uiState.update { it.copy(isPlayingOriginal = false) }
                 }
             null -> viewModelScope.launch {
@@ -656,10 +690,16 @@ class PracticeViewModel @Inject constructor(
 
     // ==================== 문장 경계 보정 ====================
 
-    /** 문장 끝 ms 계산: segment.endMs + 전역버퍼 + 개별오프셋, 총 오디오 길이 이내로 클램핑 */
+    /** 실제 재생 시작 ms: segment.startMs + 문장별 시작 오프셋 */
+    private fun effectiveSegmentStartMs(segment: com.opic.android.util.SentenceSegment): Long {
+        val adjustment = _uiState.value.sentenceStartOffsets[segment.index] ?: 0L
+        return (segment.startMs + adjustment).coerceAtLeast(0L)
+    }
+
+    /** 실제 재생 끝 ms: segment.endMs + 전역버퍼 + 문장별 끝 오프셋 */
     private fun effectiveSegmentEndMs(segment: com.opic.android.util.SentenceSegment): Long {
         val state = _uiState.value
-        val adjustment = state.sentenceOffsets[segment.index] ?: 0L
+        val adjustment      = state.sentenceEndOffsets[segment.index] ?: 0L
         val totalDurationMs = state.sentences.lastOrNull()?.segment?.endMs ?: segment.endMs
         return (segment.endMs + state.endBufferMs + adjustment).coerceIn(segment.startMs + 100L, totalDurationMs)
     }
@@ -670,14 +710,36 @@ class PracticeViewModel @Inject constructor(
         prefs.edit().putLong("end_buffer_ms", clamped).apply()
     }
 
-    fun adjustSentenceOffset(index: Int, deltaMs: Long) {
-        val current = _uiState.value.sentenceOffsets[index] ?: 0L
-        val newOffset = (current + deltaMs).coerceIn(-500L, 500L)
-        _uiState.update { it.copy(sentenceOffsets = it.sentenceOffsets + (index to newOffset)) }
+    // ── 파형 확장 범위 설정 ────────────────────────────────────────────
+    // ★ UI 버튼 1회 클릭 = 500ms 변경 / 최대값 = 3000ms (PracticeScreen 쪽 참고)
+    fun setExpandBefore(ms: Long) {
+        val clamped = ms.coerceIn(0L, 3000L)
+        prefs.edit().putLong("expand_before_ms", clamped).apply()
+        _uiState.update { it.copy(expandBeforeMs = clamped) }
+        loadWaveforms()   // 범위가 바뀌면 파형 재로드
     }
 
-    fun resetSentenceOffset(index: Int) {
-        _uiState.update { it.copy(sentenceOffsets = it.sentenceOffsets - index) }
+    fun setExpandAfter(ms: Long) {
+        val clamped = ms.coerceIn(0L, 3000L)
+        prefs.edit().putLong("expand_after_ms", clamped).apply()
+        _uiState.update { it.copy(expandAfterMs = clamped) }
+        loadWaveforms()
+    }
+
+    // ── 문장별 경계 드래그 저장 ──────────────────────────────────────
+    // SharedPreferences 키: "start_off_{questionId}_{sentenceIndex}"
+    fun setSentenceStartOffset(index: Int, offsetMs: Long) {
+        val clamped    = offsetMs.coerceIn(-3000L, 3000L)
+        val questionId = _uiState.value.questionId
+        _uiState.update { it.copy(sentenceStartOffsets = it.sentenceStartOffsets + (index to clamped)) }
+        prefs.edit().putLong("start_off_${questionId}_$index", clamped).apply()
+    }
+
+    fun setSentenceEndOffset(index: Int, offsetMs: Long) {
+        val clamped    = offsetMs.coerceIn(-3000L, 3000L)
+        val questionId = _uiState.value.questionId
+        _uiState.update { it.copy(sentenceEndOffsets = it.sentenceEndOffsets + (index to clamped)) }
+        prefs.edit().putLong("end_off_${questionId}_$index", clamped).apply()
     }
 
     fun toggleTimingPanel() {
@@ -740,61 +802,65 @@ class PracticeViewModel @Inject constructor(
             val state = _uiState.value
             val segment = state.currentSegment
 
-            // 원본 파형 로드 (WAV 직접 파싱 → MP3 등은 MediaCodec 디코딩)
+            // ── 원본 파형: 구간 앞뒤를 expandBefore/After 만큼 확장하여 로드 ──
+            // ★ 표시 범위 조정: expandBeforeMs / expandAfterMs 값이 범위를 결정
+            val waveformStartMs: Long
+            val waveformEndMs: Long
+            if (segment != null) {
+                // 앞으로 확장 (0 미만이면 0으로 클램핑)
+                waveformStartMs = (segment.startMs - state.expandBeforeMs).coerceAtLeast(0L)
+                // 뒤로 확장
+                waveformEndMs   = segment.endMs + state.expandAfterMs
+            } else {
+                waveformStartMs = 0L
+                waveformEndMs   = 0L
+            }
+
             val origWaveform = when (val source = state.assetPath) {
-                is AudioSource.AssetPath -> {
-                    WavSampleReader.readFromAssets(
-                        context, source.path, 300,
-                        segment?.startMs, segment?.endMs
-                    )
-                }
-                is AudioSource.FilePath -> {
-                    WavSampleReader.readFromFile(
-                        source.path, 300,
-                        segment?.startMs, segment?.endMs
-                    )
-                }
+                is AudioSource.AssetPath -> WavSampleReader.readFromAssets(
+                    context, source.path, 300,
+                    if (segment != null) waveformStartMs else null,
+                    if (segment != null) waveformEndMs   else null
+                )
+                is AudioSource.FilePath -> WavSampleReader.readFromFile(
+                    source.path, 300,
+                    if (segment != null) waveformStartMs else null,
+                    if (segment != null) waveformEndMs   else null
+                )
                 null -> FloatArray(0)
             }
 
             // 사용자 녹음: 선행 묵음 감지 → 트리밍하여 파형 로드
             val userPath = state.userAudioPath
-            val silenceTrimMs = if (userPath != null) {
-                WavSampleReader.detectLeadingSilenceMs(userPath)
-            } else 0L
-
+            val silenceTrimMs = if (userPath != null) WavSampleReader.detectLeadingSilenceMs(userPath) else 0L
             val userWaveform = if (userPath != null) {
-                WavSampleReader.readFromFile(
-                    userPath, 300,
-                    startMs = if (silenceTrimMs > 0) silenceTrimMs else null
-                )
+                WavSampleReader.readFromFile(userPath, 300, startMs = if (silenceTrimMs > 0) silenceTrimMs else null)
             } else FloatArray(0)
 
             // 사용자 오디오 전체 길이 측정
             val userDurationMs: Long = if (userPath != null) {
                 var mp: android.media.MediaPlayer? = null
                 try {
-                    mp = android.media.MediaPlayer().apply {
-                        setDataSource(userPath)
-                        prepare()
-                    }
+                    mp = android.media.MediaPlayer().apply { setDataSource(userPath); prepare() }
                     mp.duration.toLong()
                 } catch (e: Exception) { 0L }
                 finally { try { mp?.release() } catch (_: Exception) {} }
             } else 0L
 
-            // 초기 시작 위치: 자동 감지된 묵음 끝 지점
             val initialStartFraction = if (userDurationMs > 0 && silenceTrimMs > 0) {
                 (silenceTrimMs.toFloat() / userDurationMs).coerceIn(0f, 0.5f)
             } else 0f
 
             _uiState.update {
                 it.copy(
-                    originalWaveform = origWaveform,
-                    userWaveform = userWaveform,
+                    originalWaveform       = origWaveform,
+                    userWaveform           = userWaveform,
                     userAudioSilenceTrimMs = silenceTrimMs,
-                    userAudioDurationMs = userDurationMs,
-                    userStartFraction = initialStartFraction
+                    userAudioDurationMs    = userDurationMs,
+                    userStartFraction      = initialStartFraction,
+                    // 마커↔ms 변환에 필요한 실제 파형 범위 저장
+                    originalWaveformStartMs = waveformStartMs,
+                    originalWaveformEndMs   = waveformEndMs
                 )
             }
         }
@@ -823,8 +889,8 @@ class PracticeViewModel @Inject constructor(
 
         dualPlaybackManager.playSimultaneous(
             originalSource = state.assetPath,
-            originalStartMs = segment.startMs,
-            originalEndMs = segment.endMs,
+            originalStartMs = effectiveSegmentStartMs(segment),
+            originalEndMs   = effectiveSegmentEndMs(segment),
             userFilePath = userPath,
             userStartMs = userStartMs,
             initialBalance = state.comparisonBalance,
@@ -874,6 +940,51 @@ class PracticeViewModel @Inject constructor(
 
     fun setUserStartFraction(fraction: Float) {
         _uiState.update { it.copy(userStartFraction = fraction.coerceIn(0f, 1f)) }
+    }
+
+    // ==================== Auto Sync ====================
+
+    /**
+     * 사용자 녹음에서 음성 시작점을 자동 감지하여 userStartFraction을 설정.
+     *
+     * 알고리즘:
+     * 1. 이동 평균 에너지가 threshold를 초과하는 첫 지점 = 음성 시작 후보
+     * 2. leadSamples 만큼 앞으로 당겨 여유 확보 (시작이 잘리지 않도록)
+     * 3. 샘플 인덱스 → 파일 내 절대 ms → userStartFraction 변환
+     */
+    fun autoSyncUserStart() {
+        val state      = _uiState.value
+        val userWav    = state.userWaveform
+        val totalMs    = state.userAudioDurationMs
+        val silenceMs  = state.userAudioSilenceTrimMs
+
+        if (userWav.isEmpty() || totalMs <= 0L) return
+
+        // ── 파라미터 (★ 감도/여유 조절 포인트) ──────────────────────────────
+        val windowSize  = 5       // 이동 평균 윈도우 크기 (샘플 수)
+        val threshold   = 0.05f   // 음성 감지 임계값 (0.0~1.0, 낮을수록 민감)
+        val leadSamples = 3       // 감지 지점보다 앞 여유 (클수록 시작이 더 당겨짐)
+
+        // ── 이동 평균 에너지로 음성 시작 지점 탐색 ───────────────────────────
+        var onsetIdx = 0  // 기본: 파형 맨 앞 (= silenceTrimMs 지점)
+        for (i in windowSize until userWav.size) {
+            val avg = (i - windowSize until i).sumOf { userWav[it].toDouble() }.toFloat() / windowSize
+            if (avg >= threshold) {
+                onsetIdx = (i - windowSize - leadSamples).coerceAtLeast(0)
+                break
+            }
+        }
+
+        // ── 샘플 인덱스 → userStartFraction 변환 ─────────────────────────────
+        // userWaveform[0] = silenceTrimMs 시점, [size-1] = userDurationMs 시점
+        val spanMs       = (totalMs - silenceMs).coerceAtLeast(1L)
+        val relativeMs   = (onsetIdx.toFloat() / userWav.size * spanMs).toLong()
+        val absoluteMs   = silenceMs + relativeMs
+        // userStartFraction: playback 시 userStartMs = fraction * totalMs 로 사용됨
+        val fraction     = (absoluteMs.toFloat() / totalMs).coerceIn(0f, 0.9f)
+
+        _uiState.update { it.copy(userStartFraction = fraction) }
+        Log.d(TAG, "AutoSync: onsetIdx=$onsetIdx, absoluteMs=$absoluteMs, fraction=$fraction")
     }
 
     override fun onCleared() {

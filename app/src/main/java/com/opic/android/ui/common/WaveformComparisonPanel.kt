@@ -74,6 +74,8 @@ fun WaveformComparisonPanel(
     onStopRecording: (() -> Unit)? = null,
     onPlayUser: (() -> Unit)? = null,
     onStopUser: (() -> Unit)? = null,
+    // 자동 싱크: 사용자 파형에서 음성 시작점 자동 감지 (null이면 버튼 미표시)
+    onAutoSync: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -183,6 +185,17 @@ fun WaveformComparisonPanel(
                     fontSize = 9.sp,
                     color = Color(0xFFFF9800)
                 )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            // Auto Sync 버튼: 녹음이 있고 재생 중이 아닐 때만 표시
+            if (!isPlaying && !isPlayingUser && !isRecordingUser && onAutoSync != null && hasUserAudio) {
+                TextButton(
+                    onClick = onAutoSync,
+                    modifier = Modifier.height(24.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                ) {
+                    Text("Auto", fontSize = 9.sp, color = OPicColors.Primary)
+                }
             }
         }
         WaveformView(

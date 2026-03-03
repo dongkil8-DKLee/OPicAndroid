@@ -242,7 +242,8 @@ private fun PracticeContent(
                         onStartRecording = { viewModel.toggleUserScriptRecording() },
                         onStopRecording = { viewModel.stopUserScriptRecording() },
                         onPlayUser = { viewModel.playUserScriptAudio() },
-                        onStopUser = { viewModel.stopUserScriptAudio() }
+                        onStopUser = { viewModel.stopUserScriptAudio() },
+                        onAutoSync = if (state.hasUserAudio) { { viewModel.autoSyncUserStart() } } else null
                     )
 
                     // ===== 드래그 핸들 2 =====
