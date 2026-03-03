@@ -845,8 +845,11 @@ class PracticeViewModel @Inject constructor(
             val userPath = File(recordingDir, "UserRec_${state.questionId}_S${state.currentIndex}.wav")
                 .takeIf { it.exists() }?.absolutePath
             val silenceTrimMs = if (userPath != null) WavSampleReader.detectLeadingSilenceMs(userPath) else 0L
+            // 파형을 0부터 전체 로드 — fraction 좌표계를 totalDuration 기준으로 일치시킴.
+            // 선행 묵음 구간은 파형에 평탄하게 표시되고, startMarker가 실제 음성 시작을 가리킴.
+            // (이전: silenceTrimMs부터 로드 → 마커·진행바·드래그 좌표가 어긋나는 버그)
             val userWaveform = if (userPath != null) {
-                WavSampleReader.readFromFile(userPath, 300, startMs = if (silenceTrimMs > 0) silenceTrimMs else null)
+                WavSampleReader.readFromFile(userPath, 300)
             } else FloatArray(0)
 
             // 사용자 오디오 전체 길이 측정

@@ -254,8 +254,10 @@ class StudyViewModel @Inject constructor(
 
     /** Review → Study 바로가기: type + set 동시 적용 (loading 완료 후 호출 전제) */
     fun initFilters(type: String, set: String?) {
-        _uiState.update { it.copy(selectedType = type) }
+        // studyFilter 전체로 리셋 — 이전 필터("저득점", "0"회차 등)가 남아있으면 대상 문제가 안 보임
+        _uiState.update { it.copy(selectedType = type, selectedStudyFilter = "전체") }
         prefs.type = type
+        prefs.studyFilter = "전체"
 
         viewModelScope.launch {
             val filteredSets = if (type == "전체") {
