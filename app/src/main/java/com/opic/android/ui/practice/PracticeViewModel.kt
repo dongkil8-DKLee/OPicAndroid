@@ -69,7 +69,8 @@ data class PracticeUiState(
 
     // 발화 연습 관련 상태
     val hasUserAudio: Boolean = false,
-    val userAudioPath: String? = null,
+    // 문장별 UserScript 녹음 존재 여부 (key = sentenceIndex)
+    val sentenceHasRecording: Map<Int, Boolean> = emptyMap(),
     val isRecordingUserScript: Boolean = false,
     val userScriptMicLevel: Float = 0f,
     val isPlayingUserAudio: Boolean = false,
@@ -93,10 +94,10 @@ data class PracticeUiState(
     val comparisonSpeed: Float = 1.0f,
     // PLAY 단독 재생 진행률
     val userPlayProgress: Float = 0f,
+    // 원본 단독 재생 진행률 (파형 윈도우 기준)
+    val originalPlayProgress: Float = 0f,
 
     // ─── 문장 경계 보정 ───────────────────────────────────────────────
-    // 끝 여유시간: 모든 문장 endMs에 추가 (0 ~ 500ms)
-    val endBufferMs: Long = 150L,
     // 파형 확장 표시 범위: 구간 앞/뒤로 얼마나 더 보여줄지 (ms)
     // ★ 기본값 변경: expandBeforeMs / expandAfterMs 수정
     val expandBeforeMs: Long = 1000L,   // 구간 시작 앞쪽 확장 (기본 1초)
@@ -145,13 +146,11 @@ class PracticeViewModel @Inject constructor(
     init {
         val questionId = savedStateHandle.get<Int>("questionId") ?: 0
         // 저장된 전역 설정 복원
-        val savedBuffer       = prefs.getLong("end_buffer_ms",    150L)
         // ★ 기본값: expand_before/after_ms → 여기서도 기본값 일치시킬 것
         val savedExpandBefore = prefs.getLong("expand_before_ms", 1000L)
         val savedExpandAfter  = prefs.getLong("expand_after_ms",  1000L)
         _uiState.update {
             it.copy(
-                endBufferMs   = savedBuffer,
                 expandBeforeMs = savedExpandBefore,
                 expandAfterMs  = savedExpandAfter
             )
@@ -162,6 +161,10 @@ class PracticeViewModel @Inject constructor(
             _uiState.update { it.copy(loading = false, error = "Invalid question ID") }
         }
     }
+
+    /** 문장별 UserScript 녹음 파일 경로 (고정 파일명, 재녹음 = 덮어쓰기) */
+    private fun userRecordingPath(sentenceIndex: Int): String =
+        File(recordingDir, "UserRec_${_uiState.value.questionId}_S${sentenceIndex}.wav").absolutePath
 
     private fun loadQuestion(questionId: Int) {
         viewModelScope.launch {
@@ -189,8 +192,10 @@ class PracticeViewModel @Inject constructor(
                 val segments = SentenceSplitter.split(answerScript, totalDurationMs)
                 val sentenceStates = segments.map { SentenceState(segment = it) }
 
-                // UserScript 녹음 파일 검색
-                val userAudio = findUserRecording(questionId)
+                // 문장별 UserScript 녹음 파일 존재 여부 스캔
+                val hasRecording = sentenceStates.indices.associate { i ->
+                    i to File(recordingDir, "UserRec_${questionId}_S${i}.wav").exists()
+                }
 
                 // 저장된 문장별 경계 오프셋 복원 (0인 경우 맵에서 제외하여 깔끔하게 유지)
                 val savedStartOffsets = sentenceStates.indices
@@ -214,8 +219,8 @@ class PracticeViewModel @Inject constructor(
                         sentenceEndOffsets   = savedEndOffsets,
                         hasOriginalAudio = assetPath != null,
                         assetPath = assetPath,
-                        hasUserAudio = userAudio != null,
-                        userAudioPath = userAudio
+                        sentenceHasRecording = hasRecording,
+                        hasUserAudio = hasRecording[0] == true
                     )
                 }
                 loadWaveforms() // 녹음 없어도 원본 파형 항상 로드
@@ -224,15 +229,6 @@ class PracticeViewModel @Inject constructor(
                 _uiState.update { it.copy(loading = false, error = "Load failed: ${e.message}") }
             }
         }
-    }
-
-    private fun findUserRecording(questionId: Int): String? {
-        if (!recordingDir.exists()) return null
-        val pattern = "UserRec_${questionId}_"
-        return recordingDir.listFiles()
-            ?.filter { it.name.startsWith(pattern) && it.name.endsWith(".wav") }
-            ?.maxByOrNull { it.name }
-            ?.absolutePath
     }
 
     private suspend fun measureAudioDuration(source: com.opic.android.audio.AudioSource): Long = withContext(Dispatchers.IO) {
@@ -281,7 +277,8 @@ class PracticeViewModel @Inject constructor(
                 originalWaveform = FloatArray(0),
                 userWaveform = FloatArray(0),
                 originalWaveformStartMs = 0L,
-                originalWaveformEndMs   = 0L
+                originalWaveformEndMs   = 0L,
+                hasUserAudio = it.sentenceHasRecording[index] == true
             )
         }
         loadWaveforms()
@@ -304,34 +301,50 @@ class PracticeViewModel @Inject constructor(
         val effectiveStart = effectiveSegmentStartMs(segment)
         val effectiveEnd   = effectiveSegmentEndMs(segment)
 
-        _uiState.update { it.copy(isPlayingOriginal = true) }
+        _uiState.update { it.copy(isPlayingOriginal = true, originalPlayProgress = 0f) }
         markInProgressIfNeeded()
+
+        // 비교 속도와 동일하게 원본도 재생
+        audioPlayer.setSpeed(state.comparisonSpeed)
+
+        val onComplete = {
+            _uiState.update { it.copy(isPlayingOriginal = false, originalPlayProgress = 0f) }
+        }
 
         when (val source = state.assetPath) {
             is com.opic.android.audio.AudioSource.AssetPath ->
-                audioPlayer.playRangeFromAssets(source.path, effectiveStart, effectiveEnd) {
-                    _uiState.update { it.copy(isPlayingOriginal = false) }
-                }
+                audioPlayer.playRangeFromAssets(source.path, effectiveStart, effectiveEnd, onComplete)
             is com.opic.android.audio.AudioSource.FilePath ->
-                audioPlayer.playRangeFromFile(source.path, effectiveStart, effectiveEnd) {
-                    _uiState.update { it.copy(isPlayingOriginal = false) }
-                }
+                audioPlayer.playRangeFromFile(source.path, effectiveStart, effectiveEnd, onComplete)
             null -> viewModelScope.launch {
                 val ttsPath = ttsManager.generateToFile(segment.text)
                 if (ttsPath != null) {
-                    audioPlayer.playFromFile(ttsPath) {
-                        _uiState.update { it.copy(isPlayingOriginal = false) }
-                    }
+                    audioPlayer.playFromFile(ttsPath, onComplete)
                 } else {
-                    _uiState.update { it.copy(isPlayingOriginal = false) }
+                    _uiState.update { it.copy(isPlayingOriginal = false, originalPlayProgress = 0f) }
                 }
+            }
+        }
+
+        // 진행 바 폴링 (50ms 간격) — 파형 윈도우 기준으로 매핑
+        viewModelScope.launch {
+            while (_uiState.value.isPlayingOriginal) {
+                val posMs = audioPlayer.currentPosition.toLong()
+                val wStart = _uiState.value.originalWaveformStartMs
+                val wEnd   = _uiState.value.originalWaveformEndMs
+                val wDur   = (wEnd - wStart).toFloat()
+                val progress = if (wDur > 0f) {
+                    ((posMs - wStart).toFloat() / wDur).coerceIn(0f, 1f)
+                } else 0f
+                _uiState.update { it.copy(originalPlayProgress = progress) }
+                kotlinx.coroutines.delay(50)
             }
         }
     }
 
     fun stopOriginal() {
         audioPlayer.stop()
-        _uiState.update { it.copy(isPlayingOriginal = false) }
+        _uiState.update { it.copy(isPlayingOriginal = false, originalPlayProgress = 0f) }
     }
 
     // ==================== 녹음 재생 ====================
@@ -419,8 +432,6 @@ class PracticeViewModel @Inject constructor(
                     s.copy(sttListening = false, sentences = updated)
                 }
                 Log.d(TAG, "STT result for sentence $idx: $text")
-
-                // STT 완료 시 자동 분석
                 autoAnalyzeAfterStt()
             },
             onError = { error ->
@@ -540,10 +551,11 @@ class PracticeViewModel @Inject constructor(
         val state = _uiState.value
         if (state.isComparisonPlaying) return
         val qId = state.questionId
+        val idx = state.currentIndex
         if (qId <= 0) return
 
-        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val filename = "UserRec_${qId}_$timestamp.wav"
+        // 문장별 고정 파일명: 재녹음 시 덮어쓰기
+        val filename = "UserRec_${qId}_S${idx}.wav"
         val outputFile = File(recordingDir, filename)
 
         _uiState.update { it.copy(isRecordingUserScript = true, userScriptMicLevel = 0f) }
@@ -552,12 +564,13 @@ class PracticeViewModel @Inject constructor(
             audioRecorder.record(outputFile) { rmsLevel ->
                 _uiState.update { it.copy(userScriptMicLevel = rmsLevel) }
             }
+            val exists = outputFile.exists() && outputFile.length() > 44
             _uiState.update {
                 it.copy(
                     isRecordingUserScript = false,
                     userScriptMicLevel = 0f,
-                    hasUserAudio = outputFile.exists() && outputFile.length() > 44,
-                    userAudioPath = outputFile.absolutePath
+                    hasUserAudio = exists,
+                    sentenceHasRecording = it.sentenceHasRecording + (idx to exists)
                 )
             }
             Log.d(TAG, "UserScript recording done: ${outputFile.name}")
@@ -571,7 +584,7 @@ class PracticeViewModel @Inject constructor(
 
     fun playUserScriptAudio() {
         val state = _uiState.value
-        val path = state.userAudioPath ?: return
+        val path = userRecordingPath(state.currentIndex).takeIf { File(it).exists() } ?: return
         if (state.isPlayingUserAudio || state.isComparisonPlaying) return
 
         _uiState.update { it.copy(isPlayingUserAudio = true, userPlayProgress = 0f) }
@@ -607,8 +620,6 @@ class PracticeViewModel @Inject constructor(
             onResult = { text ->
                 _uiState.update { it.copy(userScriptSttText = text, userScriptSttListening = false) }
                 Log.d(TAG, "UserScript STT result: $text")
-
-                // 자동 분석
                 analyzeUserScript()
             },
             onError = { error ->
@@ -696,18 +707,12 @@ class PracticeViewModel @Inject constructor(
         return (segment.startMs + adjustment).coerceAtLeast(0L)
     }
 
-    /** 실제 재생 끝 ms: segment.endMs + 전역버퍼 + 문장별 끝 오프셋 */
+    /** 실제 재생 끝 ms: segment.endMs + 문장별 끝 오프셋 (endBufferMs 제거됨) */
     private fun effectiveSegmentEndMs(segment: com.opic.android.util.SentenceSegment): Long {
         val state = _uiState.value
         val adjustment      = state.sentenceEndOffsets[segment.index] ?: 0L
         val totalDurationMs = state.sentences.lastOrNull()?.segment?.endMs ?: segment.endMs
-        return (segment.endMs + state.endBufferMs + adjustment).coerceIn(segment.startMs + 100L, totalDurationMs)
-    }
-
-    fun setEndBuffer(ms: Long) {
-        val clamped = ms.coerceIn(0L, 500L)
-        _uiState.update { it.copy(endBufferMs = clamped) }
-        prefs.edit().putLong("end_buffer_ms", clamped).apply()
+        return (segment.endMs + adjustment).coerceIn(segment.startMs + 100L, totalDurationMs)
     }
 
     // ── 파형 확장 범위 설정 ────────────────────────────────────────────
@@ -773,7 +778,8 @@ class PracticeViewModel @Inject constructor(
                 sttListening = false,
                 isComparisonPlaying = false,
                 comparisonOriginalProgress = 0f,
-                comparisonUserProgress = 0f
+                comparisonUserProgress = 0f,
+                originalPlayProgress = 0f
             )
         }
     }
@@ -830,8 +836,9 @@ class PracticeViewModel @Inject constructor(
                 null -> FloatArray(0)
             }
 
-            // 사용자 녹음: 선행 묵음 감지 → 트리밍하여 파형 로드
-            val userPath = state.userAudioPath
+            // 사용자 녹음: 문장별 고정 파일명으로 로드
+            val userPath = File(recordingDir, "UserRec_${state.questionId}_S${state.currentIndex}.wav")
+                .takeIf { it.exists() }?.absolutePath
             val silenceTrimMs = if (userPath != null) WavSampleReader.detectLeadingSilenceMs(userPath) else 0L
             val userWaveform = if (userPath != null) {
                 WavSampleReader.readFromFile(userPath, 300, startMs = if (silenceTrimMs > 0) silenceTrimMs else null)
@@ -858,6 +865,7 @@ class PracticeViewModel @Inject constructor(
                     userAudioSilenceTrimMs = silenceTrimMs,
                     userAudioDurationMs    = userDurationMs,
                     userStartFraction      = initialStartFraction,
+                    hasUserAudio           = userPath != null,
                     // 마커↔ms 변환에 필요한 실제 파형 범위 저장
                     originalWaveformStartMs = waveformStartMs,
                     originalWaveformEndMs   = waveformEndMs
@@ -876,7 +884,7 @@ class PracticeViewModel @Inject constructor(
         if (state.isPlayingOriginal || state.isPlayingUser || state.isRecording ||
             state.isRecordingUserScript || state.isPlayingUserAudio) return
 
-        val userPath = state.userAudioPath ?: return
+        val userPath = userRecordingPath(state.currentIndex).takeIf { File(it).exists() } ?: return
         val segment = state.currentSegment ?: return
 
         _uiState.update { it.copy(isComparisonPlaying = true, comparisonOriginalProgress = 0f, comparisonUserProgress = 0f) }
@@ -932,9 +940,10 @@ class PracticeViewModel @Inject constructor(
     }
 
     fun setComparisonSpeed(speed: Float) {
-        _uiState.update { it.copy(comparisonSpeed = speed) }
+        val clamped = speed.coerceIn(0.5f, 1.5f)
+        _uiState.update { it.copy(comparisonSpeed = clamped) }
         if (_uiState.value.isComparisonPlaying) {
-            dualPlaybackManager.setSpeed(speed)
+            dualPlaybackManager.setSpeed(clamped)
         }
     }
 

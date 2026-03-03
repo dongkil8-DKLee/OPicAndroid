@@ -30,16 +30,12 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -67,13 +63,13 @@ import com.opic.android.ui.common.WaveformComparisonPanel
 import com.opic.android.ui.theme.OPicColors
 
 /**
- * PracticeScreen (집중학습) - v2 리팩토링.
- * - AnimatedVisibility 제거 → 단순 if/else
- * - 문장 테이블 헤더: Play만 좌측 정렬 (Rec/STT 제거)
- * - 발화 연습 섹션: REC/PLAY/STT/확대만 (제목/Edit/UserText 제거)
- * - STT는 선택 문장 기준 평가, % 문장 테이블 반영
- * - Diff 항상 표시
- * - Back 버튼: BeginTestScreen 스타일
+ * PracticeScreen (집중학습) - v3.
+ * - Play 버튼: PracticeSentenceSection → WaveformComparisonPanel으로 이동
+ * - endBufferMs 슬라이더 제거
+ * - 문장별 독립 녹음 (🎤 아이콘으로 녹음 존재 표시)
+ * - originalPlayProgress 파형 진행 바 연동
+ * - 속도: ± 버튼 (0.5~1.5)
+ * - 원본 파형: 핀치 줌 + 잠금 버튼
  */
 @Composable
 fun PracticeScreen(
@@ -197,7 +193,7 @@ private fun PracticeContent(
                         val effectiveStartMs = currentSeg.startMs + (state.sentenceStartOffsets[state.currentIndex] ?: 0L)
                         ((effectiveStartMs - state.originalWaveformStartMs) / waveformDurationMs).coerceIn(0f, 0.95f)
                     } else 0f
-                    // 끝 마커: segment.endMs + endOffset → 파형 내 fraction (endBufferMs 제외, 마커 드래그는 순수 경계)
+                    // 끝 마커: segment.endMs + endOffset → 파형 내 fraction
                     val segEndMarker = if (currentSeg != null && waveformDurationMs > 0f) {
                         val effectiveEndMs = currentSeg.endMs + (state.sentenceEndOffsets[state.currentIndex] ?: 0L)
                         ((effectiveEndMs - state.originalWaveformStartMs) / waveformDurationMs).coerceIn(0.05f, 1f)
@@ -226,7 +222,6 @@ private fun PracticeContent(
                         segmentStartMarker = segStartMarker,
                         segmentEndMarker   = segEndMarker,
                         onSegmentStartMarkerChange = if (currentSeg != null && waveformDurationMs > 0f) { fraction ->
-                            // fraction → 절대 ms → segment 기준 오프셋
                             val absoluteMs = state.originalWaveformStartMs + (fraction * waveformDurationMs).toLong()
                             val offsetMs   = absoluteMs - currentSeg.startMs
                             viewModel.setSentenceStartOffset(state.currentIndex, offsetMs)
@@ -243,6 +238,11 @@ private fun PracticeContent(
                         onStopRecording = { viewModel.stopUserScriptRecording() },
                         onPlayUser = { viewModel.playUserScriptAudio() },
                         onStopUser = { viewModel.stopUserScriptAudio() },
+                        // 원본 단독 재생
+                        isPlayingOriginal = state.isPlayingOriginal,
+                        onPlayOriginal = { viewModel.playOriginal() },
+                        onStopOriginal = { viewModel.stopOriginal() },
+                        originalPlayProgress = state.originalPlayProgress,
                         onAutoSync = if (state.hasUserAudio) { { viewModel.autoSyncUserStart() } } else null
                     )
 
@@ -360,38 +360,17 @@ private fun PracticeSentenceSection(
     isExpanded: Boolean,
     onExpandToggle: () -> Unit
 ) {
-    val isBusy = state.isPlayingOriginal || state.isRecordingUserScript ||
-            state.isPlayingUserAudio || state.userScriptSttListening || state.isComparisonPlaying
-
     Column(
         modifier = modifier
             .fillMaxWidth()
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
-        // 헤더: Play + ±타이밍 + 확대/축소
+        // 헤더: ±타이밍 + 확대/축소 (Play 버튼은 WaveformComparisonPanel으로 이동)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Play / Stop (선택 문장 재생)
-            if (state.isPlayingOriginal) {
-                TextButton(onClick = { viewModel.stopOriginal() }) {
-                    Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text(" Stop", fontSize = 11.sp)
-                }
-            } else {
-                TextButton(
-                    onClick = { viewModel.playOriginal() },
-                    enabled = !isBusy
-                ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text(" Play", fontSize = 11.sp)
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
             // 타이밍 보정 토글
             TextButton(
                 onClick = { viewModel.toggleTimingPanel() },
@@ -404,6 +383,8 @@ private fun PracticeSentenceSection(
                     fontWeight = if (state.showTimingPanel) FontWeight.Bold else FontWeight.Normal
                 )
             }
+
+            Spacer(modifier = Modifier.weight(1f))
 
             IconButton(onClick = onExpandToggle, modifier = Modifier.size(28.dp)) {
                 Icon(
@@ -423,25 +404,6 @@ private fun PracticeSentenceSection(
                     .background(Color(0xFFF5F5F5), RoundedCornerShape(6.dp))
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                // ── 끝 여유시간 슬라이더 (0~500ms) ──────────────────────
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("끝 여유시간", fontSize = 10.sp, color = Color.Gray)
-                    Slider(
-                        value = state.endBufferMs.toFloat(),
-                        onValueChange = { viewModel.setEndBuffer(it.toLong()) },
-                        valueRange = 0f..500f,
-                        steps = 9,   // ★ steps 수정 시 범위도 같이 확인할 것
-                        modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
-                        colors = SliderDefaults.colors(
-                            thumbColor = OPicColors.Primary,
-                            activeTrackColor = OPicColors.Primary,
-                            inactiveTrackColor = OPicColors.Border
-                        )
-                    )
-                    Text("+${state.endBufferMs}ms", fontSize = 10.sp, color = OPicColors.Primary,
-                        fontWeight = FontWeight.Bold, modifier = Modifier.width(52.dp))
-                }
-
                 // ── 파형 표시 확장 범위: 앞/뒤 ±500ms 단위 조절 ──────────
                 // ★ 1회 클릭 단위(500L)와 최대값(3000L)은 ViewModel.setExpandBefore/After에서 변경
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -494,9 +456,9 @@ private fun PracticeSentenceSection(
                     text = sentenceState.segment.text,
                     isSelected = index == state.currentIndex,
                     accuracyPercent = sentenceState.analysisResult?.accuracyPercent?.toInt(),
-                    // 저장된 경계 조정값 표시 (오프셋이 있을 때 강조)
                     startOffset = state.sentenceStartOffsets[index] ?: 0L,
                     endOffset   = state.sentenceEndOffsets[index]   ?: 0L,
+                    hasRecording = state.sentenceHasRecording[index] == true,
                     onClick = { viewModel.goToSentence(index) }
                 )
             }
@@ -513,10 +475,11 @@ private fun SentenceTableRow(
     // 파형 마커로 저장된 경계 조정값 (0이면 미표시, 비영이면 색상 강조)
     startOffset: Long = 0L,
     endOffset: Long = 0L,
+    // 이 문장에 UserScript 녹음이 있는지
+    hasRecording: Boolean = false,
     onClick: () -> Unit
 ) {
     val bgColor = if (isSelected) Color(0xFFE3F2FD) else Color.Transparent
-    // 오프셋이 있을 때만 작은 표시 추가
     val hasOffset = startOffset != 0L || endOffset != 0L
 
     Row(
@@ -548,11 +511,22 @@ private fun SentenceTableRow(
             modifier = Modifier.weight(1f)
         )
 
+        // 녹음 존재 표시
+        if (hasRecording) {
+            Spacer(modifier = Modifier.width(4.dp))
+            Icon(
+                Icons.Filled.Mic,
+                contentDescription = "녹음 있음",
+                modifier = Modifier.size(12.dp),
+                tint = OPicColors.TimerGreen
+            )
+        }
+
         // 경계 조정값 표시 (드래그 마커로 저장된 경우)
         if (hasOffset) {
             Spacer(modifier = Modifier.width(4.dp))
             Text(
-                text = "✎",  // 조정 있음 표시
+                text = "✎",
                 fontSize = 10.sp,
                 color = OPicColors.Primary
             )
@@ -646,7 +620,7 @@ private fun UserScriptSection(
             Spacer(modifier = Modifier.height(4.dp))
         }
 
-        // 내용 영역 (STT 결과 + 분석만, 편집 제거)
+        // 내용 영역 (STT 결과 + 분석만)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
