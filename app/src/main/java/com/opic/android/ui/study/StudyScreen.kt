@@ -9,6 +9,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -25,11 +26,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FilterList
@@ -44,20 +48,17 @@ import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -79,6 +80,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -483,7 +485,7 @@ private fun FilterSection(state: StudyUiState, viewModel: StudyViewModel) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            CompactDropdown(
+            BottomSheetPicker(
                 label = "주제",
                 selected = state.selectedSet,
                 options = listOf("전체") + state.sets,
@@ -491,7 +493,7 @@ private fun FilterSection(state: StudyUiState, viewModel: StudyViewModel) {
                 modifier = Modifier.weight(1.3f)
             )
 
-            CompactDropdown(
+            BottomSheetPicker(
                 label = "유형",
                 selected = state.selectedType,
                 options = listOf("전체") + state.types,
@@ -499,7 +501,7 @@ private fun FilterSection(state: StudyUiState, viewModel: StudyViewModel) {
                 modifier = Modifier.weight(1f)
             )
 
-            CompactDropdown(
+            BottomSheetPicker(
                 label = "정렬",
                 selected = state.selectedSort,
                 options = listOf("주제 순서", "오래된 순"),
@@ -521,8 +523,8 @@ private fun FilterSection(state: StudyUiState, viewModel: StudyViewModel) {
                     containerColor = if (state.groupPlaying) OPicColors.RecordActive else OPicColors.PlayButton,
                     contentColor = Color.White
                 ),
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier.height(52.dp)
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.height(44.dp)
             ) {
                 Icon(
                     if (state.groupPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
@@ -537,7 +539,7 @@ private fun FilterSection(state: StudyUiState, viewModel: StudyViewModel) {
                 )
             }
 
-            CompactDropdown(
+            BottomSheetPicker(
                 label = "모드",
                 selected = state.groupPlayMode,
                 options = listOf("목록 재생", "질문 재생", "답변 재생"),
@@ -545,7 +547,7 @@ private fun FilterSection(state: StudyUiState, viewModel: StudyViewModel) {
                 modifier = Modifier.weight(1f)
             )
 
-            CompactDropdown(
+            BottomSheetPicker(
                 label = "학습",
                 selected = state.selectedStudyFilter,
                 options = listOf("전체", "\uD83D\uDCCC", "저득점", "최근오답", "0", "1", "2", "3", "4", "5", "6", "7"),
@@ -577,7 +579,7 @@ private fun TitleSelector(
             Icon(Icons.Filled.ChevronLeft, contentDescription = "Prev")
         }
 
-        CompactDropdown(
+        BottomSheetPicker(
             label = "목록",
             selected = state.selectedTitle,
             options = state.titles,
@@ -799,49 +801,119 @@ private fun ScriptSection(
     }
 }
 
-// ==================== 공용 컴팩트 드롭다운 ====================
+// ==================== 바텀 시트 픽커 (필터/목록 선택) ====================
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CompactDropdown(
+private fun BottomSheetPicker(
     label: String,
     selected: String,
     options: List<String>,
     onSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var showSheet by remember { mutableStateOf(false) }
 
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = it },
+    // Pill 버튼: label(작은 회색) + selected(Primary 굵게) + ▾
+    Box(
         modifier = modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(OPicColors.LightBg)
+            .border(1.dp, OPicColors.Border, RoundedCornerShape(10.dp))
+            .clickable { showSheet = true },
+        contentAlignment = Alignment.Center
     ) {
-        TextField(
-            value = selected,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(label, fontSize = 10.sp) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            singleLine = true,
-            textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+        Row(
             modifier = Modifier
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                 .fillMaxWidth()
-                .height(52.dp)
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option, fontSize = 13.sp) },
-                    onClick = {
-                        onSelected(option)
-                        expanded = false
-                    }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    fontSize = 9.sp,
+                    color = OPicColors.TextOnLight.copy(alpha = 0.55f),
+                    lineHeight = 11.sp
                 )
+                Text(
+                    text = selected,
+                    fontSize = 12.sp,
+                    color = OPicColors.Primary,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 14.sp
+                )
+            }
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("▾", fontSize = 10.sp, color = OPicColors.TextOnLight.copy(alpha = 0.45f))
+        }
+    }
+
+    // 바텀 시트
+    if (showSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showSheet = false },
+            containerColor = OPicColors.Surface,
+            tonalElevation = 0.dp
+        ) {
+            // 시트 제목
+            Text(
+                text = label,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = OPicColors.TextOnLight,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+            )
+            HorizontalDivider(color = OPicColors.Border)
+
+            // 옵션 목록
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(options) { option ->
+                    val isSelected = option == selected
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onSelected(option)
+                                showSheet = false
+                            }
+                            .background(
+                                if (isSelected) OPicColors.Primary.copy(alpha = 0.08f)
+                                else Color.Transparent
+                            )
+                            .padding(horizontal = 20.dp, vertical = 15.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = option,
+                            fontSize = 15.sp,
+                            color = if (isSelected) OPicColors.Primary else OPicColors.TextOnLight,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                        if (isSelected) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = OPicColors.Primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    if (option != options.last()) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 20.dp),
+                            color = OPicColors.Border.copy(alpha = 0.4f)
+                        )
+                    }
+                }
+                // 하단 여백 (네비게이션 바 위)
+                item { Spacer(modifier = Modifier.height(32.dp)) }
             }
         }
     }
