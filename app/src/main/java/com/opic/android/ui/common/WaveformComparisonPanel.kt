@@ -61,6 +61,11 @@ fun WaveformComparisonPanel(
     userPlayProgress: Float = 0f,
     comparisonSpeed: Float = 1.0f,
     onComparisonSpeedChange: (Float) -> Unit = {},
+    // 원본 파형 구간 마커 (주황=시작, 빨강=끝) — 드래그로 경계 조정
+    segmentStartMarker: Float = 0f,
+    segmentEndMarker: Float = 1f,
+    onSegmentStartMarkerChange: ((Float) -> Unit)? = null,
+    onSegmentEndMarkerChange: ((Float) -> Unit)? = null,
     // REC / PLAY 버튼 (선택적)
     isRecordingUser: Boolean = false,
     isPlayingUser: Boolean = false,
@@ -137,17 +142,25 @@ fun WaveformComparisonPanel(
             }
         }
 
-        // 원본 파형
-        Text(
-            text = "원본 음성",
-            fontSize = 10.sp,
-            color = Color.Gray,
-            modifier = Modifier.padding(start = 2.dp)
-        )
+        // 원본 파형 + 구간 경계 마커 (재생 중이 아닐 때 드래그 가능)
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("원본 음성", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(start = 2.dp))
+            if (!isPlaying && onSegmentStartMarkerChange != null) {
+                Text(
+                    text = "  ▶ 주황=시작  빨강=끝  드래그로 조절",
+                    fontSize = 9.sp, color = Color(0xFFFF9800)
+                )
+            }
+        }
         WaveformView(
             samples = originalWaveform,
             waveformColor = OPicColors.LevelGauge,
             playbackProgress = if (isPlaying) originalProgress else null,
+            // 재생 중에는 마커 숨김, 정지 시에만 드래그 가능
+            startMarkerFraction = if (!isPlaying) segmentStartMarker else null,
+            onStartMarkerChange = if (!isPlaying) onSegmentStartMarkerChange else null,
+            endMarkerFraction   = if (!isPlaying) segmentEndMarker   else null,
+            onEndMarkerChange   = if (!isPlaying) onSegmentEndMarkerChange else null,
             height = 40.dp
         )
 
@@ -189,7 +202,7 @@ fun WaveformComparisonPanel(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // 볼륨 밸런스 슬라이더 (항상 활성화)
+        // 볼륨 밸런스 슬라이더 (재생/녹음 중에는 비활성화)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -199,7 +212,7 @@ fun WaveformComparisonPanel(
                 value = balance,
                 onValueChange = onBalanceChange,
                 modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
-                enabled = true,
+                enabled = enabled,  // ← enabled 파라미터 반영 (재생/녹음 중 조작 차단)
                 colors = SliderDefaults.colors(
                     thumbColor = OPicColors.Primary,
                     activeTrackColor = OPicColors.Primary,
@@ -217,7 +230,8 @@ fun WaveformComparisonPanel(
             Text("속도", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(start = 2.dp))
             Spacer(modifier = Modifier.width(4.dp))
             listOf(0.6f, 0.7f, 0.8f, 0.9f, 1.0f).forEach { speed ->
-                val selected = comparisonSpeed == speed
+                // Float 직접 비교 대신 허용 오차(0.001f) 사용 → 부동소수 오차 방지
+                val selected = kotlin.math.abs(comparisonSpeed - speed) < 0.001f
                 TextButton(
                     onClick = { onComparisonSpeedChange(speed) },
                     modifier = Modifier.padding(horizontal = 0.dp)
