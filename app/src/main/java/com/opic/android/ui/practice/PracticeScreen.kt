@@ -187,6 +187,22 @@ private fun PracticeContent(
                             state.isRecording || state.isRecordingUserScript ||
                             state.isPlayingUserAudio || state.sttListening ||
                             state.userScriptSttListening
+
+                    // ── 원본 파형 마커 위치 계산 (ms → fraction) ──────────────
+                    // originalWaveformStartMs/EndMs: loadWaveforms() 에서 저장된 파형 범위
+                    val waveformDurationMs = (state.originalWaveformEndMs - state.originalWaveformStartMs).toFloat()
+                    val currentSeg = state.currentSegment
+                    // 시작 마커: segment.startMs + startOffset → 파형 내 fraction
+                    val segStartMarker = if (currentSeg != null && waveformDurationMs > 0f) {
+                        val effectiveStartMs = currentSeg.startMs + (state.sentenceStartOffsets[state.currentIndex] ?: 0L)
+                        ((effectiveStartMs - state.originalWaveformStartMs) / waveformDurationMs).coerceIn(0f, 0.95f)
+                    } else 0f
+                    // 끝 마커: segment.endMs + endOffset → 파형 내 fraction (endBufferMs 제외, 마커 드래그는 순수 경계)
+                    val segEndMarker = if (currentSeg != null && waveformDurationMs > 0f) {
+                        val effectiveEndMs = currentSeg.endMs + (state.sentenceEndOffsets[state.currentIndex] ?: 0L)
+                        ((effectiveEndMs - state.originalWaveformStartMs) / waveformDurationMs).coerceIn(0.05f, 1f)
+                    } else 1f
+
                     WaveformComparisonPanel(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -205,6 +221,21 @@ private fun PracticeContent(
                         userPlayProgress = state.userPlayProgress,
                         comparisonSpeed = state.comparisonSpeed,
                         onComparisonSpeedChange = { viewModel.setComparisonSpeed(it) },
+                        // ── 원본 파형 경계 마커 (주황=시작, 빨강=끝) ──────────────
+                        // ★ 마커 드래그 → fraction → ms 변환 후 ViewModel에 저장
+                        segmentStartMarker = segStartMarker,
+                        segmentEndMarker   = segEndMarker,
+                        onSegmentStartMarkerChange = if (currentSeg != null && waveformDurationMs > 0f) { fraction ->
+                            // fraction → 절대 ms → segment 기준 오프셋
+                            val absoluteMs = state.originalWaveformStartMs + (fraction * waveformDurationMs).toLong()
+                            val offsetMs   = absoluteMs - currentSeg.startMs
+                            viewModel.setSentenceStartOffset(state.currentIndex, offsetMs)
+                        } else null,
+                        onSegmentEndMarkerChange = if (currentSeg != null && waveformDurationMs > 0f) { fraction ->
+                            val absoluteMs = state.originalWaveformStartMs + (fraction * waveformDurationMs).toLong()
+                            val offsetMs   = absoluteMs - currentSeg.endMs
+                            viewModel.setSentenceEndOffset(state.currentIndex, offsetMs)
+                        } else null,
                         isRecordingUser = state.isRecordingUserScript,
                         isPlayingUser = state.isPlayingUserAudio,
                         hasUserAudio = state.hasUserAudio,
@@ -385,33 +416,66 @@ private fun PracticeSentenceSection(
 
         // 타이밍 보정 패널 (토글)
         if (state.showTimingPanel) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color(0xFFF5F5F5), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                Text("끝 여유시간", fontSize = 10.sp, color = Color.Gray)
-                Slider(
-                    value = state.endBufferMs.toFloat(),
-                    onValueChange = { viewModel.setEndBuffer(it.toLong()) },
-                    valueRange = 0f..500f,
-                    steps = 9,
-                    modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
-                    colors = SliderDefaults.colors(
-                        thumbColor = OPicColors.Primary,
-                        activeTrackColor = OPicColors.Primary,
-                        inactiveTrackColor = OPicColors.Border
+                // ── 끝 여유시간 슬라이더 (0~500ms) ──────────────────────
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("끝 여유시간", fontSize = 10.sp, color = Color.Gray)
+                    Slider(
+                        value = state.endBufferMs.toFloat(),
+                        onValueChange = { viewModel.setEndBuffer(it.toLong()) },
+                        valueRange = 0f..500f,
+                        steps = 9,   // ★ steps 수정 시 범위도 같이 확인할 것
+                        modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
+                        colors = SliderDefaults.colors(
+                            thumbColor = OPicColors.Primary,
+                            activeTrackColor = OPicColors.Primary,
+                            inactiveTrackColor = OPicColors.Border
+                        )
                     )
-                )
-                Text(
-                    text = "+${state.endBufferMs}ms",
-                    fontSize = 10.sp,
-                    color = OPicColors.Primary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.width(52.dp)
-                )
+                    Text("+${state.endBufferMs}ms", fontSize = 10.sp, color = OPicColors.Primary,
+                        fontWeight = FontWeight.Bold, modifier = Modifier.width(52.dp))
+                }
+
+                // ── 파형 표시 확장 범위: 앞/뒤 ±500ms 단위 조절 ──────────
+                // ★ 1회 클릭 단위(500L)와 최대값(3000L)은 ViewModel.setExpandBefore/After에서 변경
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("파형 확장", fontSize = 10.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.weight(1f))
+                    // 앞
+                    Text("앞", fontSize = 10.sp, color = Color.Gray)
+                    TextButton(onClick = { viewModel.setExpandBefore(state.expandBeforeMs - 500L) },
+                        modifier = Modifier.size(28.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+                        Text("−", fontSize = 13.sp, color = OPicColors.TimerRed)
+                    }
+                    Text("${state.expandBeforeMs}ms", fontSize = 10.sp, color = OPicColors.Primary,
+                        modifier = Modifier.width(44.dp))
+                    TextButton(onClick = { viewModel.setExpandBefore(state.expandBeforeMs + 500L) },
+                        modifier = Modifier.size(28.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+                        Text("+", fontSize = 13.sp, color = OPicColors.TimerGreen)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    // 뒤
+                    Text("뒤", fontSize = 10.sp, color = Color.Gray)
+                    TextButton(onClick = { viewModel.setExpandAfter(state.expandAfterMs - 500L) },
+                        modifier = Modifier.size(28.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+                        Text("−", fontSize = 13.sp, color = OPicColors.TimerRed)
+                    }
+                    Text("${state.expandAfterMs}ms", fontSize = 10.sp, color = OPicColors.Primary,
+                        modifier = Modifier.width(44.dp))
+                    TextButton(onClick = { viewModel.setExpandAfter(state.expandAfterMs + 500L) },
+                        modifier = Modifier.size(28.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+                        Text("+", fontSize = 13.sp, color = OPicColors.TimerGreen)
+                    }
+                }
             }
         }
 
@@ -429,11 +493,9 @@ private fun PracticeSentenceSection(
                     text = sentenceState.segment.text,
                     isSelected = index == state.currentIndex,
                     accuracyPercent = sentenceState.analysisResult?.accuracyPercent?.toInt(),
-                    showTimingPanel = state.showTimingPanel,
-                    sentenceOffset = state.sentenceOffsets[index] ?: 0L,
-                    onDecreaseOffset = { viewModel.adjustSentenceOffset(index, -50L) },
-                    onIncreaseOffset = { viewModel.adjustSentenceOffset(index, +50L) },
-                    onResetOffset = { viewModel.resetSentenceOffset(index) },
+                    // 저장된 경계 조정값 표시 (오프셋이 있을 때 강조)
+                    startOffset = state.sentenceStartOffsets[index] ?: 0L,
+                    endOffset   = state.sentenceEndOffsets[index]   ?: 0L,
                     onClick = { viewModel.goToSentence(index) }
                 )
             }
@@ -447,14 +509,14 @@ private fun SentenceTableRow(
     text: String,
     isSelected: Boolean,
     accuracyPercent: Int?,
-    showTimingPanel: Boolean = false,
-    sentenceOffset: Long = 0L,
-    onDecreaseOffset: () -> Unit = {},
-    onIncreaseOffset: () -> Unit = {},
-    onResetOffset: () -> Unit = {},
+    // 파형 마커로 저장된 경계 조정값 (0이면 미표시, 비영이면 색상 강조)
+    startOffset: Long = 0L,
+    endOffset: Long = 0L,
     onClick: () -> Unit
 ) {
     val bgColor = if (isSelected) Color(0xFFE3F2FD) else Color.Transparent
+    // 오프셋이 있을 때만 작은 표시 추가
+    val hasOffset = startOffset != 0L || endOffset != 0L
 
     Row(
         modifier = Modifier
@@ -462,7 +524,7 @@ private fun SentenceTableRow(
             .background(bgColor)
             .clickable { onClick() }
             .border(width = 0.5.dp, color = OPicColors.Border)
-            .padding(horizontal = 8.dp, vertical = if (showTimingPanel) 4.dp else 10.dp),
+            .padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -485,34 +547,14 @@ private fun SentenceTableRow(
             modifier = Modifier.weight(1f)
         )
 
-        // 문장별 ± 오프셋 조절 (타이밍 패널 열릴 때만)
-        if (showTimingPanel) {
+        // 경계 조정값 표시 (드래그 마커로 저장된 경우)
+        if (hasOffset) {
             Spacer(modifier = Modifier.width(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(
-                    onClick = onDecreaseOffset,
-                    modifier = Modifier.size(28.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
-                ) {
-                    Text("−", fontSize = 14.sp, color = OPicColors.TimerRed)
-                }
-                Text(
-                    text = if (sentenceOffset == 0L) "±0" else "${if (sentenceOffset > 0) "+" else ""}${sentenceOffset}",
-                    fontSize = 9.sp,
-                    color = if (sentenceOffset == 0L) Color.Gray else OPicColors.Primary,
-                    fontWeight = if (sentenceOffset != 0L) FontWeight.Bold else FontWeight.Normal,
-                    modifier = Modifier
-                        .clickable { onResetOffset() }
-                        .padding(horizontal = 2.dp)
-                )
-                TextButton(
-                    onClick = onIncreaseOffset,
-                    modifier = Modifier.size(28.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
-                ) {
-                    Text("+", fontSize = 14.sp, color = OPicColors.TimerGreen)
-                }
-            }
+            Text(
+                text = "✎",  // 조정 있음 표시
+                fontSize = 10.sp,
+                color = OPicColors.Primary
+            )
         }
 
         if (accuracyPercent != null) {
