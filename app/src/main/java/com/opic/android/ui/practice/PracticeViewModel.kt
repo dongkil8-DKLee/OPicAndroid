@@ -96,8 +96,6 @@ data class PracticeUiState(
     val userPlayProgress: Float = 0f,
     // 원본 단독 재생 진행률 (파형 윈도우 기준)
     val originalPlayProgress: Float = 0f,
-    // 원본 구간 루프 재생
-    val isLooping: Boolean = false,
 
     // ─── 문장 경계 보정 ───────────────────────────────────────────────
     // 파형 확장 표시 범위: 구간 앞/뒤로 얼마나 더 보여줄지 (ms)
@@ -312,13 +310,6 @@ class PracticeViewModel @Inject constructor(
 
         val onComplete = {
             _uiState.update { it.copy(isPlayingOriginal = false, originalPlayProgress = 0f) }
-            // 루프 활성화 시 자동 재시작
-            if (_uiState.value.isLooping) {
-                viewModelScope.launch {
-                    kotlinx.coroutines.delay(80) // 루프 간 짧은 간격
-                    playOriginal()
-                }
-            }
         }
 
         when (val source = state.assetPath) {
@@ -354,17 +345,7 @@ class PracticeViewModel @Inject constructor(
 
     fun stopOriginal() {
         audioPlayer.stop()
-        _uiState.update { it.copy(isPlayingOriginal = false, originalPlayProgress = 0f, isLooping = false) }
-    }
-
-    /** 원본 구간 루프 재생 토글. */
-    fun toggleOriginalLoop() {
-        val newLooping = !_uiState.value.isLooping
-        _uiState.update { it.copy(isLooping = newLooping) }
-        if (newLooping && !_uiState.value.isPlayingOriginal) {
-            playOriginal()  // 루프 켜질 때 재생 중이 아니면 즉시 시작
-        }
-        // 루프 끌 때는 현재 재생이 끝나면 자동으로 멈춤 (onComplete에서 재시작 안 함)
+        _uiState.update { it.copy(isPlayingOriginal = false, originalPlayProgress = 0f) }
     }
 
     // ==================== 녹음 재생 ====================
@@ -803,8 +784,7 @@ class PracticeViewModel @Inject constructor(
                 isComparisonPlaying = false,
                 comparisonOriginalProgress = 0f,
                 comparisonUserProgress = 0f,
-                originalPlayProgress = 0f,
-                isLooping = false
+                originalPlayProgress = 0f
             )
         }
     }

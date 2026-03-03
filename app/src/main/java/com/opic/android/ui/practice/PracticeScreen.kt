@@ -243,9 +243,6 @@ private fun PracticeContent(
                         onPlayOriginal = { viewModel.playOriginal() },
                         onStopOriginal = { viewModel.stopOriginal() },
                         originalPlayProgress = state.originalPlayProgress,
-                        // 구간 루프
-                        isLooping = state.isLooping,
-                        onToggleLoop = { viewModel.toggleOriginalLoop() },
                         onAutoSync = if (state.hasUserAudio) { { viewModel.autoSyncUserStart() } } else null
                     )
 

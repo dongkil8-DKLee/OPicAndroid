@@ -74,9 +74,6 @@ fun WaveformComparisonPanel(
     onPlayOriginal: (() -> Unit)? = null,
     onStopOriginal: (() -> Unit)? = null,
     originalPlayProgress: Float = 0f,
-    // 구간 루프 재생
-    isLooping: Boolean = false,
-    onToggleLoop: (() -> Unit)? = null,
     // 자동 싱크: 사용자 파형에서 음성 시작점 자동 감지 (null이면 버튼 미표시)
     onAutoSync: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -92,50 +89,7 @@ fun WaveformComparisonPanel(
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
-        // ── 헤더: REC + 동시재생 ─────────────────────────────────────
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // REC 버튼
-            if (onStartRecording != null) {
-                if (isRecordingUser) {
-                    TextButton(onClick = { onStopRecording?.invoke() }) {
-                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(16.dp), tint = OPicColors.RecordActive)
-                        Text(" Stop", fontSize = 11.sp, color = OPicColors.RecordActive)
-                    }
-                } else {
-                    TextButton(
-                        onClick = onStartRecording,
-                        enabled = !isPlayingUser && !isPlaying && !isPlayingOriginal
-                    ) {
-                        Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Text(" Rec", fontSize = 11.sp)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // 동시재생 버튼
-            if (isPlaying) {
-                TextButton(onClick = onTogglePlayback) {
-                    Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(16.dp), tint = OPicColors.RecordActive)
-                    Text(" 정지", fontSize = 11.sp, color = OPicColors.RecordActive)
-                }
-            } else {
-                TextButton(
-                    onClick = onTogglePlayback,
-                    enabled = enabled && userWaveform.isNotEmpty()
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text(" 동시재생", fontSize = 11.sp)
-                }
-            }
-        }
-
-        // ── 원본 음성 Row ──────────────────────────────────────────────
-        // [▶/⏹ 원본]  [🔁]  탭힌트  [시작] [종료]
+        // ── 원본 음성 Row: [▶원본][시작] Spacer [종료] ──────────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -166,18 +120,19 @@ fun WaveformComparisonPanel(
                 Text("원본 음성", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(start = 2.dp))
             }
 
-            // 루프 버튼 🔁
-            if (onToggleLoop != null) {
+            // [시작] 버튼 — Play 버튼 바로 옆에 배치, 클릭 시 Start 모드 토글 (주황 강조)
+            if (onSegmentStartMarkerChange != null && !isPlaying && !isPlayingOriginal) {
                 TextButton(
-                    onClick = { onToggleLoop.invoke() },
-                    enabled = !isPlaying && !isRecordingUser,
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                    onClick = {
+                        markerMode = if (markerMode == MarkerMode.Start) MarkerMode.None else MarkerMode.Start
+                    },
+                    contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp),
                     modifier = Modifier.height(28.dp)
                 ) {
                     Text(
-                        text = "🔁",
-                        fontSize = 14.sp,
-                        color = if (isLooping) OPicColors.Primary else Color.Gray
+                        "시작",
+                        fontSize = 10.sp,
+                        color = if (markerMode == MarkerMode.Start) Color(0xFFFF9800) else Color.Gray
                     )
                 }
             }
@@ -201,24 +156,7 @@ fun WaveformComparisonPanel(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // [시작] 버튼 — 클릭 시 Start 모드 토글 (주황 강조)
-            if (onSegmentStartMarkerChange != null && !isPlaying && !isPlayingOriginal) {
-                TextButton(
-                    onClick = {
-                        markerMode = if (markerMode == MarkerMode.Start) MarkerMode.None else MarkerMode.Start
-                    },
-                    contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp),
-                    modifier = Modifier.height(28.dp)
-                ) {
-                    Text(
-                        "시작",
-                        fontSize = 10.sp,
-                        color = if (markerMode == MarkerMode.Start) Color(0xFFFF9800) else Color.Gray
-                    )
-                }
-            }
-
-            // [종료] 버튼 — 클릭 시 End 모드 토글 (빨강 강조)
+            // [종료] 버튼 — 오른쪽 끝에 배치, 클릭 시 End 모드 토글 (빨강 강조)
             if (onSegmentEndMarkerChange != null && !isPlaying && !isPlayingOriginal) {
                 TextButton(
                     onClick = {
@@ -365,13 +303,62 @@ fun WaveformComparisonPanel(
             Text("내 녹음", fontSize = 10.sp, color = Color.Gray)
         }
 
-        // ── 속도 조절 (± 버튼, 범위 0.5~1.5, 0.1 단위) ──────────────
+        // ── 하단 Row: [Rec][동시재생] Spacer 속도:[−][1.0x][+] ──────
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("속도", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(start = 2.dp))
-            Spacer(modifier = Modifier.width(4.dp))
+            // REC 버튼
+            if (onStartRecording != null) {
+                if (isRecordingUser) {
+                    TextButton(
+                        onClick = { onStopRecording?.invoke() },
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(14.dp), tint = OPicColors.RecordActive)
+                        Text(" Stop", fontSize = 11.sp, color = OPicColors.RecordActive)
+                    }
+                } else {
+                    TextButton(
+                        onClick = onStartRecording,
+                        enabled = !isPlayingUser && !isPlaying && !isPlayingOriginal,
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Text(" Rec", fontSize = 11.sp)
+                    }
+                }
+            }
+
+            // 동시재생 버튼
+            if (isPlaying) {
+                TextButton(
+                    onClick = onTogglePlayback,
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(14.dp), tint = OPicColors.RecordActive)
+                    Text(" 정지", fontSize = 11.sp, color = OPicColors.RecordActive)
+                }
+            } else {
+                TextButton(
+                    onClick = onTogglePlayback,
+                    enabled = enabled && userWaveform.isNotEmpty(),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Text(" 동시재생", fontSize = 11.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // 속도 ± (범위 0.5~1.5, 0.1 단위)
+            Text("속도", fontSize = 10.sp, color = Color.Gray)
+            Spacer(modifier = Modifier.width(2.dp))
             TextButton(
                 onClick = { onComparisonSpeedChange((comparisonSpeed - 0.1f).coerceAtLeast(0.5f)) },
                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),

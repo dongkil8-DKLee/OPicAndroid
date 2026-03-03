@@ -407,24 +407,24 @@ private fun SpeedAndControlRow(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 좌측: 속도 ± 컨트롤 (0.5~2.0, 0.25 단위)
+        // 좌측: 속도 ± 컨트롤 (0.5~1.5, 0.1 단위)
         Text("속도:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.width(2.dp))
         TextButton(
-            onClick = { viewModel.onPlaybackSpeedChanged((state.playbackSpeed - 0.25f).coerceAtLeast(0.5f)) },
+            onClick = { viewModel.onPlaybackSpeedChanged((state.playbackSpeed - 0.1f).coerceAtLeast(0.5f)) },
             contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
             modifier = Modifier.height(28.dp)
         ) {
             Text("−", fontSize = 14.sp, color = OPicColors.TimerRed)
         }
         Text(
-            text = String.format("%.2f", state.playbackSpeed) + "x",
+            text = String.format("%.1f", state.playbackSpeed) + "x",
             fontSize = 11.sp,
             color = OPicColors.Primary,
-            modifier = Modifier.width(44.dp)
+            modifier = Modifier.width(36.dp)
         )
         TextButton(
-            onClick = { viewModel.onPlaybackSpeedChanged((state.playbackSpeed + 0.25f).coerceAtMost(2.0f)) },
+            onClick = { viewModel.onPlaybackSpeedChanged((state.playbackSpeed + 0.1f).coerceAtMost(1.5f)) },
             contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
             modifier = Modifier.height(28.dp)
         ) {
