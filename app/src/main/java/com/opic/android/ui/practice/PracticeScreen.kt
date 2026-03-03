@@ -38,6 +38,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -335,7 +337,7 @@ private fun PracticeSentenceSection(
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
-        // 헤더: Play만 좌측 정렬 + 확대/축소
+        // 헤더: Play + ±타이밍 + 확대/축소
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -358,12 +360,57 @@ private fun PracticeSentenceSection(
 
             Spacer(modifier = Modifier.weight(1f))
 
+            // 타이밍 보정 토글
+            TextButton(
+                onClick = { viewModel.toggleTimingPanel() },
+                modifier = Modifier.padding(horizontal = 0.dp)
+            ) {
+                Text(
+                    "±타이밍",
+                    fontSize = 11.sp,
+                    color = if (state.showTimingPanel) OPicColors.Primary else Color.Gray,
+                    fontWeight = if (state.showTimingPanel) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+
             IconButton(onClick = onExpandToggle, modifier = Modifier.size(28.dp)) {
                 Icon(
                     if (isExpanded) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
                     contentDescription = if (isExpanded) "축소" else "확대",
                     tint = Color.Gray,
                     modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
+        // 타이밍 보정 패널 (토글)
+        if (state.showTimingPanel) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFF5F5F5), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("끝 여유시간", fontSize = 10.sp, color = Color.Gray)
+                Slider(
+                    value = state.endBufferMs.toFloat(),
+                    onValueChange = { viewModel.setEndBuffer(it.toLong()) },
+                    valueRange = 0f..500f,
+                    steps = 9,
+                    modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
+                    colors = SliderDefaults.colors(
+                        thumbColor = OPicColors.Primary,
+                        activeTrackColor = OPicColors.Primary,
+                        inactiveTrackColor = OPicColors.Border
+                    )
+                )
+                Text(
+                    text = "+${state.endBufferMs}ms",
+                    fontSize = 10.sp,
+                    color = OPicColors.Primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.width(52.dp)
                 )
             }
         }
@@ -382,6 +429,11 @@ private fun PracticeSentenceSection(
                     text = sentenceState.segment.text,
                     isSelected = index == state.currentIndex,
                     accuracyPercent = sentenceState.analysisResult?.accuracyPercent?.toInt(),
+                    showTimingPanel = state.showTimingPanel,
+                    sentenceOffset = state.sentenceOffsets[index] ?: 0L,
+                    onDecreaseOffset = { viewModel.adjustSentenceOffset(index, -50L) },
+                    onIncreaseOffset = { viewModel.adjustSentenceOffset(index, +50L) },
+                    onResetOffset = { viewModel.resetSentenceOffset(index) },
                     onClick = { viewModel.goToSentence(index) }
                 )
             }
@@ -395,6 +447,11 @@ private fun SentenceTableRow(
     text: String,
     isSelected: Boolean,
     accuracyPercent: Int?,
+    showTimingPanel: Boolean = false,
+    sentenceOffset: Long = 0L,
+    onDecreaseOffset: () -> Unit = {},
+    onIncreaseOffset: () -> Unit = {},
+    onResetOffset: () -> Unit = {},
     onClick: () -> Unit
 ) {
     val bgColor = if (isSelected) Color(0xFFE3F2FD) else Color.Transparent
@@ -405,7 +462,7 @@ private fun SentenceTableRow(
             .background(bgColor)
             .clickable { onClick() }
             .border(width = 0.5.dp, color = OPicColors.Border)
-            .padding(horizontal = 8.dp, vertical = 10.dp),
+            .padding(horizontal = 8.dp, vertical = if (showTimingPanel) 4.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -428,8 +485,38 @@ private fun SentenceTableRow(
             modifier = Modifier.weight(1f)
         )
 
+        // 문장별 ± 오프셋 조절 (타이밍 패널 열릴 때만)
+        if (showTimingPanel) {
+            Spacer(modifier = Modifier.width(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(
+                    onClick = onDecreaseOffset,
+                    modifier = Modifier.size(28.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                ) {
+                    Text("−", fontSize = 14.sp, color = OPicColors.TimerRed)
+                }
+                Text(
+                    text = if (sentenceOffset == 0L) "±0" else "${if (sentenceOffset > 0) "+" else ""}${sentenceOffset}",
+                    fontSize = 9.sp,
+                    color = if (sentenceOffset == 0L) Color.Gray else OPicColors.Primary,
+                    fontWeight = if (sentenceOffset != 0L) FontWeight.Bold else FontWeight.Normal,
+                    modifier = Modifier
+                        .clickable { onResetOffset() }
+                        .padding(horizontal = 2.dp)
+                )
+                TextButton(
+                    onClick = onIncreaseOffset,
+                    modifier = Modifier.size(28.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                ) {
+                    Text("+", fontSize = 14.sp, color = OPicColors.TimerGreen)
+                }
+            }
+        }
+
         if (accuracyPercent != null) {
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = "${accuracyPercent}%",
                 fontSize = 12.sp,

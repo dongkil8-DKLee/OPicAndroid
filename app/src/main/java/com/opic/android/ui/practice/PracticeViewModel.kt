@@ -92,7 +92,11 @@ data class PracticeUiState(
     val comparisonBalance: Float = 0.5f,
     val comparisonSpeed: Float = 1.0f,
     // PLAY 단독 재생 진행률
-    val userPlayProgress: Float = 0f
+    val userPlayProgress: Float = 0f,
+    // 문장 경계 보정
+    val endBufferMs: Long = 150L,
+    val sentenceOffsets: Map<Int, Long> = emptyMap(),
+    val showTimingPanel: Boolean = false
 )
 
 @HiltViewModel
@@ -120,11 +124,17 @@ class PracticeViewModel @Inject constructor(
         File(context.getExternalFilesDir(null), "Recording").also { it.mkdirs() }
     }
 
+    private val prefs by lazy {
+        context.getSharedPreferences("practice_settings", android.content.Context.MODE_PRIVATE)
+    }
+
     private var recordingJob: Job? = null
     private var userScriptRecordingJob: Job? = null
 
     init {
         val questionId = savedStateHandle.get<Int>("questionId") ?: 0
+        val savedBuffer = prefs.getLong("end_buffer_ms", 150L)
+        _uiState.update { it.copy(endBufferMs = savedBuffer) }
         if (questionId > 0) {
             loadQuestion(questionId)
         } else {
@@ -258,17 +268,18 @@ class PracticeViewModel @Inject constructor(
         val state = _uiState.value
         if (state.isPlayingOriginal || state.isPlayingUser || state.isRecording || state.isComparisonPlaying) return
         val segment = state.currentSegment ?: return
+        val effectiveEnd = effectiveSegmentEndMs(segment)
 
         _uiState.update { it.copy(isPlayingOriginal = true) }
         markInProgressIfNeeded()
 
         when (val source = state.assetPath) {
             is com.opic.android.audio.AudioSource.AssetPath ->
-                audioPlayer.playRangeFromAssets(source.path, segment.startMs, segment.endMs) {
+                audioPlayer.playRangeFromAssets(source.path, segment.startMs, effectiveEnd) {
                     _uiState.update { it.copy(isPlayingOriginal = false) }
                 }
             is com.opic.android.audio.AudioSource.FilePath ->
-                audioPlayer.playRangeFromFile(source.path, segment.startMs, segment.endMs) {
+                audioPlayer.playRangeFromFile(source.path, segment.startMs, effectiveEnd) {
                     _uiState.update { it.copy(isPlayingOriginal = false) }
                 }
             null -> viewModelScope.launch {
@@ -641,6 +652,36 @@ class PracticeViewModel @Inject constructor(
     fun setPlaybackSpeed(speed: Float) {
         audioPlayer.setSpeed(speed)
         _uiState.update { it.copy(playbackSpeed = speed) }
+    }
+
+    // ==================== 문장 경계 보정 ====================
+
+    /** 문장 끝 ms 계산: segment.endMs + 전역버퍼 + 개별오프셋, 총 오디오 길이 이내로 클램핑 */
+    private fun effectiveSegmentEndMs(segment: com.opic.android.util.SentenceSegment): Long {
+        val state = _uiState.value
+        val adjustment = state.sentenceOffsets[segment.index] ?: 0L
+        val totalDurationMs = state.sentences.lastOrNull()?.segment?.endMs ?: segment.endMs
+        return (segment.endMs + state.endBufferMs + adjustment).coerceIn(segment.startMs + 100L, totalDurationMs)
+    }
+
+    fun setEndBuffer(ms: Long) {
+        val clamped = ms.coerceIn(0L, 500L)
+        _uiState.update { it.copy(endBufferMs = clamped) }
+        prefs.edit().putLong("end_buffer_ms", clamped).apply()
+    }
+
+    fun adjustSentenceOffset(index: Int, deltaMs: Long) {
+        val current = _uiState.value.sentenceOffsets[index] ?: 0L
+        val newOffset = (current + deltaMs).coerceIn(-500L, 500L)
+        _uiState.update { it.copy(sentenceOffsets = it.sentenceOffsets + (index to newOffset)) }
+    }
+
+    fun resetSentenceOffset(index: Int) {
+        _uiState.update { it.copy(sentenceOffsets = it.sentenceOffsets - index) }
+    }
+
+    fun toggleTimingPanel() {
+        _uiState.update { it.copy(showTimingPanel = !it.showTimingPanel) }
     }
 
     // ==================== Utility ====================
