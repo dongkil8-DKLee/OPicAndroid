@@ -245,7 +245,11 @@ fun WaveformComparisonPanel(
             waveformColor = OPicColors.LevelGauge,
             playbackProgress = when {
                 isPlayingOriginal -> originalPlayProgress
-                isPlaying         -> originalProgress
+                // 동시재생: comparisonOriginalProgress(0~1)는 세그먼트 내 진행률.
+                // 파형은 expand 포함 전체 범위를 표시하므로,
+                // segmentStartMarker~segmentEndMarker 구간으로 선형 매핑하여 올바른 위치에 표시.
+                isPlaying -> (segmentStartMarker + originalProgress * (segmentEndMarker - segmentStartMarker))
+                    .coerceIn(0f, 1f)
                 else              -> null
             },
             startMarkerFraction = if (!isPlaying && !isPlayingOriginal) segmentStartMarker else null,

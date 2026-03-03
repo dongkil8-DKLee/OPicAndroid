@@ -403,31 +403,32 @@ private fun SpeedAndControlRow(
     viewModel: StudyViewModel,
     onSettings: () -> Unit
 ) {
-    val speedOptions = listOf(0.75f, 1.0f, 1.25f, 1.5f)
-
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 좌측: 속도 컨트롤
+        // 좌측: 속도 ± 컨트롤 (0.5~2.0, 0.25 단위)
         Text("속도:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        speedOptions.forEach { speed ->
-            val label = if (speed == speed.toInt().toFloat()) "${speed.toInt()}x" else "${speed}x"
-            val isSelected = state.playbackSpeed == speed
-            TextButton(
-                onClick = { viewModel.onPlaybackSpeedChanged(speed) },
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = if (isSelected) OPicColors.Primary else Color.Gray
-                ),
-                contentPadding = PaddingValues(horizontal = 2.dp),
-                modifier = Modifier.height(30.dp)
-            ) {
-                Text(
-                    text = label,
-                    fontSize = 10.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                )
-            }
+        Spacer(modifier = Modifier.width(2.dp))
+        TextButton(
+            onClick = { viewModel.onPlaybackSpeedChanged((state.playbackSpeed - 0.25f).coerceAtLeast(0.5f)) },
+            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+            modifier = Modifier.height(28.dp)
+        ) {
+            Text("−", fontSize = 14.sp, color = OPicColors.TimerRed)
+        }
+        Text(
+            text = String.format("%.2f", state.playbackSpeed) + "x",
+            fontSize = 11.sp,
+            color = OPicColors.Primary,
+            modifier = Modifier.width(44.dp)
+        )
+        TextButton(
+            onClick = { viewModel.onPlaybackSpeedChanged((state.playbackSpeed + 0.25f).coerceAtMost(2.0f)) },
+            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+            modifier = Modifier.height(28.dp)
+        ) {
+            Text("+", fontSize = 14.sp, color = OPicColors.TimerGreen)
         }
 
         // 중간 여백 → 오른쪽 항목 항상 보이도록
