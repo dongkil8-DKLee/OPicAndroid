@@ -125,10 +125,9 @@ private fun PracticeContent(
     var expandedSection by remember { mutableStateOf<String?>(null) }
     // 드래그 리사이즈: section1(문장연습) vs 나머지 비율
     var splitFraction by remember { mutableFloatStateOf(0.40f) }
-    // 드래그 리사이즈: section2(발화연습) vs section3(음성비교) 비율 (나머지 공간 내)
-    var innerSplitFraction by remember { mutableFloatStateOf(0.65f) }
-
-    val showComparison = state.hasUserAudio && expandedSection == null
+    // 드래그 리사이즈: section2(음성비교) vs section3(발화연습) 비율 (나머지 공간 내)
+    // 초기값 0.85f → UserScript 최소 크기로 시작
+    var innerSplitFraction by remember { mutableFloatStateOf(0.85f) }
 
     Column(
         modifier = Modifier
@@ -167,9 +166,8 @@ private fun PracticeContent(
                             .height(12.dp)
                             .draggable(
                                 state = rememberDraggableState { delta ->
-                                    val maxFraction = if (showComparison) 0.75f else 0.85f
                                     splitFraction = (splitFraction + delta / totalHeightPx)
-                                        .coerceIn(0.10f, maxFraction)
+                                        .coerceIn(0.10f, 0.75f)
                                 },
                                 orientation = Orientation.Vertical
                             ),
@@ -182,82 +180,69 @@ private fun PracticeContent(
                         )
                     }
 
-                    if (showComparison) {
-                        // ===== 발화 연습 섹션 (3분할) =====
-                        UserScriptSection(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight((1f - splitFraction) * innerSplitFraction),
-                            state = state,
-                            viewModel = viewModel,
-                            isExpanded = false,
-                            onExpandToggle = { expandedSection = "userscript" }
-                        )
+                    // ===== 음성 비교 패널 (항상 표시) =====
+                    val isBusyForComparison = state.isPlayingOriginal || state.isPlayingUser ||
+                            state.isRecording || state.isRecordingUserScript ||
+                            state.isPlayingUserAudio || state.sttListening ||
+                            state.userScriptSttListening
+                    WaveformComparisonPanel(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight((1f - splitFraction) * innerSplitFraction),
+                        originalWaveform = state.originalWaveform,
+                        userWaveform = state.userWaveform,
+                        isPlaying = state.isComparisonPlaying,
+                        originalProgress = state.comparisonOriginalProgress,
+                        userProgress = state.comparisonUserProgress,
+                        balance = state.comparisonBalance,
+                        enabled = !isBusyForComparison,
+                        onTogglePlayback = { viewModel.toggleComparisonPlayback() },
+                        onBalanceChange = { viewModel.setComparisonBalance(it) },
+                        userStartFraction = state.userStartFraction,
+                        onUserStartFractionChange = { viewModel.setUserStartFraction(it) },
+                        userPlayProgress = state.userPlayProgress,
+                        comparisonSpeed = state.comparisonSpeed,
+                        onComparisonSpeedChange = { viewModel.setComparisonSpeed(it) },
+                        isRecordingUser = state.isRecordingUserScript,
+                        isPlayingUser = state.isPlayingUserAudio,
+                        hasUserAudio = state.hasUserAudio,
+                        onStartRecording = { viewModel.toggleUserScriptRecording() },
+                        onStopRecording = { viewModel.stopUserScriptRecording() },
+                        onPlayUser = { viewModel.playUserScriptAudio() },
+                        onStopUser = { viewModel.stopUserScriptAudio() }
+                    )
 
-                        // ===== 드래그 핸들 2 =====
+                    // ===== 드래그 핸들 2 =====
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(12.dp)
+                            .draggable(
+                                state = rememberDraggableState { delta ->
+                                    innerSplitFraction = (innerSplitFraction + delta / (totalHeightPx * (1f - splitFraction)))
+                                        .coerceIn(0.15f, 0.92f)
+                                },
+                                orientation = Orientation.Vertical
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(12.dp)
-                                .draggable(
-                                    state = rememberDraggableState { delta ->
-                                        innerSplitFraction = (innerSplitFraction + delta / (totalHeightPx * (1f - splitFraction)))
-                                            .coerceIn(0.15f, 0.85f)
-                                    },
-                                    orientation = Orientation.Vertical
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(width = 40.dp, height = 4.dp)
-                                    .background(Color.Gray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
-                            )
-                        }
-
-                        // ===== 음성 비교 패널 (3분할) =====
-                        val isBusyForComparison = state.isPlayingOriginal || state.isPlayingUser ||
-                                state.isRecording || state.isRecordingUserScript ||
-                                state.isPlayingUserAudio || state.sttListening ||
-                                state.userScriptSttListening
-                        WaveformComparisonPanel(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight((1f - splitFraction) * (1f - innerSplitFraction)),
-                            originalWaveform = state.originalWaveform,
-                            userWaveform = state.userWaveform,
-                            isPlaying = state.isComparisonPlaying,
-                            originalProgress = state.comparisonOriginalProgress,
-                            userProgress = state.comparisonUserProgress,
-                            balance = state.comparisonBalance,
-                            enabled = !isBusyForComparison,
-                            onTogglePlayback = { viewModel.toggleComparisonPlayback() },
-                            onBalanceChange = { viewModel.setComparisonBalance(it) },
-                            userStartFraction = state.userStartFraction,
-                            onUserStartFractionChange = { viewModel.setUserStartFraction(it) },
-                            userPlayProgress = state.userPlayProgress,
-                            comparisonSpeed = state.comparisonSpeed,
-                            onComparisonSpeedChange = { viewModel.setComparisonSpeed(it) },
-                            isRecordingUser = state.isRecordingUserScript,
-                            isPlayingUser = state.isPlayingUserAudio,
-                            hasUserAudio = state.hasUserAudio,
-                            onStartRecording = { viewModel.toggleUserScriptRecording() },
-                            onStopRecording = { viewModel.stopUserScriptRecording() },
-                            onPlayUser = { viewModel.playUserScriptAudio() },
-                            onStopUser = { viewModel.stopUserScriptAudio() }
-                        )
-                    } else {
-                        // ===== 발화 연습 섹션 (2분할) =====
-                        UserScriptSection(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f - splitFraction),
-                            state = state,
-                            viewModel = viewModel,
-                            isExpanded = false,
-                            onExpandToggle = { expandedSection = "userscript" }
+                                .size(width = 40.dp, height = 4.dp)
+                                .background(Color.Gray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
                         )
                     }
+
+                    // ===== 발화 연습 섹션 (하단, 초기 최소 크기) =====
+                    UserScriptSection(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight((1f - splitFraction) * (1f - innerSplitFraction)),
+                        state = state,
+                        viewModel = viewModel,
+                        isExpanded = false,
+                        onExpandToggle = { expandedSection = "userscript" }
+                    )
                 }
             }
         } else {

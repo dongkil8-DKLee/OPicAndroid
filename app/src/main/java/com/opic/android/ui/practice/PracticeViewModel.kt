@@ -177,7 +177,7 @@ class PracticeViewModel @Inject constructor(
                         userAudioPath = userAudio
                     )
                 }
-                if (userAudio != null) loadWaveforms()
+                loadWaveforms() // 녹음 없어도 원본 파형 항상 로드
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load question", e)
                 _uiState.update { it.copy(loading = false, error = "Load failed: ${e.message}") }

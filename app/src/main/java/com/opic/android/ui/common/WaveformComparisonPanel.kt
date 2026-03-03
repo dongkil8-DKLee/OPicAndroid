@@ -82,14 +82,6 @@ fun WaveformComparisonPanel(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.AutoMirrored.Filled.CompareArrows,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = OPicColors.LevelGauge
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-
             // REC 버튼
             if (onStartRecording != null) {
                 if (isRecordingUser) {
@@ -224,11 +216,11 @@ fun WaveformComparisonPanel(
         ) {
             Text("속도", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(start = 2.dp))
             Spacer(modifier = Modifier.width(4.dp))
-            listOf(0.75f, 1.0f, 1.25f, 1.5f).forEach { speed ->
+            listOf(0.6f, 0.7f, 0.8f, 0.9f, 1.0f).forEach { speed ->
                 val selected = comparisonSpeed == speed
                 TextButton(
                     onClick = { onComparisonSpeedChange(speed) },
-                    modifier = Modifier.padding(horizontal = 1.dp)
+                    modifier = Modifier.padding(horizontal = 0.dp)
                 ) {
                     Text(
                         text = if (speed == 1.0f) "1x" else "${speed}x",
