@@ -6,12 +6,12 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// OPIc brand colors
-val OPicBlue = Color(0xFF1565C0)
-val OPicLightBlue = Color(0xFF1976D2)
-val OPicAccent = Color(0xFF00B0FF)
-val OPicGreen = Color(0xFF4CAF50)
-val OPicRed = Color(0xFFE53935)
+// OPIc brand colors (StudyDetail 다크 패널 전용)
+val OPicBlue = Color(0xFF4F46E5)
+val OPicLightBlue = Color(0xFF6366F1)
+val OPicAccent = Color(0xFF0891B2)
+val OPicGreen = Color(0xFF10B981)
+val OPicRed = Color(0xFFEF4444)
 
 // StudyDetail dark panel colors
 val StudyDarkBg = Color(0xFF1A1A2E)
@@ -27,51 +27,56 @@ val StudySeekbarActive = Color(0xFF42A5F5)
 val StudySeekbarTrack = Color(0xFF2C3E5A)
 
 private val LightColorScheme = lightColorScheme(
-    primary = OPicBlue,
+    primary = Color(0xFF4F46E5),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFD3E4FF),
-    onPrimaryContainer = Color(0xFF001B3F),
-    secondary = Color(0xFF545F70),
+    primaryContainer = Color(0xFFEEF2FF),
+    onPrimaryContainer = Color(0xFF1E1B4B),
+    secondary = Color(0xFF0891B2),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFD8E3F8),
-    onSecondaryContainer = Color(0xFF111C2B),
-    background = Color(0xFFF8FAFF),
-    surface = Color(0xFFF8FAFF),
-    onBackground = Color(0xFF0F172A),
-    onSurface = Color(0xFF0F172A),
-    error = OPicRed,
-    onError = Color.White
+    secondaryContainer = Color(0xFFE0F2FE),
+    onSecondaryContainer = Color(0xFF0F2D3D),
+    background = Color(0xFFF5F7FF),
+    surface = Color(0xFFFFFFFF),
+    surfaceVariant = Color(0xFFEEF2FF),
+    onBackground = Color(0xFF1E1B4B),
+    onSurface = Color(0xFF1E1B4B),
+    onSurfaceVariant = Color(0xFF4F46E5),
+    error = Color(0xFFEF4444),
+    onError = Color.White,
+    outline = Color(0xFFE0E7FF)
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF3B82F6),
-    onPrimary = Color(0xFFF1F5F9),
-    primaryContainer = Color(0xFF1E293B),
-    onPrimaryContainer = Color(0xFFF1F5F9),
-    secondary = Color(0xFF94A3B8),
+    primary = Color(0xFF818CF8),
+    onPrimary = Color(0xFF1E1B4B),
+    primaryContainer = Color(0xFF263450),
+    onPrimaryContainer = Color(0xFFE2E8F0),
+    secondary = Color(0xFF22D3EE),
     onSecondary = Color(0xFF0F172A),
-    secondaryContainer = Color(0xFF1E293B),
-    onSecondaryContainer = Color(0xFFF1F5F9),
+    secondaryContainer = Color(0xFF0F2D3D),
+    onSecondaryContainer = Color(0xFFE2E8F0),
     background = Color(0xFF0F172A),
-    surface = Color(0xFF0F172A),
-    onBackground = Color(0xFFF1F5F9),
-    onSurface = Color(0xFFF1F5F9),
+    surface = Color(0xFF1E293B),
+    surfaceVariant = Color(0xFF263450),
+    onBackground = Color(0xFFE2E8F0),
+    onSurface = Color(0xFFE2E8F0),
+    onSurfaceVariant = Color(0xFFA5B4FC),
     error = Color(0xFFF87171),
-    onError = Color(0xFF0F172A)
+    onError = Color(0xFF0F172A),
+    outline = Color(0xFF334155)
 )
 
 @Composable
 fun OPicTheme(
     darkTheme: Boolean = false,
-    dynamicColor: Boolean = false,  // 커스텀 색상 우선 적용 — dynamic color 사용 안 함
+    dynamicColor: Boolean = false,  // 커스텀 색상 우선 — dynamic color 사용 안 함
     content: @Composable () -> Unit
 ) {
-    val bgColor    = if (darkTheme) Color(0xFF0F172A) else Color(0xFFF8FAFF)
-    val onBgColor  = if (darkTheme) Color(0xFFF1F5F9) else Color(0xFF0F172A)
+    val bgColor   = if (darkTheme) Color(0xFF0F172A) else Color(0xFFF5F7FF)
+    val onBgColor = if (darkTheme) Color(0xFFE2E8F0) else Color(0xFF1E1B4B)
 
     val colorScheme = (if (darkTheme) DarkColorScheme else LightColorScheme).copy(
         background   = bgColor,
-        surface      = bgColor,
         onBackground = onBgColor,
         onSurface    = onBgColor
     )

@@ -1,13 +1,15 @@
 package com.opic.android.ui.navigation
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -15,14 +17,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.opic.android.ui.theme.OPicColors
 
-/** 테스트 플로우 라우트 (Survey, SelfAssessment, Test) */
+/** 테스트 플로우 라우트 */
 private val testFlowRoutes = setOf(
     Screen.Survey.route,
     Screen.SelfAssessment.route,
@@ -37,14 +42,13 @@ private fun isTestFlowRoute(route: String?): Boolean {
 }
 
 /**
- * 모든 화면 공통 하단바: < Back | Study | Home | Test | Next >
+ * 하단 네비게이션 바 — Pill 스타일
  *
- * - < Back, Next > 항상 좌/우 고정
- * - 테스트 플로우: Study, Home, Test 비활성화
- * - 현재 탭 = NavTextSelected(Light:검정/Dark:골드), 나머지 = NavTextNormal
- * - Study 탭: StudyScreen + PracticeScreen
- * - Test 탭: SurveyPage + SelfAssessmentPage + BeginTestPage + TestScreen
- * - Home 탭: ReportScreen
+ * 레이아웃: ← Back | Study | Home | Test | Next →
+ * - 바 배경: NavBarBg (인디고 / 다크 슬레이트)
+ * - 현재 탭: 골드 텍스트 + 반투명 골드 pill 배경
+ * - 일반 탭: 흰색/뮤트 텍스트
+ * - 비활성: 30% 투명도
  */
 @Composable
 fun OPicBottomBar(navController: NavHostController) {
@@ -52,7 +56,6 @@ fun OPicBottomBar(navController: NavHostController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // 테스트 플로우 감지 (전환 애니메이션 중에도 감지)
     val visibleEntries by navController.visibleEntries.collectAsState()
     val isTestFlow = visibleEntries.any { isTestFlowRoute(it.destination.route) }
             || isTestFlowRoute(currentRoute)
@@ -65,22 +68,16 @@ fun OPicBottomBar(navController: NavHostController) {
             || currentRoute?.startsWith("BeginTestPage") == true
             || currentRoute == Screen.SelfAssessment.route
 
-    // ★ stale 액션 방지: ownerRoute가 현재 화면과 일치할 때만 액션 사용
     val isOwner = bottomNavState.isOwnerRoute(currentRoute)
     val effectiveBackAction = if (isOwner) bottomNavState.backAction else null
     val effectiveNextAction = if (isOwner) bottomNavState.nextAction else null
 
-    // < Back 활성 여부
     val canGoBack = effectiveBackAction != null ||
             (!isOnHome && !isTestFlow && navController.previousBackStackEntry != null)
-
-    // Next > 활성 여부
     val canGoNext = effectiveNextAction != null && bottomNavState.nextEnabled
 
-    // 테스트 플로우에서는 Study/Home/Test 비활성화
     val middleEnabled = !isTestFlow
 
-    // 빠른 연속 클릭 방지 (300ms 디바운스)
     val lastClickTime = remember { longArrayOf(0L) }
     fun debounced(action: () -> Unit): () -> Unit = {
         val now = System.currentTimeMillis()
@@ -93,30 +90,27 @@ fun OPicBottomBar(navController: NavHostController) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(48.dp),
+            .height(50.dp)
+            .background(OPicColors.NavBarBg)
+            .padding(horizontal = 3.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        // ===== < Back (좌측 고정) =====
-        BarButton(
-            text = "< Back",
+        NavPill(
+            text = "← Back",
             enabled = canGoBack,
-            isCurrentTab = false,
+            isActive = false,
             onClick = debounced {
-                if (effectiveBackAction != null) {
-                    effectiveBackAction.invoke()
-                } else if (navController.previousBackStackEntry != null) {
-                    navController.popBackStack()
-                }
+                if (effectiveBackAction != null) effectiveBackAction.invoke()
+                else if (navController.previousBackStackEntry != null) navController.popBackStack()
             },
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1.2f)
         )
 
-        // ===== Study =====
-        BarButton(
+        NavPill(
             text = "Study",
             enabled = middleEnabled,
-            isCurrentTab = isOnStudy && middleEnabled,
+            isActive = isOnStudy && middleEnabled,
             onClick = debounced {
                 navController.navigate(Screen.Study.createRoute()) {
                     popUpTo(Screen.Report.route) { inclusive = false }
@@ -126,22 +120,20 @@ fun OPicBottomBar(navController: NavHostController) {
             modifier = Modifier.weight(1f)
         )
 
-        // ===== Home =====
-        BarButton(
+        NavPill(
             text = "Home",
             enabled = middleEnabled,
-            isCurrentTab = isOnHome && middleEnabled,
+            isActive = isOnHome && middleEnabled,
             onClick = debounced {
                 navController.popBackStack(Screen.Report.route, inclusive = false)
             },
             modifier = Modifier.weight(1f)
         )
 
-        // ===== Test =====
-        BarButton(
+        NavPill(
             text = "Test",
             enabled = middleEnabled,
-            isCurrentTab = isOnTest && middleEnabled,
+            isActive = isOnTest && middleEnabled,
             onClick = debounced {
                 navController.navigate(Screen.Survey.route) {
                     popUpTo(Screen.Report.route) { inclusive = false }
@@ -151,43 +143,50 @@ fun OPicBottomBar(navController: NavHostController) {
             modifier = Modifier.weight(1f)
         )
 
-        // ===== Next > (우측 고정) =====
-        BarButton(
-            text = "Next >",
+        NavPill(
+            text = "Next →",
             enabled = canGoNext,
-            isCurrentTab = false,
+            isActive = false,
             onClick = debounced { effectiveNextAction?.invoke() },
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1.2f)
         )
     }
 }
 
 @Composable
-private fun BarButton(
+private fun NavPill(
     text: String,
     enabled: Boolean,
-    isCurrentTab: Boolean,
+    isActive: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        colors = ButtonDefaults.buttonColors(
-            containerColor        = OPicColors.NavBarBg,
-            contentColor          = if (isCurrentTab) OPicColors.NavTextSelected else OPicColors.NavTextNormal,
-            disabledContainerColor = OPicColors.NavDisabledBg,
-            disabledContentColor  = OPicColors.NavTextNormal.copy(alpha = 0.5f)
-        ),
-        shape = RoundedCornerShape(6.dp),
-        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-        modifier = modifier.height(40.dp)
+    val pillBg = when {
+        isActive  -> OPicColors.NavTextSelected.copy(alpha = 0.18f)
+        else      -> Color.Transparent
+    }
+    val textColor = when {
+        !enabled  -> OPicColors.NavTextNormal.copy(alpha = 0.30f)
+        isActive  -> OPicColors.NavTextSelected
+        else      -> OPicColors.NavTextNormal
+    }
+    val weight = if (isActive) FontWeight.Bold else FontWeight.Normal
+
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(50.dp))
+            .background(pillBg)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
-            fontWeight = FontWeight.Bold,
+            color = textColor,
+            fontWeight = weight,
             fontSize = 12.sp,
-            maxLines = 1
+            maxLines = 1,
+            textAlign = TextAlign.Center
         )
     }
 }

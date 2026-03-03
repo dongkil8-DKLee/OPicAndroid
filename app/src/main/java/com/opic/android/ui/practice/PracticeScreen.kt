@@ -377,7 +377,7 @@ private fun PracticeSentenceSection(
                 modifier = Modifier.padding(horizontal = 0.dp)
             ) {
                 Text(
-                    "통계",
+                    "문장 학습",
                     fontSize = 11.sp,
                     color = if (state.showStatsPanel) OPicColors.Primary else Color.Gray,
                     fontWeight = if (state.showStatsPanel) FontWeight.Bold else FontWeight.Normal
@@ -390,7 +390,7 @@ private fun PracticeSentenceSection(
                 modifier = Modifier.padding(horizontal = 0.dp)
             ) {
                 Text(
-                    "±타이밍",
+                    " ± 타이밍",
                     fontSize = 11.sp,
                     color = if (state.showTimingPanel) OPicColors.Primary else Color.Gray,
                     fontWeight = if (state.showTimingPanel) FontWeight.Bold else FontWeight.Normal
@@ -612,7 +612,7 @@ private fun SentenceTableRow(
     hasRecording: Boolean = false,
     onClick: () -> Unit
 ) {
-    val bgColor = if (isSelected) Color(0xFFE3F2FD) else Color.Transparent
+    val bgColor = if (isSelected) OPicColors.LightBg else Color.Transparent
     val hasOffset = startOffset != 0L || endOffset != 0L
 
     Row(

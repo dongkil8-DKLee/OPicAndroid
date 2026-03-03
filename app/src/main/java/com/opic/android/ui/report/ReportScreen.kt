@@ -469,8 +469,8 @@ private fun RecentTestsSection(
                         .fillMaxWidth()
                         .padding(vertical = 3.dp)
                         .clickable { onSessionClick(session.sessionId) },
-                    colors = CardDefaults.cardColors(containerColor = OPicColors.LightBg),
-                    shape = RoundedCornerShape(6.dp)
+                    colors = CardDefaults.cardColors(containerColor = OPicColors.Secondary),
+                    shape = RoundedCornerShape(8.dp)
                 ) {
                     Row(
                         modifier = Modifier
@@ -562,14 +562,14 @@ private fun SectionCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(10.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = OPicColors.Surface),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(
                 text = title,
-                fontSize = 16.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = OPicColors.TextOnLight
             )
