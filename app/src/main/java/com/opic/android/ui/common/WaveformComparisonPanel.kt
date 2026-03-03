@@ -36,22 +36,9 @@ import com.opic.android.ui.theme.OPicColors
 /**
  * 두 파형 + 원본재생 + 동시재생 버튼 + 볼륨 밸런스 슬라이더 패널.
  *
- * @param originalWaveform 원본 음성 파형 데이터
- * @param userWaveform 사용자 녹음 파형 데이터
- * @param isPlaying 동시 재생 중 여부
- * @param originalProgress 동시재생 시 원본 진행률 (0~1)
- * @param userProgress 동시재생 시 사용자 진행률 (0~1, userStartFraction 이후 구간 기준)
- * @param balance 볼륨 밸런스 (0.0=원본만, 0.5=둘다, 1.0=녹음만)
- * @param enabled 비활성화 여부 (다른 오디오 활동 중)
- * @param onTogglePlayback 동시 재생 토글
- * @param onBalanceChange 밸런스 변경
- * @param isPlayingOriginal 원본 단독 재생 중 여부
- * @param onPlayOriginal 원본 단독 재생 콜백
- * @param onStopOriginal 원본 단독 재생 정지 콜백
- * @param originalPlayProgress 원본 단독 재생 진행률 (0~1, 파형 윈도우 기준)
- * @param userPlayProgress PLAY 단독 재생 진행률 (0~1)
- * @param comparisonSpeed 동시재생 속도
- * @param onComparisonSpeedChange 속도 변경 콜백
+ * 원본 파형 마커 설정 방식:
+ *   [시작] / [종료] 버튼 클릭 후 파형을 탭하면 해당 마커 위치 설정.
+ *   드래그 대신 버튼+탭 방식으로 핀치 줌과 제스처 충돌 없음.
  */
 @Composable
 fun WaveformComparisonPanel(
@@ -69,7 +56,7 @@ fun WaveformComparisonPanel(
     userPlayProgress: Float = 0f,
     comparisonSpeed: Float = 1.0f,
     onComparisonSpeedChange: (Float) -> Unit = {},
-    // 원본 파형 구간 마커 (주황=시작, 빨강=끝) — 드래그로 경계 조정
+    // 원본 파형 구간 마커 (주황=시작, 빨강=끝)
     segmentStartMarker: Float = 0f,
     segmentEndMarker: Float = 1f,
     onSegmentStartMarkerChange: ((Float) -> Unit)? = null,
@@ -94,8 +81,10 @@ fun WaveformComparisonPanel(
     onAutoSync: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    // 마커 잠금 상태 (🔓 = 드래그 가능, 🔒 = 드래그 차단)
-    var markersLocked by remember { mutableStateOf(false) }
+    // 마커 설정 모드: None / Start / End
+    // [시작] 버튼 클릭 → Start 모드, 파형 탭 → 시작 마커 설정 후 None으로 복귀
+    // [종료] 버튼 클릭 → End 모드, 파형 탭 → 종료 마커 설정 후 None으로 복귀
+    var markerMode by remember { mutableStateOf(MarkerMode.None) }
 
     Column(
         modifier = modifier
@@ -145,7 +134,8 @@ fun WaveformComparisonPanel(
             }
         }
 
-        // ── 원본 음성 Row: [▶/⏹ 원본] "원본 음성" 드래그힌트 [🔓/🔒] ──
+        // ── 원본 음성 Row ──────────────────────────────────────────────
+        // [▶/⏹ 원본]  [🔁]  탭힌트  [시작] [종료]
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -192,27 +182,64 @@ fun WaveformComparisonPanel(
                 }
             }
 
-            // 드래그 힌트 (잠금 해제 시, 재생 중이 아닐 때)
-            if (!isPlaying && !isPlayingOriginal && !markersLocked && onSegmentStartMarkerChange != null) {
+            // 탭 힌트 (마커 설정 모드 활성 시 표시)
+            if (!isPlaying && !isPlayingOriginal && markerMode != MarkerMode.None) {
                 Text(
-                    text = " ▶ 주황=시작  빨강=끝",
-                    fontSize = 9.sp, color = Color(0xFFFF9800)
+                    text = when (markerMode) {
+                        MarkerMode.Start -> " 📍탭=시작"
+                        MarkerMode.End   -> " 📍탭=종료"
+                        MarkerMode.None  -> ""
+                    },
+                    fontSize = 9.sp,
+                    color = when (markerMode) {
+                        MarkerMode.Start -> Color(0xFFFF9800)
+                        MarkerMode.End   -> Color(0xFFE53935)
+                        MarkerMode.None  -> Color.Transparent
+                    }
                 )
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // 🔓/🔒 잠금 버튼
-            TextButton(
-                onClick = { markersLocked = !markersLocked },
-                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                modifier = Modifier.height(28.dp)
-            ) {
-                Text(if (markersLocked) "🔒" else "🔓", fontSize = 14.sp)
+            // [시작] 버튼 — 클릭 시 Start 모드 토글 (주황 강조)
+            if (onSegmentStartMarkerChange != null && !isPlaying && !isPlayingOriginal) {
+                TextButton(
+                    onClick = {
+                        markerMode = if (markerMode == MarkerMode.Start) MarkerMode.None else MarkerMode.Start
+                    },
+                    contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Text(
+                        "시작",
+                        fontSize = 10.sp,
+                        color = if (markerMode == MarkerMode.Start) Color(0xFFFF9800) else Color.Gray
+                    )
+                }
+            }
+
+            // [종료] 버튼 — 클릭 시 End 모드 토글 (빨강 강조)
+            if (onSegmentEndMarkerChange != null && !isPlaying && !isPlayingOriginal) {
+                TextButton(
+                    onClick = {
+                        markerMode = if (markerMode == MarkerMode.End) MarkerMode.None else MarkerMode.End
+                    },
+                    contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Text(
+                        "종료",
+                        fontSize = 10.sp,
+                        color = if (markerMode == MarkerMode.End) Color(0xFFE53935) else Color.Gray
+                    )
+                }
             }
         }
 
-        // 원본 WaveformView (핀치 줌 활성화, 마커 잠금 반영)
+        // 원본 WaveformView
+        // - 드래그 비활성화 (onStart/EndMarkerChange = null)
+        // - 탭으로 마커 설정 (onTap: markerMode에 따라 시작/종료 마커 업데이트 후 None 복귀)
+        // - 핀치 줌 활성화 (zoomEnabled = true)
         WaveformView(
             samples = originalWaveform,
             waveformColor = OPicColors.LevelGauge,
@@ -221,23 +248,35 @@ fun WaveformComparisonPanel(
                 isPlaying         -> originalProgress
                 else              -> null
             },
-            // 재생 중에는 마커 숨김, 정지 시에만 드래그 가능 (잠금이면 onChange=null)
             startMarkerFraction = if (!isPlaying && !isPlayingOriginal) segmentStartMarker else null,
-            onStartMarkerChange = if (!isPlaying && !isPlayingOriginal && !markersLocked) onSegmentStartMarkerChange else null,
             endMarkerFraction   = if (!isPlaying && !isPlayingOriginal) segmentEndMarker   else null,
-            onEndMarkerChange   = if (!isPlaying && !isPlayingOriginal && !markersLocked) onSegmentEndMarkerChange else null,
+            onStartMarkerChange = null,  // 드래그 비활성화
+            onEndMarkerChange   = null,  // 드래그 비활성화
+            onTap = if (!isPlaying && !isPlayingOriginal && markerMode != MarkerMode.None) { fraction ->
+                when (markerMode) {
+                    MarkerMode.Start -> {
+                        onSegmentStartMarkerChange?.invoke(fraction)
+                        markerMode = MarkerMode.None
+                    }
+                    MarkerMode.End -> {
+                        onSegmentEndMarkerChange?.invoke(fraction)
+                        markerMode = MarkerMode.None
+                    }
+                    MarkerMode.None -> {}
+                }
+            } else null,
             height = 40.dp,
             zoomEnabled = true
         )
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // ── 내 녹음 Row: [▶/⏹ 내녹음] "내 녹음" 드래그힌트 [Auto] ──
+        // ── 내 녹음 Row: [▶/⏹ 내녹음]  드래그힌트  [Auto] ──────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 내 녹음 단독 Play/Stop (헤더에서 이동)
+            // 내 녹음 단독 Play/Stop
             if (onPlayUser != null) {
                 if (isPlayingUser) {
                     TextButton(
@@ -286,7 +325,7 @@ fun WaveformComparisonPanel(
             }
         }
 
-        // 사용자 파형 (시작 마커 드래그 가능)
+        // 사용자 파형 (시작 마커 드래그 가능 — zoomEnabled=false이므로 핀치 충돌 없음)
         WaveformView(
             samples = userWaveform,
             waveformColor = OPicColors.TimerGreen,
@@ -352,3 +391,6 @@ fun WaveformComparisonPanel(
         }
     }
 }
+
+/** 원본 파형 마커 설정 모드 */
+private enum class MarkerMode { None, Start, End }
