@@ -87,6 +87,9 @@ fun WaveformComparisonPanel(
     onPlayOriginal: (() -> Unit)? = null,
     onStopOriginal: (() -> Unit)? = null,
     originalPlayProgress: Float = 0f,
+    // 구간 루프 재생
+    isLooping: Boolean = false,
+    onToggleLoop: (() -> Unit)? = null,
     // 자동 싱크: 사용자 파형에서 음성 시작점 자동 감지 (null이면 버튼 미표시)
     onAutoSync: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -171,6 +174,22 @@ fun WaveformComparisonPanel(
                 }
             } else {
                 Text("원본 음성", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(start = 2.dp))
+            }
+
+            // 루프 버튼 🔁
+            if (onToggleLoop != null) {
+                TextButton(
+                    onClick = { onToggleLoop.invoke() },
+                    enabled = !isPlaying && !isRecordingUser,
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Text(
+                        text = "🔁",
+                        fontSize = 14.sp,
+                        color = if (isLooping) OPicColors.Primary else Color.Gray
+                    )
+                }
             }
 
             // 드래그 힌트 (잠금 해제 시, 재생 중이 아닐 때)

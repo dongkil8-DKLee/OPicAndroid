@@ -32,6 +32,10 @@ class DualPlaybackManager @Inject constructor(
     private var isPlaying = false
     private var currentSpeed: Float = 1.0f
 
+    // 속도 변경 시 stop 타이머 재스케줄을 위해 재생 범위 저장
+    private var playbackOriginalStartMs: Long = 0L
+    private var playbackTotalDurationMs: Long = 0L
+
     /**
      * 원본 + 사용자 녹음 동시 재생.
      *
@@ -58,6 +62,8 @@ class DualPlaybackManager @Inject constructor(
         stop()
         currentSpeed = speed
         this.onComplete = onComplete
+        playbackOriginalStartMs = originalStartMs
+        playbackTotalDurationMs = 0L  // playSimultaneous 내부에서 maxDuration 계산 후 갱신
 
         runCatching {
             // 원본 플레이어 준비
@@ -109,6 +115,7 @@ class DualPlaybackManager @Inject constructor(
             val userTotalDuration = runCatching { usrPlayer.duration.toLong() }.getOrElse { origDurationMs }
             val userEffectiveDuration = (userTotalDuration - userStartMs).coerceAtLeast(0)
             val maxDuration = maxOf(origDurationMs, userEffectiveDuration)
+            playbackTotalDurationMs = maxDuration
             scheduleStop(maxDuration)
 
             // 완료 리스너
@@ -218,11 +225,19 @@ class DualPlaybackManager @Inject constructor(
 
     /**
      * 재생 중 속도 변경.
+     * 속도가 바뀌면 stop 타이머를 남은 시간 기준으로 재스케줄.
      */
     fun setSpeed(speed: Float) {
         currentSpeed = speed
         runCatching { originalPlayer?.playbackParams = PlaybackParams().setSpeed(speed) }
         runCatching { userPlayer?.playbackParams = PlaybackParams().setSpeed(speed) }
+        // 속도 변경 시 stop 타이머 재스케줄 (기존 타이머는 이전 속도 기준이라 틀림)
+        if (isPlaying && playbackTotalDurationMs > 0L) {
+            val origPos = runCatching { originalPlayer?.currentPosition?.toLong() }.getOrNull() ?: return
+            val elapsedMs = (origPos - playbackOriginalStartMs).coerceAtLeast(0L)
+            val remainingMs = (playbackTotalDurationMs - elapsedMs).coerceAtLeast(100L)
+            scheduleStop(remainingMs)
+        }
     }
 
     private fun cancelScheduledStop() {

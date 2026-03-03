@@ -133,6 +133,89 @@ object WavSampleReader {
         }
     }.getOrElse { 0L }
 
+    /**
+     * 선행 묵음 이후의 실제 음성 시작점(ms) 감지 — PCM 프레임 수준 정밀도.
+     * detectLeadingSilenceMs()보다 높은 threshold와 지속 시간 조건을 사용하여
+     * 일시적 노이즈 스파이크를 제거하고 "지속적인 음성" 시작점만 반환.
+     *
+     * @param filePath WAV 파일 경로
+     * @param startOffsetMs 스캔 시작 오프셋 (ms) — 선행 묵음 끝점부터 시작 권장
+     * @param thresholdPercent 음성 판정 임계값 (기본 5%) ★ 감도 조절 포인트
+     * @param sustainWindowMs 이 시간(ms) 동안 연속으로 threshold 초과해야 음성으로 판정 ★
+     * @param leadMs 감지 지점보다 이만큼 앞으로 당겨 반환 (시작 잘림 방지) ★
+     * @return 음성 시작 절대 시간(ms), 감지 실패 시 startOffsetMs 반환
+     */
+    fun detectSpeechOnsetMs(
+        filePath: String,
+        startOffsetMs: Long = 0L,
+        thresholdPercent: Float = 5f,
+        sustainWindowMs: Long = 20L,
+        leadMs: Long = 50L
+    ): Long = runCatching {
+        val file = File(filePath)
+        if (!file.exists() || file.length() < 44) return@runCatching startOffsetMs
+
+        FileInputStream(file).use { fis ->
+            val headerBytes = ByteArray(44)
+            if (fis.read(headerBytes) < 44) return@runCatching startOffsetMs
+
+            val header = parseHeader(headerBytes) ?: return@runCatching startOffsetMs
+            if (header.bitsPerSample != 16) return@runCatching startOffsetMs
+
+            val frameSize = (header.bitsPerSample / 8) * header.channels
+            val threshold = (Short.MAX_VALUE * thresholdPercent / 100f).toInt()
+            val sustainFrames = (sustainWindowMs * header.sampleRate / 1000L).toInt().coerceAtLeast(1)
+            val leadFrames = (leadMs * header.sampleRate / 1000L).toInt()
+
+            // startOffsetMs 위치로 skip
+            val startFrame = (startOffsetMs * header.sampleRate / 1000L).coerceAtLeast(0L).toInt()
+            val skipBytes = startFrame.toLong() * frameSize
+            var skipped = 0L
+            while (skipped < skipBytes) {
+                val s = fis.skip(skipBytes - skipped)
+                if (s <= 0) break
+                skipped += s
+            }
+
+            val chunkFrames = header.sampleRate / 10  // 0.1초 청크
+            val chunkBytes = chunkFrames * frameSize
+            val buf = ByteArray(chunkBytes)
+            var frameIndex = startFrame.toLong()
+            var sustainCount = 0
+            var candidateFrame = -1L
+
+            while (true) {
+                val read = fis.read(buf, 0, chunkBytes)
+                if (read <= 0) break
+
+                val frames = read / frameSize
+                val bb = ByteBuffer.wrap(buf, 0, read).order(ByteOrder.LITTLE_ENDIAN)
+
+                for (f in 0 until frames) {
+                    val sample = kotlin.math.abs(bb.getShort((f * frameSize).toInt()).toInt())
+                    if (sample > threshold) {
+                        if (candidateFrame < 0L) candidateFrame = frameIndex
+                        sustainCount++
+                        if (sustainCount >= sustainFrames) {
+                            // 감지 지점에서 leadFrames 만큼 앞으로 당겨 반환
+                            val onsetFrame = (candidateFrame - leadFrames).coerceAtLeast(startFrame.toLong())
+                            val onsetMs = onsetFrame * 1000L / header.sampleRate
+                            Log.d(TAG, "음성 시작점 감지: ${onsetMs}ms (thresh=${thresholdPercent}%, sustain=${sustainWindowMs}ms)")
+                            return@runCatching onsetMs
+                        }
+                    } else {
+                        // 연속 조건 리셋 (일시적 스파이크 무시)
+                        candidateFrame = -1L
+                        sustainCount = 0
+                    }
+                    frameIndex++
+                }
+            }
+
+            startOffsetMs  // 감지 실패 → startOffsetMs 유지
+        }
+    }.getOrElse { startOffsetMs }
+
     // ==================== WAV 직접 파싱 (기존 로직) ====================
 
     private fun readWavFromFile(

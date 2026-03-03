@@ -96,6 +96,8 @@ data class PracticeUiState(
     val userPlayProgress: Float = 0f,
     // 원본 단독 재생 진행률 (파형 윈도우 기준)
     val originalPlayProgress: Float = 0f,
+    // 원본 구간 루프 재생
+    val isLooping: Boolean = false,
 
     // ─── 문장 경계 보정 ───────────────────────────────────────────────
     // 파형 확장 표시 범위: 구간 앞/뒤로 얼마나 더 보여줄지 (ms)
@@ -108,7 +110,8 @@ data class PracticeUiState(
     // 현재 로드된 파형의 실제 ms 범위 (마커↔ms 변환에 사용)
     val originalWaveformStartMs: Long = 0L,
     val originalWaveformEndMs:   Long = 0L,
-    val showTimingPanel: Boolean = false
+    val showTimingPanel: Boolean = false,
+    val showStatsPanel: Boolean = false
 )
 
 @HiltViewModel
@@ -309,6 +312,13 @@ class PracticeViewModel @Inject constructor(
 
         val onComplete = {
             _uiState.update { it.copy(isPlayingOriginal = false, originalPlayProgress = 0f) }
+            // 루프 활성화 시 자동 재시작
+            if (_uiState.value.isLooping) {
+                viewModelScope.launch {
+                    kotlinx.coroutines.delay(80) // 루프 간 짧은 간격
+                    playOriginal()
+                }
+            }
         }
 
         when (val source = state.assetPath) {
@@ -344,7 +354,17 @@ class PracticeViewModel @Inject constructor(
 
     fun stopOriginal() {
         audioPlayer.stop()
-        _uiState.update { it.copy(isPlayingOriginal = false, originalPlayProgress = 0f) }
+        _uiState.update { it.copy(isPlayingOriginal = false, originalPlayProgress = 0f, isLooping = false) }
+    }
+
+    /** 원본 구간 루프 재생 토글. */
+    fun toggleOriginalLoop() {
+        val newLooping = !_uiState.value.isLooping
+        _uiState.update { it.copy(isLooping = newLooping) }
+        if (newLooping && !_uiState.value.isPlayingOriginal) {
+            playOriginal()  // 루프 켜질 때 재생 중이 아니면 즉시 시작
+        }
+        // 루프 끌 때는 현재 재생이 끝나면 자동으로 멈춤 (onComplete에서 재시작 안 함)
     }
 
     // ==================== 녹음 재생 ====================
@@ -748,7 +768,11 @@ class PracticeViewModel @Inject constructor(
     }
 
     fun toggleTimingPanel() {
-        _uiState.update { it.copy(showTimingPanel = !it.showTimingPanel) }
+        _uiState.update { it.copy(showTimingPanel = !it.showTimingPanel, showStatsPanel = false) }
+    }
+
+    fun toggleStatsPanel() {
+        _uiState.update { it.copy(showStatsPanel = !it.showStatsPanel, showTimingPanel = false) }
     }
 
     // ==================== Utility ====================
@@ -779,7 +803,8 @@ class PracticeViewModel @Inject constructor(
                 isComparisonPlaying = false,
                 comparisonOriginalProgress = 0f,
                 comparisonUserProgress = 0f,
-                originalPlayProgress = 0f
+                originalPlayProgress = 0f,
+                isLooping = false
             )
         }
     }
@@ -956,44 +981,35 @@ class PracticeViewModel @Inject constructor(
     /**
      * 사용자 녹음에서 음성 시작점을 자동 감지하여 userStartFraction을 설정.
      *
-     * 알고리즘:
-     * 1. 이동 평균 에너지가 threshold를 초과하는 첫 지점 = 음성 시작 후보
-     * 2. leadSamples 만큼 앞으로 당겨 여유 확보 (시작이 잘리지 않도록)
-     * 3. 샘플 인덱스 → 파일 내 절대 ms → userStartFraction 변환
+     * PCM 프레임 직접 스캔 방식 (기존 300포인트 다운샘플 파형 방식 대체):
+     * - detectSpeechOnsetMs() 호출 → ms 단위 정밀 감지
+     * - 선행 묵음(silenceTrimMs) 이후부터 스캔
+     * - 지속 에너지(sustainWindowMs) 조건으로 노이즈 스파이크 제거
+     *
+     * ★ 감도 조절: thresholdPercent, sustainWindowMs, leadMs 파라미터
      */
     fun autoSyncUserStart() {
-        val state      = _uiState.value
-        val userWav    = state.userWaveform
-        val totalMs    = state.userAudioDurationMs
-        val silenceMs  = state.userAudioSilenceTrimMs
+        val state     = _uiState.value
+        val totalMs   = state.userAudioDurationMs
+        val silenceMs = state.userAudioSilenceTrimMs
+        if (totalMs <= 0L) return
 
-        if (userWav.isEmpty() || totalMs <= 0L) return
+        val userPath = userRecordingPath(state.currentIndex)
+        if (!File(userPath).exists()) return
 
-        // ── 파라미터 (★ 감도/여유 조절 포인트) ──────────────────────────────
-        val windowSize  = 5       // 이동 평균 윈도우 크기 (샘플 수)
-        val threshold   = 0.05f   // 음성 감지 임계값 (0.0~1.0, 낮을수록 민감)
-        val leadSamples = 3       // 감지 지점보다 앞 여유 (클수록 시작이 더 당겨짐)
-
-        // ── 이동 평균 에너지로 음성 시작 지점 탐색 ───────────────────────────
-        var onsetIdx = 0  // 기본: 파형 맨 앞 (= silenceTrimMs 지점)
-        for (i in windowSize until userWav.size) {
-            val avg = (i - windowSize until i).sumOf { userWav[it].toDouble() }.toFloat() / windowSize
-            if (avg >= threshold) {
-                onsetIdx = (i - windowSize - leadSamples).coerceAtLeast(0)
-                break
-            }
+        viewModelScope.launch(Dispatchers.IO) {
+            // PCM 직접 스캔 — ms 단위 정밀도
+            val onsetMs = WavSampleReader.detectSpeechOnsetMs(
+                filePath       = userPath,
+                startOffsetMs  = silenceMs,
+                thresholdPercent = 5f,   // ★ 감도 조절 포인트 (낮을수록 민감)
+                sustainWindowMs  = 20L,  // ★ 지속 조건 (ms, 클수록 노이즈에 강함)
+                leadMs           = 50L   // ★ 앞 여유 (ms, 클수록 시작이 더 당겨짐)
+            )
+            val fraction = (onsetMs.toFloat() / totalMs).coerceIn(0f, 0.9f)
+            _uiState.update { it.copy(userStartFraction = fraction) }
+            Log.d(TAG, "AutoSync PCM: onsetMs=$onsetMs, fraction=$fraction")
         }
-
-        // ── 샘플 인덱스 → userStartFraction 변환 ─────────────────────────────
-        // userWaveform[0] = silenceTrimMs 시점, [size-1] = userDurationMs 시점
-        val spanMs       = (totalMs - silenceMs).coerceAtLeast(1L)
-        val relativeMs   = (onsetIdx.toFloat() / userWav.size * spanMs).toLong()
-        val absoluteMs   = silenceMs + relativeMs
-        // userStartFraction: playback 시 userStartMs = fraction * totalMs 로 사용됨
-        val fraction     = (absoluteMs.toFloat() / totalMs).coerceIn(0f, 0.9f)
-
-        _uiState.update { it.copy(userStartFraction = fraction) }
-        Log.d(TAG, "AutoSync: onsetIdx=$onsetIdx, absoluteMs=$absoluteMs, fraction=$fraction")
     }
 
     override fun onCleared() {

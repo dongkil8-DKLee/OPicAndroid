@@ -243,6 +243,9 @@ private fun PracticeContent(
                         onPlayOriginal = { viewModel.playOriginal() },
                         onStopOriginal = { viewModel.stopOriginal() },
                         originalPlayProgress = state.originalPlayProgress,
+                        // 구간 루프
+                        isLooping = state.isLooping,
+                        onToggleLoop = { viewModel.toggleOriginalLoop() },
                         onAutoSync = if (state.hasUserAudio) { { viewModel.autoSyncUserStart() } } else null
                     )
 
@@ -366,11 +369,24 @@ private fun PracticeSentenceSection(
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
-        // 헤더: ±타이밍 + 확대/축소 (Play 버튼은 WaveformComparisonPanel으로 이동)
+        // 헤더: 통계 + ±타이밍 + 확대/축소 (Play 버튼은 WaveformComparisonPanel으로 이동)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // 학습 통계 토글
+            TextButton(
+                onClick = { viewModel.toggleStatsPanel() },
+                modifier = Modifier.padding(horizontal = 0.dp)
+            ) {
+                Text(
+                    "통계",
+                    fontSize = 11.sp,
+                    color = if (state.showStatsPanel) OPicColors.Primary else Color.Gray,
+                    fontWeight = if (state.showStatsPanel) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+
             // 타이밍 보정 토글
             TextButton(
                 onClick = { viewModel.toggleTimingPanel() },
@@ -442,6 +458,11 @@ private fun PracticeSentenceSection(
             }
         }
 
+        // 학습 통계 패널 (토글)
+        if (state.showStatsPanel) {
+            SessionStatsPanel(state = state)
+        }
+
         // 문장 테이블 (내부 스크롤)
         Column(
             modifier = Modifier
@@ -461,6 +482,121 @@ private fun PracticeSentenceSection(
                     hasRecording = state.sentenceHasRecording[index] == true,
                     onClick = { viewModel.goToSentence(index) }
                 )
+            }
+        }
+    }
+}
+
+// ==================== 인세션 학습 통계 패널 ====================
+
+@Composable
+private fun SessionStatsPanel(state: PracticeUiState) {
+    val sentences = state.sentences
+    val total = sentences.size
+    if (total == 0) return
+
+    // 완료된 문장 수 (COMPLETED 상태)
+    val completedCount = sentences.count { it.status == SentenceStatus.COMPLETED }
+    // 녹음이 있는 문장 수
+    val recordedCount = state.sentenceHasRecording.values.count { it }
+    // 정확도가 있는 문장들
+    val withAccuracy = sentences.mapIndexedNotNull { idx, s ->
+        s.analysisResult?.accuracyPercent?.let { idx to it }
+    }
+    val avgAccuracy = if (withAccuracy.isNotEmpty()) {
+        withAccuracy.map { it.second }.average().toInt()
+    } else null
+    // 취약 문장 TOP 3 (정확도 낮은 순)
+    val weakSentences = withAccuracy
+        .sortedBy { it.second }
+        .take(3)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF0F7FF), RoundedCornerShape(6.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        // ── 요약 수치 Row ──────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 완료율
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "$completedCount/$total",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = OPicColors.Primary
+                )
+                Text("완료", fontSize = 9.sp, color = Color.Gray)
+            }
+            // 녹음
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "$recordedCount/$total",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = OPicColors.TimerGreen
+                )
+                Text("녹음", fontSize = 9.sp, color = Color.Gray)
+            }
+            // 평균 정확도
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = if (avgAccuracy != null) "$avgAccuracy%" else "—",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = when {
+                        avgAccuracy == null -> Color.Gray
+                        avgAccuracy >= 80 -> Color(0xFF2ECC71)
+                        avgAccuracy >= 50 -> OPicColors.TimerOrange
+                        else -> OPicColors.TimerRed
+                    }
+                )
+                Text("평균정확도", fontSize = 9.sp, color = Color.Gray)
+            }
+        }
+
+        // ── 취약 문장 TOP 3 ────────────────────────────────────────
+        if (weakSentences.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("취약 문장", fontSize = 9.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+            weakSentences.forEach { (idx, acc) ->
+                val text = sentences.getOrNull(idx)?.segment?.text ?: return@forEach
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 1.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${idx + 1}.",
+                        fontSize = 10.sp,
+                        color = OPicColors.TimerRed,
+                        modifier = Modifier.width(20.dp)
+                    )
+                    Text(
+                        text = text,
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "$acc%",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = when {
+                            acc >= 80 -> Color(0xFF2ECC71)
+                            acc >= 50 -> OPicColors.TimerOrange
+                            else -> OPicColors.TimerRed
+                        }
+                    )
+                }
             }
         }
     }
