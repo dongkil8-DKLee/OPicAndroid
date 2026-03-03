@@ -177,12 +177,10 @@ fun WaveformView(
                             latestEndMarkerFraction ?: 1f
                         }
 
-                        // ★ zoomDelta: 1x→앵커방향 기준, 확대→우측=확대/좌측=축소
-                        val zoomDelta = if (latestZoomScale <= 1f) {
-                            if (anchorLeft) deltaX else -deltaX
-                        } else {
-                            deltaX  // 우측=양수=확대, 좌측=음수=축소
-                        }
+                        // 앵커 방향 기준 (항상 일관):
+                        //   시작 마커(anchorLeft=true)  → 우측 스와이프=확대, 좌측=축소
+                        //   끝   마커(anchorLeft=false) → 좌측 스와이프=확대, 우측=축소
+                        val zoomDelta = if (anchorLeft) deltaX else -deltaX
                         val factor    = 1f + zoomDelta / size.width * 4f
                         val newScale  = (latestZoomScale * factor).coerceIn(1f, 8f)
                         val ws        = 1f / newScale
