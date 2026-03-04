@@ -35,12 +35,15 @@ import androidx.compose.ui.unit.sp
 import com.opic.android.ui.theme.OPicColors
 
 /**
- * 두 파형 + 원본재생/루프/녹음/녹음재생/동시재생 버튼 + 볼륨 밸런스 슬라이더 패널.
+ * 두 파형 + 재생 버튼 + 볼륨 밸런스 슬라이더 패널.
  *
- * 원본 파형 상단 Row: [《][-][타이밍][시작] Spacer [종료][-][》]
- *   - 타이밍 모드 ON → 《 - - 》 활성화
- *   - 시작/종료: 탭으로 마커 위치 설정
- * 하단 Row: [▶원본][🔁구간반복][🎤녹음][▶녹음재생][⇄동시재생] Spacer 속도:-/+
+ * 원본 파형 위 2줄:
+ *   Line 1: [타이밍] [시작] Spacer [종료]
+ *   Line 2: [《][-] {1000ms / 1000ms} [-][》]  ← 타이밍 ON 시만 표시
+ *
+ * 하단 버튼 2줄:
+ *   Line 1: [▶원본] [🔁구간]    속도: [−] 1.0x [+]
+ *   Line 2: [🎤Rec] [▶녹음] [⇄동시]
  */
 @Composable
 fun WaveformComparisonPanel(
@@ -79,9 +82,9 @@ fun WaveformComparisonPanel(
     // 구간 반복
     isLoopPlaying: Boolean = false,
     onToggleLoop: (() -> Unit)? = null,
-    // 자동 싱크: 사용자 파형에서 음성 시작점 자동 감지 (null이면 버튼 미표시)
+    // 자동 싱크 (null이면 버튼 미표시)
     onAutoSync: (() -> Unit)? = null,
-    // 타이밍 모드 (파형 확장 컨트롤 활성화)
+    // 타이밍 모드 (파형 확장 컨트롤)
     isTimingModeEnabled: Boolean = false,
     onToggleTimingMode: (() -> Unit)? = null,
     expandBeforeMs: Long = 1000L,
@@ -90,10 +93,7 @@ fun WaveformComparisonPanel(
     onExpandAfterChange: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    // 마커 설정 모드: None / Start / End
     var markerMode by remember { mutableStateOf(MarkerMode.None) }
-
-    // 재생 중이면 마커 모드 해제
     if (isPlaying || isPlayingOriginal || isLoopPlaying) markerMode = MarkerMode.None
 
     val isBusy = isPlaying || isPlayingOriginal || isLoopPlaying || isRecordingUser
@@ -104,37 +104,11 @@ fun WaveformComparisonPanel(
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
-        // ── Row 1: [《][-][타이밍][시작] Spacer [종료][-][》] ─────────────
+        // ── Line 1: [타이밍] [시작]  탭힌트  Spacer  [종료] ────────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 《 (+expandBefore)
-            if (onExpandBeforeChange != null) {
-                TextButton(
-                    onClick = { onExpandBeforeChange(expandBeforeMs + 500L) },
-                    enabled = isTimingModeEnabled && !isBusy,
-                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
-                    modifier = Modifier.height(28.dp)
-                ) {
-                    Text("《", fontSize = 11.sp,
-                        color = if (isTimingModeEnabled && !isBusy) OPicColors.Primary else Color.Gray.copy(alpha = 0.4f))
-                }
-            }
-
-            // - (-expandBefore)
-            if (onExpandBeforeChange != null) {
-                TextButton(
-                    onClick = { onExpandBeforeChange(expandBeforeMs - 500L) },
-                    enabled = isTimingModeEnabled && !isBusy,
-                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
-                    modifier = Modifier.height(28.dp)
-                ) {
-                    Text("−", fontSize = 12.sp,
-                        color = if (isTimingModeEnabled && !isBusy) OPicColors.TimerRed else Color.Gray.copy(alpha = 0.4f))
-                }
-            }
-
             // [타이밍] 토글
             if (onToggleTimingMode != null) {
                 TextButton(
@@ -170,11 +144,7 @@ fun WaveformComparisonPanel(
             // 탭 힌트 (마커 모드 활성 시)
             if (!isBusy && markerMode != MarkerMode.None) {
                 Text(
-                    text = when (markerMode) {
-                        MarkerMode.Start -> "↑탭"
-                        MarkerMode.End   -> "↑탭"
-                        MarkerMode.None  -> ""
-                    },
+                    text = "↑탭",
                     fontSize = 9.sp,
                     color = when (markerMode) {
                         MarkerMode.Start -> Color(0xFFFF9800)
@@ -185,22 +155,6 @@ fun WaveformComparisonPanel(
             }
 
             Spacer(modifier = Modifier.weight(1f))
-
-            // 타이밍 수치 표시 (타이밍 모드 활성 시)
-            if (isTimingModeEnabled) {
-                Text(
-                    "${expandBeforeMs}ms",
-                    fontSize = 9.sp,
-                    color = OPicColors.Primary.copy(alpha = 0.7f)
-                )
-                Text(" / ", fontSize = 9.sp, color = Color.Gray)
-                Text(
-                    "${expandAfterMs}ms",
-                    fontSize = 9.sp,
-                    color = OPicColors.Primary.copy(alpha = 0.7f)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-            }
 
             // [종료] 마커 버튼
             if (onSegmentEndMarkerChange != null && !isBusy) {
@@ -218,30 +172,74 @@ fun WaveformComparisonPanel(
                     )
                 }
             }
+        }
 
-            // - (-expandAfter)
-            if (onExpandAfterChange != null) {
-                TextButton(
-                    onClick = { onExpandAfterChange(expandAfterMs - 500L) },
-                    enabled = isTimingModeEnabled && !isBusy,
-                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
-                    modifier = Modifier.height(28.dp)
-                ) {
-                    Text("−", fontSize = 12.sp,
-                        color = if (isTimingModeEnabled && !isBusy) OPicColors.TimerRed else Color.Gray.copy(alpha = 0.4f))
+        // ── Line 2: [《][-] {1000ms / 1000ms} [-][》]  ← 타이밍 ON 시만 ──
+        if (isTimingModeEnabled && (onExpandBeforeChange != null || onExpandAfterChange != null)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 《 (+expandBefore)
+                if (onExpandBeforeChange != null) {
+                    TextButton(
+                        onClick = { onExpandBeforeChange(expandBeforeMs + 500L) },
+                        enabled = !isBusy,
+                        contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp),
+                        modifier = Modifier.height(26.dp)
+                    ) {
+                        Text("《", fontSize = 11.sp,
+                            color = if (!isBusy) OPicColors.Primary else Color.Gray.copy(alpha = 0.4f))
+                    }
+                    // − (-expandBefore)
+                    TextButton(
+                        onClick = { onExpandBeforeChange(expandBeforeMs - 500L) },
+                        enabled = !isBusy,
+                        contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp),
+                        modifier = Modifier.height(26.dp)
+                    ) {
+                        Text("−", fontSize = 12.sp,
+                            color = if (!isBusy) OPicColors.TimerRed else Color.Gray.copy(alpha = 0.4f))
+                    }
                 }
-            }
 
-            // 》 (+expandAfter)
-            if (onExpandAfterChange != null) {
-                TextButton(
-                    onClick = { onExpandAfterChange(expandAfterMs + 500L) },
-                    enabled = isTimingModeEnabled && !isBusy,
-                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
-                    modifier = Modifier.height(28.dp)
-                ) {
-                    Text("》", fontSize = 11.sp,
-                        color = if (isTimingModeEnabled && !isBusy) OPicColors.Primary else Color.Gray.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.weight(1f))
+
+                // 현재 값 표시
+                Text(
+                    "${expandBeforeMs}ms",
+                    fontSize = 10.sp,
+                    color = OPicColors.Primary
+                )
+                Text("  /  ", fontSize = 10.sp, color = Color.Gray)
+                Text(
+                    "${expandAfterMs}ms",
+                    fontSize = 10.sp,
+                    color = OPicColors.Primary
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // − (-expandAfter) + 》 (+expandAfter)
+                if (onExpandAfterChange != null) {
+                    TextButton(
+                        onClick = { onExpandAfterChange(expandAfterMs - 500L) },
+                        enabled = !isBusy,
+                        contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp),
+                        modifier = Modifier.height(26.dp)
+                    ) {
+                        Text("−", fontSize = 12.sp,
+                            color = if (!isBusy) OPicColors.TimerRed else Color.Gray.copy(alpha = 0.4f))
+                    }
+                    TextButton(
+                        onClick = { onExpandAfterChange(expandAfterMs + 500L) },
+                        enabled = !isBusy,
+                        contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp),
+                        modifier = Modifier.height(26.dp)
+                    ) {
+                        Text("》", fontSize = 11.sp,
+                            color = if (!isBusy) OPicColors.Primary else Color.Gray.copy(alpha = 0.4f))
+                    }
                 }
             }
         }
@@ -291,9 +289,7 @@ fun WaveformComparisonPanel(
                     color = Color(0xFFFF9800)
                 )
             }
-
             Spacer(modifier = Modifier.weight(1f))
-
             if (!isPlaying && !isPlayingUser && !isRecordingUser && !isPlayingOriginal && !isLoopPlaying
                 && onAutoSync != null && hasUserAudio) {
                 TextButton(
@@ -342,7 +338,7 @@ fun WaveformComparisonPanel(
             Text(" 녹음", fontSize = 10.sp, color = Color.Gray)
         }
 
-        // ── 하단 Row: [▶원본][🔁구간반복][🎤녹음][▶녹음재생][⇄동시재생] Spacer 속도 ──
+        // ── 하단 Line 1: [▶원본] [🔁구간]    속도: [−] 1.0x [+] ──────────
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -396,6 +392,38 @@ fun WaveformComparisonPanel(
                 }
             }
 
+            Spacer(modifier = Modifier.weight(1f))
+
+            // 속도 ± (범위 0.5~1.5, 0.1 단위)
+            Text("속도", fontSize = 10.sp, color = Color.Gray)
+            Spacer(modifier = Modifier.width(2.dp))
+            TextButton(
+                onClick = { onComparisonSpeedChange((comparisonSpeed - 0.1f).coerceAtLeast(0.5f)) },
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                modifier = Modifier.height(28.dp)
+            ) {
+                Text("−", fontSize = 14.sp, color = OPicColors.TimerRed)
+            }
+            Text(
+                text = String.format("%.1f", comparisonSpeed) + "x",
+                fontSize = 11.sp,
+                color = OPicColors.Primary,
+                modifier = Modifier.width(36.dp)
+            )
+            TextButton(
+                onClick = { onComparisonSpeedChange((comparisonSpeed + 0.1f).coerceAtMost(1.5f)) },
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                modifier = Modifier.height(28.dp)
+            ) {
+                Text("+", fontSize = 14.sp, color = OPicColors.TimerGreen)
+            }
+        }
+
+        // ── 하단 Line 2: [🎤Rec] [▶녹음] [⇄동시] ───────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             // 🎤/⏹ 녹음
             if (onStartRecording != null) {
                 if (isRecordingUser) {
@@ -466,32 +494,6 @@ fun WaveformComparisonPanel(
                     Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null, modifier = Modifier.size(13.dp))
                     Text(" 동시", fontSize = 10.sp)
                 }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // 속도 ± (범위 0.5~1.5, 0.1 단위)
-            Text("속도", fontSize = 10.sp, color = Color.Gray)
-            Spacer(modifier = Modifier.width(2.dp))
-            TextButton(
-                onClick = { onComparisonSpeedChange((comparisonSpeed - 0.1f).coerceAtLeast(0.5f)) },
-                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                modifier = Modifier.height(28.dp)
-            ) {
-                Text("−", fontSize = 14.sp, color = OPicColors.TimerRed)
-            }
-            Text(
-                text = String.format("%.1f", comparisonSpeed) + "x",
-                fontSize = 11.sp,
-                color = OPicColors.Primary,
-                modifier = Modifier.width(36.dp),
-            )
-            TextButton(
-                onClick = { onComparisonSpeedChange((comparisonSpeed + 0.1f).coerceAtMost(1.5f)) },
-                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                modifier = Modifier.height(28.dp)
-            ) {
-                Text("+", fontSize = 14.sp, color = OPicColors.TimerGreen)
             }
         }
     }
