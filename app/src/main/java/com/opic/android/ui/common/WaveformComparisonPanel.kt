@@ -1,6 +1,9 @@
 package com.opic.android.ui.common
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -10,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
@@ -449,27 +453,36 @@ fun WaveformComparisonPanel(
                 }
             }
 
-            // ▶/⏹ 녹음재생
+            // ▶/⏹ 녹음재생 — 원형 outline 버튼
+            // ★ 미세 튜닝 포인트:
+            // ★ CIRCLE_SIZE  = 40.dp  : 원 전체 크기
+            // ★ BORDER_WIDTH = 1.5.dp : 테두리 두께
+            // ★ ICON_SIZE    = 20.dp  : 삼각형/정지 아이콘 크기
+            // ★ IDLE_COLOR   = OPicColors.PlayButton   : 대기 상태 색상
+            // ★ ACTIVE_COLOR = OPicColors.RecordActive : 재생 중 색상
+            // ★ DISABLED_COLOR = Color.Gray            : 비활성화 색상
             if (onPlayUser != null) {
-                if (isPlayingUser) {
-                    TextButton(
-                        onClick = { onStopUser?.invoke() },
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(13.dp))
-                        Text(" 녹음", fontSize = 10.sp)
-                    }
-                } else {
-                    TextButton(
-                        onClick = onPlayUser,
-                        enabled = hasUserAudio && !isRecordingUser && !isPlaying && !isPlayingOriginal && !isLoopPlaying,
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(13.dp))
-                        Text(" 녹음", fontSize = 10.sp)
-                    }
+                val isUserPlayEnabled = hasUserAudio && !isRecordingUser && !isPlaying && !isPlayingOriginal && !isLoopPlaying
+                val circleColor = when {
+                    isPlayingUser        -> OPicColors.RecordActive  // ★ ACTIVE_COLOR
+                    isUserPlayEnabled    -> OPicColors.PlayButton     // ★ IDLE_COLOR
+                    else                 -> Color.Gray                 // ★ DISABLED_COLOR
+                }
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)                                   // ★ CIRCLE_SIZE
+                        .border(1.5.dp, circleColor, CircleShape)      // ★ BORDER_WIDTH
+                        .clickable(enabled = isPlayingUser || isUserPlayEnabled) {
+                            if (isPlayingUser) onStopUser?.invoke() else onPlayUser.invoke()
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isPlayingUser) Icons.Filled.Stop else Icons.Filled.PlayArrow,
+                        contentDescription = if (isPlayingUser) "녹음 정지" else "녹음 재생",
+                        tint     = circleColor,
+                        modifier = Modifier.size(20.dp)                // ★ ICON_SIZE
+                    )
                 }
             }
 

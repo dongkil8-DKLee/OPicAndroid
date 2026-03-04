@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -380,20 +381,36 @@ private fun IconButtonRow(
             }
         }
 
-        if (state.playingTarget == StudyPlayTarget.USER) {
-            IconButton(onClick = { viewModel.stopAudio() }, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Filled.Stop, contentDescription = "재생 중지", modifier = Modifier.size(28.dp))
-            }
-        } else {
-            IconButton(
-                onClick  = { viewModel.playUserAudio() },
-                enabled  = state.hasUserAudio && !isBusy,
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = "녹음 재생",
-                    tint     = if (state.hasUserAudio && !isBusy) OPicColors.PlayButton else Color.Gray,
-                    modifier = Modifier.size(28.dp))
-            }
+        // 녹음 재생 버튼 — 원형 outline 스타일
+        // ★ 미세 튜닝 포인트:
+        // ★ CIRCLE_SIZE  = 40.dp  : 원 전체 크기
+        // ★ BORDER_WIDTH = 1.5.dp : 테두리 두께
+        // ★ ICON_SIZE    = 20.dp  : 삼각형/정지 아이콘 크기
+        // ★ IDLE_COLOR   = OPicColors.PlayButton   : 대기 상태 색상
+        // ★ ACTIVE_COLOR = OPicColors.RecordActive : 재생 중 색상
+        // ★ DISABLED_COLOR = Color.Gray            : 비활성화 색상
+        val isUserPlaying  = state.playingTarget == StudyPlayTarget.USER
+        val userPlayEnabled = state.hasUserAudio && !isBusy
+        val userCircleColor = when {
+            isUserPlaying   -> OPicColors.RecordActive  // ★ ACTIVE_COLOR
+            userPlayEnabled -> OPicColors.PlayButton    // ★ IDLE_COLOR
+            else            -> Color.Gray               // ★ DISABLED_COLOR
+        }
+        Box(
+            modifier = Modifier
+                .size(40.dp)                                          // ★ CIRCLE_SIZE
+                .border(1.5.dp, userCircleColor, CircleShape)         // ★ BORDER_WIDTH
+                .clickable(enabled = isUserPlaying || userPlayEnabled) {
+                    if (isUserPlaying) viewModel.stopAudio() else viewModel.playUserAudio()
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (isUserPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
+                contentDescription = if (isUserPlaying) "재생 중지" else "녹음 재생",
+                tint     = userCircleColor,
+                modifier = Modifier.size(20.dp)                       // ★ ICON_SIZE
+            )
         }
 
         IconButton(onClick = onPractice, enabled = state.currentQuestion != null, modifier = Modifier.size(48.dp)) {
