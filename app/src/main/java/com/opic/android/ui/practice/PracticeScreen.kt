@@ -1,6 +1,11 @@
 package com.opic.android.ui.practice
 
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,6 +26,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -33,14 +40,14 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -62,11 +69,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.opic.android.ui.common.SpeechAnalysisPanel
 import com.opic.android.ui.common.WaveformComparisonPanel
+import com.opic.android.ui.common.filter.FilterPanel
+import com.opic.android.ui.common.filter.StudyFilterState
 import com.opic.android.ui.theme.OPicColors
 
 /**
@@ -85,10 +92,10 @@ fun PracticeScreen(
     onNavigateToQuestion: (Int) -> Unit = {},
     viewModel: PracticeViewModel = hiltViewModel()
 ) {
-    val state by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
+    val state       by viewModel.uiState.collectAsState()
+    val filterState by viewModel.filterController.state.collectAsState()
+    val context     = LocalContext.current
 
-    // 단어 추가 메시지 Toast
     LaunchedEffect(state.wordAddedMessage) {
         state.wordAddedMessage?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
@@ -116,7 +123,7 @@ fun PracticeScreen(
                     }
                 }
             }
-            else -> PracticeContent(state, viewModel, onBack, onNavigateToQuestion)
+            else -> PracticeContent(state, filterState, viewModel, onBack, onNavigateToQuestion)
         }
     }
 }
@@ -125,15 +132,13 @@ fun PracticeScreen(
 @Composable
 private fun PracticeContent(
     state: PracticeUiState,
+    filterState: StudyFilterState,
     viewModel: PracticeViewModel,
     onBack: () -> Unit,
     onNavigateToQuestion: (Int) -> Unit = {}
 ) {
-    var expandedSection by remember { mutableStateOf<String?>(null) }
-    // 드래그 리사이즈: section1(문장연습) vs 나머지 비율
-    var splitFraction by remember { mutableFloatStateOf(0.40f) }
-    // 드래그 리사이즈: section2(음성비교) vs section3(발화연습) 비율 (나머지 공간 내)
-    // 초기값 0.85f → UserScript 최소 크기로 시작
+    var expandedSection    by remember { mutableStateOf<String?>(null) }
+    var splitFraction      by remember { mutableFloatStateOf(0.40f) }
     var innerSplitFraction by remember { mutableFloatStateOf(0.85f) }
 
     Column(
@@ -142,7 +147,7 @@ private fun PracticeContent(
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         // ===== 타이틀 네비게이터 =====
-        PracticeTitleRow(state, viewModel, onNavigateToQuestion)
+        PracticeTitleRow(state, filterState, viewModel, onNavigateToQuestion)
 
         Spacer(modifier = Modifier.height(4.dp))
 
@@ -331,14 +336,14 @@ private fun PracticeContent(
 @Composable
 private fun PracticeTitleRow(
     state: PracticeUiState,
+    filterState: StudyFilterState,
     viewModel: PracticeViewModel,
     onNavigateToQuestion: (Int) -> Unit = {}
 ) {
-    val qList  = state.practiceQuestionList
-    val qIndex = state.practiceQuestionIndex
+    val qList  = filterState.practiceQuestionList
     val qTotal = qList.size
+    val qIndex = qList.indexOfFirst { it.first == state.questionId }
 
-    // 문제 선택 BottomSheet
     var showSheet by remember { mutableStateOf(false) }
 
     Column {
@@ -347,7 +352,6 @@ private fun PracticeTitleRow(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 이전 문제
             IconButton(
                 onClick = { viewModel.prevQuestionId()?.let { onNavigateToQuestion(it) } },
                 enabled = qIndex > 0,
@@ -356,7 +360,6 @@ private fun PracticeTitleRow(
                 Icon(Icons.Filled.ChevronLeft, contentDescription = "이전 문제")
             }
 
-            // 제목 선택 버튼 (탭 → 문제 목록 BottomSheet)
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -372,19 +375,18 @@ private fun PracticeTitleRow(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (state.questionTitle.isNotBlank()) state.questionTitle else "—",
-                        fontSize = 12.sp,
-                        color = OPicColors.Primary,
+                        text       = if (state.questionTitle.isNotBlank()) state.questionTitle else "—",
+                        fontSize   = 12.sp,
+                        color      = OPicColors.Primary,
                         fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
+                        maxLines   = 1,
+                        overflow   = TextOverflow.Ellipsis,
+                        modifier   = Modifier.weight(1f)
                     )
                     Text("▾", fontSize = 10.sp, color = OPicColors.TextOnLight.copy(alpha = 0.45f))
                 }
             }
 
-            // 다음 문제
             IconButton(
                 onClick = { viewModel.nextQuestionId()?.let { onNavigateToQuestion(it) } },
                 enabled = qIndex >= 0 && qIndex < qTotal - 1,
@@ -393,17 +395,15 @@ private fun PracticeTitleRow(
                 Icon(Icons.Filled.ChevronRight, contentDescription = "다음 문제")
             }
 
-            // 문제 순서 (N/M)
             Text(
-                text = if (qTotal > 0 && qIndex >= 0) "${qIndex + 1}/$qTotal" else "—",
+                text     = if (qTotal > 0 && qIndex >= 0) "${qIndex + 1}/$qTotal" else "—",
                 fontSize = 12.sp,
-                color = Color.Gray,
+                color    = Color.Gray,
                 modifier = Modifier.padding(start = 2.dp)
             )
 
-            // 필터 아이콘
             IconButton(
-                onClick = { viewModel.togglePracticeFilterPanel() },
+                onClick  = { viewModel.togglePracticeFilterPanel() },
                 modifier = Modifier.size(32.dp)
             ) {
                 Icon(
@@ -414,22 +414,22 @@ private fun PracticeTitleRow(
             }
         }
 
-        // ── 필터 요약 패널 (토글) ─────────────────────────────────────
-        if (state.showPracticeFilterPanel) {
-            val summary = state.practiceFilterSummary
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(OPicColors.LightBg, RoundedCornerShape(6.dp))
-                    .border(1.dp, OPicColors.Border, RoundedCornerShape(6.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (summary.isBlank()) "필터 없음 (전체)" else summary,
-                    fontSize = 11.sp,
-                    color = if (summary.isBlank()) Color.Gray else OPicColors.Primary
+        // ── FilterPanel (Study와 동일 UI, AnimatedVisibility) ─────────
+        AnimatedVisibility(
+            visible = state.showPracticeFilterPanel,
+            enter   = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+            exit    = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+        ) {
+            Column {
+                Spacer(modifier = Modifier.height(4.dp))
+                FilterPanel(
+                    state                = filterState,
+                    onSetChanged         = { viewModel.onSetChanged(it) },
+                    onTypeChanged        = { viewModel.onTypeChanged(it) },
+                    onSortChanged        = { viewModel.onSortChanged(it) },
+                    onStudyFilterChanged = { viewModel.onStudyFilterChanged(it) }
                 )
+                Spacer(modifier = Modifier.height(4.dp))
             }
         }
     }
@@ -438,15 +438,15 @@ private fun PracticeTitleRow(
     if (showSheet) {
         ModalBottomSheet(
             onDismissRequest = { showSheet = false },
-            containerColor = OPicColors.Surface,
-            tonalElevation = 0.dp
+            containerColor   = OPicColors.Surface,
+            tonalElevation   = 0.dp
         ) {
             Text(
-                text = "문제 선택",
+                text       = "문제 선택",
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = OPicColors.TextOnLight,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                fontSize   = 16.sp,
+                color      = OPicColors.TextOnLight,
+                modifier   = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
             )
             HorizontalDivider(color = OPicColors.Border)
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
@@ -455,32 +455,21 @@ private fun PracticeTitleRow(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                showSheet = false
-                                if (!isSelected) onNavigateToQuestion(qId)
-                            }
-                            .background(
-                                if (isSelected) OPicColors.Primary.copy(alpha = 0.08f)
-                                else Color.Transparent
-                            )
+                            .clickable { showSheet = false; if (!isSelected) onNavigateToQuestion(qId) }
+                            .background(if (isSelected) OPicColors.Primary.copy(alpha = 0.08f) else Color.Transparent)
                             .padding(horizontal = 20.dp, vertical = 14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment     = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = qTitle,
-                            fontSize = 14.sp,
-                            color = if (isSelected) OPicColors.Primary else OPicColors.TextOnLight,
+                            text       = qTitle,
+                            fontSize   = 14.sp,
+                            color      = if (isSelected) OPicColors.Primary else OPicColors.TextOnLight,
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                            modifier = Modifier.weight(1f)
+                            modifier   = Modifier.weight(1f)
                         )
                         if (isSelected) {
-                            Icon(
-                                Icons.Filled.Check,
-                                contentDescription = null,
-                                tint = OPicColors.Primary,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            Icon(Icons.Filled.Check, contentDescription = null, tint = OPicColors.Primary, modifier = Modifier.size(16.dp))
                         }
                     }
                     HorizontalDivider(color = OPicColors.Border.copy(alpha = 0.5f))

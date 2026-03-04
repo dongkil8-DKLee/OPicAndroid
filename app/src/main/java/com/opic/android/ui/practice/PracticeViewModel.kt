@@ -17,7 +17,7 @@ import com.opic.android.util.WavSampleReader
 import com.opic.android.data.local.dao.QuestionDao
 import com.opic.android.data.local.dao.VocabularyDao
 import com.opic.android.data.local.entity.VocabularyEntity
-import com.opic.android.data.prefs.AppPreferences
+import com.opic.android.ui.common.filter.StudyFilterController
 import com.opic.android.util.AnalysisResult
 import com.opic.android.util.DictionaryApi
 import com.opic.android.util.SentenceSegment
@@ -29,6 +29,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -114,14 +116,7 @@ data class PracticeUiState(
     val showTimingPanel: Boolean = false,
     val showStatsPanel: Boolean = false,
 
-    // ─── Practice 문제 목록 탐색 (Study 필터 공유) ────────────────────────
-    /** Study 필터 기준 (questionId, title) 목록 */
-    val practiceQuestionList: List<Pair<Int, String>> = emptyList(),
-    /** 현재 문제가 목록에서 몇 번째 (0-based) */
-    val practiceQuestionIndex: Int = -1,
-    /** Study 필터 요약 ("주제: 전체 | 학습: 저득점" 등) */
-    val practiceFilterSummary: String = "",
-    /** 필터 요약 패널 표시 여부 */
+    /** 필터 패널 표시 여부 (로컬 UI 토글) */
     val showPracticeFilterPanel: Boolean = false
 )
 
@@ -137,7 +132,7 @@ class PracticeViewModel @Inject constructor(
     private val ttsManager: TtsManager,
     private val sttManager: SttManager,
     private val dualPlaybackManager: DualPlaybackManager,
-    private val appPreferences: AppPreferences
+    val filterController: StudyFilterController        // public — PracticeScreen에서 state 직접 구독
 ) : ViewModel() {
 
     companion object {
@@ -161,32 +156,15 @@ class PracticeViewModel @Inject constructor(
 
     init {
         val questionId = savedStateHandle.get<Int>("questionId") ?: 0
-        // 저장된 전역 설정 복원
-        // ★ 기본값: expand_before/after_ms → 여기서도 기본값 일치시킬 것
+
+        // prefs 복원
         val savedExpandBefore = prefs.getLong("expand_before_ms", 1000L)
         val savedExpandAfter  = prefs.getLong("expand_after_ms",  1000L)
-        _uiState.update {
-            it.copy(
-                expandBeforeMs = savedExpandBefore,
-                expandAfterMs  = savedExpandAfter
-            )
-        }
-        // Study 필터 기준 문제 목록 로드 (Practice 상단 prev/next 탐색용)
-        val qList = appPreferences.practiceQuestionList
-        val qIndex = qList.indexOfFirst { it.first == questionId }
-        _uiState.update {
-            it.copy(
-                practiceQuestionList  = qList,
-                practiceQuestionIndex = qIndex,
-                practiceFilterSummary = appPreferences.practiceFilterSummary
-            )
-        }
+        _uiState.update { it.copy(expandBeforeMs = savedExpandBefore, expandAfterMs = savedExpandAfter) }
 
-        if (questionId > 0) {
-            loadQuestion(questionId)
-        } else {
-            _uiState.update { it.copy(loading = false, error = "Invalid question ID") }
-        }
+        // 문제 로드
+        if (questionId > 0) loadQuestion(questionId)
+        else _uiState.update { it.copy(loading = false, error = "Invalid question ID") }
     }
 
     /** 문장별 UserScript 녹음 파일 경로 (고정 파일명, 재녹음 = 덮어쓰기) */
@@ -863,29 +841,30 @@ class PracticeViewModel @Inject constructor(
         _uiState.update { it.copy(showTimingPanel = !it.showTimingPanel, showStatsPanel = false) }
     }
 
-    // ─── Practice 문제 목록 탐색 ─────────────────────────────────────────
+    // ─── Practice 문제 목록 탐색 (Controller StateFlow 기반 — 항상 최신) ───
     fun togglePracticeFilterPanel() {
         _uiState.update { it.copy(showPracticeFilterPanel = !it.showPracticeFilterPanel) }
     }
 
-    /** 이전 문제 ID (없으면 null) */
+    /** 필터 변경 API — Controller에 위임 (양방향 동기화) */
+    fun onSetChanged(set: String)             = filterController.onSetChanged(set)
+    fun onTypeChanged(type: String)           = filterController.onTypeChanged(type)
+    fun onSortChanged(sort: String)           = filterController.onSortChanged(sort)
+    fun onStudyFilterChanged(filter: String)  = filterController.onStudyFilterChanged(filter)
+
+    /** 이전 문제 ID — Controller practiceQuestionList 기준 (항상 최신) */
     fun prevQuestionId(): Int? {
-        val state = _uiState.value
-        val idx = state.practiceQuestionIndex
-        return if (idx > 0) state.practiceQuestionList[idx - 1].first else null
+        val list = filterController.state.value.practiceQuestionList
+        val idx  = list.indexOfFirst { it.first == _uiState.value.questionId }
+        return if (idx > 0) list[idx - 1].first else null
     }
 
-    /** 다음 문제 ID (없으면 null) */
+    /** 다음 문제 ID — Controller practiceQuestionList 기준 (항상 최신) */
     fun nextQuestionId(): Int? {
-        val state = _uiState.value
-        val idx = state.practiceQuestionIndex
-        val list = state.practiceQuestionList
+        val list = filterController.state.value.practiceQuestionList
+        val idx  = list.indexOfFirst { it.first == _uiState.value.questionId }
         return if (idx >= 0 && idx < list.size - 1) list[idx + 1].first else null
     }
-
-    /** 목록에서 특정 인덱스 문제 ID */
-    fun questionIdAt(index: Int): Int? =
-        _uiState.value.practiceQuestionList.getOrNull(index)?.first
 
     fun toggleStatsPanel() {
         _uiState.update { it.copy(showStatsPanel = !it.showStatsPanel, showTimingPanel = false) }
