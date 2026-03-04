@@ -25,14 +25,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -57,6 +62,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.opic.android.ui.common.SpeechAnalysisPanel
 import com.opic.android.ui.common.WaveformComparisonPanel
@@ -75,6 +82,7 @@ import com.opic.android.ui.theme.OPicColors
 fun PracticeScreen(
     onBack: () -> Unit,
     onSettings: () -> Unit = {},
+    onNavigateToQuestion: (Int) -> Unit = {},
     viewModel: PracticeViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -108,7 +116,7 @@ fun PracticeScreen(
                     }
                 }
             }
-            else -> PracticeContent(state, viewModel, onBack)
+            else -> PracticeContent(state, viewModel, onBack, onNavigateToQuestion)
         }
     }
 }
@@ -118,7 +126,8 @@ fun PracticeScreen(
 private fun PracticeContent(
     state: PracticeUiState,
     viewModel: PracticeViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToQuestion: (Int) -> Unit = {}
 ) {
     var expandedSection by remember { mutableStateOf<String?>(null) }
     // 드래그 리사이즈: section1(문장연습) vs 나머지 비율
@@ -133,7 +142,7 @@ private fun PracticeContent(
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         // ===== 타이틀 네비게이터 =====
-        PracticeTitleRow(state, viewModel)
+        PracticeTitleRow(state, viewModel, onNavigateToQuestion)
 
         Spacer(modifier = Modifier.height(4.dp))
 
@@ -316,47 +325,169 @@ private fun PracticeContent(
     }
 }
 
-// ==================== 타이틀 네비게이터 ====================
+// ==================== 타이틀 네비게이터 (Study 스타일) ====================
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PracticeTitleRow(state: PracticeUiState, viewModel: PracticeViewModel) {
-    val total = state.sentences.size
-    val current = state.currentIndex
+private fun PracticeTitleRow(
+    state: PracticeUiState,
+    viewModel: PracticeViewModel,
+    onNavigateToQuestion: (Int) -> Unit = {}
+) {
+    val qList  = state.practiceQuestionList
+    val qIndex = state.practiceQuestionIndex
+    val qTotal = qList.size
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(
-            onClick = { viewModel.prevSentence() },
-            enabled = current > 0,
-            modifier = Modifier.size(36.dp)
+    // 문제 선택 BottomSheet
+    var showSheet by remember { mutableStateOf(false) }
+
+    Column {
+        // ── 메인 Row: [<문제] [제목▾] [>문제] N/M [필터] ──────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Filled.ChevronLeft, contentDescription = "이전 문장")
+            // 이전 문제
+            IconButton(
+                onClick = { viewModel.prevQuestionId()?.let { onNavigateToQuestion(it) } },
+                enabled = qIndex > 0,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(Icons.Filled.ChevronLeft, contentDescription = "이전 문제")
+            }
+
+            // 제목 선택 버튼 (탭 → 문제 목록 BottomSheet)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(OPicColors.LightBg)
+                    .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
+                    .clickable { if (qList.isNotEmpty()) showSheet = true },
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (state.questionTitle.isNotBlank()) state.questionTitle else "—",
+                        fontSize = 12.sp,
+                        color = OPicColors.Primary,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text("▾", fontSize = 10.sp, color = OPicColors.TextOnLight.copy(alpha = 0.45f))
+                }
+            }
+
+            // 다음 문제
+            IconButton(
+                onClick = { viewModel.nextQuestionId()?.let { onNavigateToQuestion(it) } },
+                enabled = qIndex >= 0 && qIndex < qTotal - 1,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(Icons.Filled.ChevronRight, contentDescription = "다음 문제")
+            }
+
+            // 문제 순서 (N/M)
+            Text(
+                text = if (qTotal > 0 && qIndex >= 0) "${qIndex + 1}/$qTotal" else "—",
+                fontSize = 12.sp,
+                color = Color.Gray,
+                modifier = Modifier.padding(start = 2.dp)
+            )
+
+            // 필터 아이콘
+            IconButton(
+                onClick = { viewModel.togglePracticeFilterPanel() },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    Icons.Filled.FilterList,
+                    contentDescription = "필터",
+                    tint = if (state.showPracticeFilterPanel) OPicColors.Primary else Color.Gray
+                )
+            }
         }
 
-        Text(
-            text = if (state.questionTitle.isNotBlank()) state.questionTitle else "—",
-            fontSize = 13.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
-        )
-
-        IconButton(
-            onClick = { viewModel.nextSentence() },
-            enabled = current < total - 1,
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(Icons.Filled.ChevronRight, contentDescription = "다음 문장")
+        // ── 필터 요약 패널 (토글) ─────────────────────────────────────
+        if (state.showPracticeFilterPanel) {
+            val summary = state.practiceFilterSummary
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(OPicColors.LightBg, RoundedCornerShape(6.dp))
+                    .border(1.dp, OPicColors.Border, RoundedCornerShape(6.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (summary.isBlank()) "필터 없음 (전체)" else summary,
+                    fontSize = 11.sp,
+                    color = if (summary.isBlank()) Color.Gray else OPicColors.Primary
+                )
+            }
         }
+    }
 
-        Text(
-            text = "${current + 1}/$total",
-            fontSize = 12.sp,
-            color = Color.Gray,
-            modifier = Modifier.padding(start = 4.dp)
-        )
+    // ── 문제 선택 BottomSheet ─────────────────────────────────────────
+    if (showSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showSheet = false },
+            containerColor = OPicColors.Surface,
+            tonalElevation = 0.dp
+        ) {
+            Text(
+                text = "문제 선택",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = OPicColors.TextOnLight,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+            )
+            HorizontalDivider(color = OPicColors.Border)
+            LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                items(qList) { (qId, qTitle) ->
+                    val isSelected = qId == state.questionId
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showSheet = false
+                                if (!isSelected) onNavigateToQuestion(qId)
+                            }
+                            .background(
+                                if (isSelected) OPicColors.Primary.copy(alpha = 0.08f)
+                                else Color.Transparent
+                            )
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = qTitle,
+                            fontSize = 14.sp,
+                            color = if (isSelected) OPicColors.Primary else OPicColors.TextOnLight,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (isSelected) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = OPicColors.Primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                    HorizontalDivider(color = OPicColors.Border.copy(alpha = 0.5f))
+                }
+                item { Spacer(modifier = Modifier.height(32.dp)) }
+            }
+        }
     }
 }
 

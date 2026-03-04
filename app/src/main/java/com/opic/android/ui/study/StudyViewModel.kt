@@ -14,6 +14,7 @@ import com.opic.android.data.local.dao.QuestionSummary
 import com.opic.android.data.local.dao.QuestionWithProgress
 import com.opic.android.data.local.dao.StudyProgressDao
 import com.opic.android.data.local.entity.StudyProgressEntity
+import com.opic.android.data.prefs.AppPreferences
 import com.opic.android.data.prefs.StudyPreferences
 import com.opic.android.util.AnalysisResult
 import com.opic.android.util.SpeechAnalyzer
@@ -122,7 +123,8 @@ class StudyViewModel @Inject constructor(
     private val audioFileResolver: AudioFileResolver,
     private val ttsManager: TtsManager,
     private val sttManager: SttManager,
-    private val prefs: StudyPreferences
+    private val prefs: StudyPreferences,
+    private val appPreferences: AppPreferences
 ) : ViewModel() {
 
     companion object {
@@ -384,6 +386,16 @@ class StudyViewModel @Inject constructor(
 
         val titles = sorted.map { it.title }.toList()
         _uiState.update { it.copy(titles = titles) }
+
+        // Practice 화면 문제 목록 공유 — 필터 변경 시 항상 갱신
+        appPreferences.practiceQuestionList = sorted.map { Pair(it.questionId, it.title) }.toList()
+        val state2 = _uiState.value
+        appPreferences.practiceFilterSummary = buildString {
+            if (state2.selectedSet != "전체") append("주제: ${state2.selectedSet}  ")
+            if (state2.selectedType != "전체") append("유형: ${state2.selectedType}  ")
+            if (state2.selectedStudyFilter != "전체") append("학습: ${state2.selectedStudyFilter}  ")
+            if (state2.selectedSort != "주제 순서") append("정렬: ${state2.selectedSort}")
+        }.trim()
     }
 
     private fun selectFirstTitle() {

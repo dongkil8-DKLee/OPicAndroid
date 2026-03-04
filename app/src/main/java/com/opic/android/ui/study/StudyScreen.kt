@@ -490,7 +490,7 @@ private fun FilterSection(state: StudyUiState, viewModel: StudyViewModel) {
                 selected = state.selectedSet,
                 options = listOf("전체") + state.sets,
                 onSelected = { viewModel.onSetChanged(it) },
-                modifier = Modifier.weight(1.3f)
+                modifier = Modifier.weight(1f)
             )
 
             BottomSheetPicker(
@@ -506,7 +506,7 @@ private fun FilterSection(state: StudyUiState, viewModel: StudyViewModel) {
                 selected = state.selectedSort,
                 options = listOf("주제 순서", "오래된 순"),
                 onSelected = { viewModel.onSortChanged(it) },
-                modifier = Modifier.weight(1.1f)
+                modifier = Modifier.weight(1f)
             )
         }
 
@@ -524,7 +524,7 @@ private fun FilterSection(state: StudyUiState, viewModel: StudyViewModel) {
                     contentColor = Color.White
                 ),
                 shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.height(44.dp)
+                modifier = Modifier.height(44.dp).weight(1f)
             ) {
                 Icon(
                     if (state.groupPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,

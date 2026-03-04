@@ -130,7 +130,12 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
             ) {
                 PracticeScreen(
                     onBack = { navController.popBackStack() },
-                    onSettings = { navController.navigate(Screen.Settings.route) }
+                    onSettings = { navController.navigate(Screen.Settings.route) },
+                    onNavigateToQuestion = { questionId ->
+                        navController.navigate(Screen.Practice.createRoute(questionId)) {
+                            popUpTo(Screen.Practice.route) { inclusive = true }
+                        }
+                    }
                 )
             }
 

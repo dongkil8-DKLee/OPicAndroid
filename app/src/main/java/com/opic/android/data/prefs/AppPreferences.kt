@@ -50,4 +50,10 @@ class AppPreferences @Inject constructor(
             prefs.edit().putString("theme_mode", v).apply()
             _themeModeFlow.value = v
         }
+
+    // ─── Practice 화면 문제 목록 공유 (in-memory, Study 필터 변경 시 갱신) ───
+    /** 현재 Study 필터 기준 정렬된 (questionId, title) 목록 */
+    var practiceQuestionList: List<Pair<Int, String>> = emptyList()
+    /** 현재 적용된 필터 요약 문자열 (Practice 상단에 표시) */
+    var practiceFilterSummary: String = ""
 }

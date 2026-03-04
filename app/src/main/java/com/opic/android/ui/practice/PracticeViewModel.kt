@@ -17,6 +17,7 @@ import com.opic.android.util.WavSampleReader
 import com.opic.android.data.local.dao.QuestionDao
 import com.opic.android.data.local.dao.VocabularyDao
 import com.opic.android.data.local.entity.VocabularyEntity
+import com.opic.android.data.prefs.AppPreferences
 import com.opic.android.util.AnalysisResult
 import com.opic.android.util.DictionaryApi
 import com.opic.android.util.SentenceSegment
@@ -111,7 +112,17 @@ data class PracticeUiState(
     val originalWaveformStartMs: Long = 0L,
     val originalWaveformEndMs:   Long = 0L,
     val showTimingPanel: Boolean = false,
-    val showStatsPanel: Boolean = false
+    val showStatsPanel: Boolean = false,
+
+    // ─── Practice 문제 목록 탐색 (Study 필터 공유) ────────────────────────
+    /** Study 필터 기준 (questionId, title) 목록 */
+    val practiceQuestionList: List<Pair<Int, String>> = emptyList(),
+    /** 현재 문제가 목록에서 몇 번째 (0-based) */
+    val practiceQuestionIndex: Int = -1,
+    /** Study 필터 요약 ("주제: 전체 | 학습: 저득점" 등) */
+    val practiceFilterSummary: String = "",
+    /** 필터 요약 패널 표시 여부 */
+    val showPracticeFilterPanel: Boolean = false
 )
 
 @HiltViewModel
@@ -125,7 +136,8 @@ class PracticeViewModel @Inject constructor(
     private val audioFileResolver: AudioFileResolver,
     private val ttsManager: TtsManager,
     private val sttManager: SttManager,
-    private val dualPlaybackManager: DualPlaybackManager
+    private val dualPlaybackManager: DualPlaybackManager,
+    private val appPreferences: AppPreferences
 ) : ViewModel() {
 
     companion object {
@@ -159,6 +171,17 @@ class PracticeViewModel @Inject constructor(
                 expandAfterMs  = savedExpandAfter
             )
         }
+        // Study 필터 기준 문제 목록 로드 (Practice 상단 prev/next 탐색용)
+        val qList = appPreferences.practiceQuestionList
+        val qIndex = qList.indexOfFirst { it.first == questionId }
+        _uiState.update {
+            it.copy(
+                practiceQuestionList  = qList,
+                practiceQuestionIndex = qIndex,
+                practiceFilterSummary = appPreferences.practiceFilterSummary
+            )
+        }
+
         if (questionId > 0) {
             loadQuestion(questionId)
         } else {
@@ -839,6 +862,30 @@ class PracticeViewModel @Inject constructor(
     fun toggleTimingPanel() {
         _uiState.update { it.copy(showTimingPanel = !it.showTimingPanel, showStatsPanel = false) }
     }
+
+    // ─── Practice 문제 목록 탐색 ─────────────────────────────────────────
+    fun togglePracticeFilterPanel() {
+        _uiState.update { it.copy(showPracticeFilterPanel = !it.showPracticeFilterPanel) }
+    }
+
+    /** 이전 문제 ID (없으면 null) */
+    fun prevQuestionId(): Int? {
+        val state = _uiState.value
+        val idx = state.practiceQuestionIndex
+        return if (idx > 0) state.practiceQuestionList[idx - 1].first else null
+    }
+
+    /** 다음 문제 ID (없으면 null) */
+    fun nextQuestionId(): Int? {
+        val state = _uiState.value
+        val idx = state.practiceQuestionIndex
+        val list = state.practiceQuestionList
+        return if (idx >= 0 && idx < list.size - 1) list[idx + 1].first else null
+    }
+
+    /** 목록에서 특정 인덱스 문제 ID */
+    fun questionIdAt(index: Int): Int? =
+        _uiState.value.practiceQuestionList.getOrNull(index)?.first
 
     fun toggleStatsPanel() {
         _uiState.update { it.copy(showStatsPanel = !it.showStatsPanel, showTimingPanel = false) }
