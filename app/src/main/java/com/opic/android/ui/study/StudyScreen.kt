@@ -136,6 +136,15 @@ private fun StudyContent(
     var showFilter    by remember { mutableStateOf(false) }
     var expandedScript by remember { mutableStateOf<String?>(null) }
     var splitFraction  by remember { mutableFloatStateOf(0.44f) }
+    val questionScrollState = rememberScrollState()
+    val answerScrollState   = rememberScrollState()
+
+    LaunchedEffect(showFilter) {
+        if (showFilter) {
+            questionScrollState.animateScrollTo(0)
+            answerScrollState.animateScrollTo(0)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -239,7 +248,8 @@ private fun StudyContent(
                         onPlay               = { viewModel.playQuestionAudio() },
                         onStop               = { viewModel.stopAudio() },
                         isExpanded           = false,
-                        onExpandToggle       = { expandedScript = "question" }
+                        onExpandToggle       = { expandedScript = "question" },
+                        scrollState          = questionScrollState
                     )
                     Box(
                         modifier = Modifier.fillMaxWidth().height(12.dp).draggable(
@@ -269,7 +279,8 @@ private fun StudyContent(
                         onPlay               = { viewModel.playAnswerAudio() },
                         onStop               = { viewModel.stopAudio() },
                         isExpanded           = false,
-                        onExpandToggle       = { expandedScript = "answer" }
+                        onExpandToggle       = { expandedScript = "answer" },
+                        scrollState          = answerScrollState
                     )
                 }
             }
@@ -291,7 +302,8 @@ private fun StudyContent(
                 onPlay               = { viewModel.playQuestionAudio() },
                 onStop               = { viewModel.stopAudio() },
                 isExpanded           = true,
-                onExpandToggle       = { expandedScript = null }
+                onExpandToggle       = { expandedScript = null },
+                scrollState          = questionScrollState
             )
         } else {
             ScriptSection(
@@ -311,7 +323,8 @@ private fun StudyContent(
                 onPlay               = { viewModel.playAnswerAudio() },
                 onStop               = { viewModel.stopAudio() },
                 isExpanded           = true,
-                onExpandToggle       = { expandedScript = null }
+                onExpandToggle       = { expandedScript = null },
+                scrollState          = answerScrollState
             )
         }
 
@@ -559,26 +572,34 @@ private fun ScriptSection(
     onPlay: () -> Unit,
     onStop: () -> Unit,
     isExpanded: Boolean,
-    onExpandToggle: () -> Unit
+    onExpandToggle: () -> Unit,
+    scrollState: ScrollState = rememberScrollState()
 ) {
-    val scrollState = rememberScrollState()
     Column(
         modifier = modifier.fillMaxWidth().border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp)).padding(8.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            if (label.isNotBlank()) Text(label, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Spacer(modifier = Modifier.width(4.dp))
-            if (isPlaying) {
-                TextButton(onClick = onStop) {
-                    Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(16.dp), tint = OPicColors.RecordActive)
-                    Text(" Stop", fontSize = 11.sp, color = OPicColors.RecordActive)
-                }
-            } else {
-                TextButton(onClick = onPlay, enabled = canPlay) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text(" Play", fontSize = 11.sp)
-                }
+            // 제목 + 아이콘 — 클릭 시 Play/Stop
+            Row(
+                modifier = Modifier.clickable(enabled = canPlay || isPlaying) {
+                    if (isPlaying) onStop() else onPlay()
+                },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (label.isNotBlank()) Text(label, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = if (isPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
+                    contentDescription = if (isPlaying) "Stop" else "Play",
+                    tint = when {
+                        isPlaying -> OPicColors.RecordActive
+                        canPlay   -> OPicColors.PlayButton
+                        else      -> Color.Gray
+                    },
+                    modifier = Modifier.size(16.dp)
+                )
             }
+            Spacer(modifier = Modifier.width(4.dp))
             if (isEditing) {
                 TextButton(onClick = onCancelEdit) { Text("Cancel", fontSize = 12.sp, color = Color.Gray) }
                 TextButton(onClick = onSave) { Text("Save", fontSize = 12.sp, color = OPicColors.Primary) }

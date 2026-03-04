@@ -41,14 +41,20 @@ import com.opic.android.ui.theme.OPicColors
 /**
  * 공통 필터 패널 — Study/Practice 재사용.
  *
- * Row 1: 주제 | 유형 | 정렬
- * Row 2: 학습 (Study 전용 Group Play 버튼은 이 컴포넌트에 포함하지 않음)
+ * showSort=true (Study 기본):
+ *   Row 1: 주제 | 유형 | 정렬
+ *   Row 2: (extraRow2Content?) | 학습
+ *
+ * showSort=false (Practice):
+ *   Row 1: 주제 | 유형 | 학습
+ *   Row 2: extraRow2Content (없으면 생략)
  *
  * @param state          현재 필터 상태
  * @param onSetChanged   주제 변경 콜백
  * @param onTypeChanged  유형 변경 콜백
  * @param onSortChanged  정렬 변경 콜백
  * @param onStudyFilterChanged 학습 필터 변경 콜백
+ * @param showSort       false이면 정렬 Picker 제거 + 학습을 Row1 3번째로 이동
  * @param extraRow2Content Row 2 에 추가할 Study 전용 컨텐츠 (Group Play 버튼 등). null이면 생략.
  */
 @Composable
@@ -59,13 +65,14 @@ fun FilterPanel(
     onSortChanged: (String) -> Unit,
     onStudyFilterChanged: (String) -> Unit,
     modifier: Modifier = Modifier,
+    showSort: Boolean = true,
     extraRow2Content: (@Composable () -> Unit)? = null
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        // Row 1: 주제 | 유형 | 정렬
+        // Row 1: 주제 | 유형 | 정렬(or 학습)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -84,31 +91,50 @@ fun FilterPanel(
                 onSelected = onTypeChanged,
                 modifier = Modifier.weight(1f)
             )
-            BottomSheetPicker(
-                label    = "정렬",
-                selected = state.selectedSort,
-                options  = listOf("주제 순서", "오래된 순"),
-                onSelected = onSortChanged,
-                modifier = Modifier.weight(1f)
-            )
+            if (showSort) {
+                BottomSheetPicker(
+                    label    = "정렬",
+                    selected = state.selectedSort,
+                    options  = listOf("주제 순서", "오래된 순"),
+                    onSelected = onSortChanged,
+                    modifier = Modifier.weight(1f)
+                )
+            } else {
+                BottomSheetPicker(
+                    label    = "학습",
+                    selected = state.selectedStudyFilter,
+                    options  = listOf("전체", "📌", "저득점", "최근오답", "0", "1", "2", "3", "4", "5", "6", "7"),
+                    onSelected = onStudyFilterChanged,
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
 
-        // Row 2: (extraRow2Content?) | 학습
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Study 전용 슬롯 (Group Play 버튼 등)
-            extraRow2Content?.invoke()
-
-            BottomSheetPicker(
-                label    = "학습",
-                selected = state.selectedStudyFilter,
-                options  = listOf("전체", "📌", "저득점", "최근오답", "0", "1", "2", "3", "4", "5", "6", "7"),
-                onSelected = onStudyFilterChanged,
-                modifier = Modifier.weight(1f)
-            )
+        // Row 2: showSort=true → (extraRow2Content?) | 학습
+        //        showSort=false → extraRow2Content만 (없으면 생략)
+        if (showSort) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                extraRow2Content?.invoke()
+                BottomSheetPicker(
+                    label    = "학습",
+                    selected = state.selectedStudyFilter,
+                    options  = listOf("전체", "📌", "저득점", "최근오답", "0", "1", "2", "3", "4", "5", "6", "7"),
+                    onSelected = onStudyFilterChanged,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        } else if (extraRow2Content != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                extraRow2Content.invoke()
+            }
         }
     }
 }

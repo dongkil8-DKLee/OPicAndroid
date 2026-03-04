@@ -427,7 +427,8 @@ private fun PracticeTitleRow(
                     onSetChanged         = { viewModel.onSetChanged(it) },
                     onTypeChanged        = { viewModel.onTypeChanged(it) },
                     onSortChanged        = { viewModel.onSortChanged(it) },
-                    onStudyFilterChanged = { viewModel.onStudyFilterChanged(it) }
+                    onStudyFilterChanged = { viewModel.onStudyFilterChanged(it) },
+                    showSort             = false
                 )
                 Spacer(modifier = Modifier.height(4.dp))
             }
