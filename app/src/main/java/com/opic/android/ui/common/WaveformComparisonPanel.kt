@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -281,23 +282,16 @@ fun WaveformComparisonPanel(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // ── 내 녹음 Row: 드래그힌트 Spacer [Auto] ─────────────────────────
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (!isPlaying && !isPlayingUser && !isPlayingOriginal && !isLoopPlaying) {
-                Text(
-                    text = " ← 드래그로 시작 위치 조절",
-                    fontSize = 9.sp,
-                    color = Color(0xFFFF9800)
-                )
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            if (!isPlaying && !isPlayingUser && !isRecordingUser && !isPlayingOriginal && !isLoopPlaying
-                && onAutoSync != null && hasUserAudio) {
+        // ── 내 녹음 Row: Spacer [Auto] ─────────────────────────────────
+        if (onAutoSync != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 TextButton(
                     onClick = onAutoSync,
+                    enabled = !isPlaying && !isPlayingUser && !isRecordingUser && !isPlayingOriginal && !isLoopPlaying && hasUserAudio,
                     modifier = Modifier.height(24.dp),
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
                 ) {
@@ -428,28 +422,20 @@ fun WaveformComparisonPanel(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 🎤/⏹ 녹음
+            // 🎤/⏹ 녹음 — Study 스타일 (아이콘만, 텍스트 없음)
             if (onStartRecording != null) {
-                if (isRecordingUser) {
-                    TextButton(
-                        onClick = { onStopRecording?.invoke() },
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(13.dp),
-                            tint = OPicColors.RecordActive)
-                        Text(" Stop", fontSize = 10.sp, color = OPicColors.RecordActive)
-                    }
-                } else {
-                    TextButton(
-                        onClick = onStartRecording,
-                        enabled = !isPlayingUser && !isPlaying && !isPlayingOriginal && !isLoopPlaying,
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(13.dp))
-                        Text(" Rec", fontSize = 10.sp)
-                    }
+                val recEnabled = !isPlayingUser && !isPlaying && !isPlayingOriginal && !isLoopPlaying
+                IconButton(
+                    onClick  = { if (isRecordingUser) onStopRecording?.invoke() else onStartRecording() },
+                    enabled  = isRecordingUser || recEnabled,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isRecordingUser) Icons.Filled.Stop else Icons.Filled.Mic,
+                        contentDescription = if (isRecordingUser) "녹음 중지" else "녹음",
+                        tint = if (isRecordingUser || recEnabled) OPicColors.RecordActive else Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
 

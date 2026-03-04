@@ -789,7 +789,8 @@ private fun UserScriptSection(
                     onClick = { viewModel.startUserScriptStt() },
                     enabled = !isBusy
                 ) {
-                    Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFF3498DB))
+                    Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(16.dp),
+                        tint = if (!isBusy) OPicColors.RecordActive else Color.Gray)
                     Text(" STT", fontSize = 11.sp)
                 }
             }
