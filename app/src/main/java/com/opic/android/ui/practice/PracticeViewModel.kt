@@ -96,6 +96,8 @@ data class PracticeUiState(
     val userPlayProgress: Float = 0f,
     // 원본 단독 재생 진행률 (파형 윈도우 기준)
     val originalPlayProgress: Float = 0f,
+    // 구간 반복 재생
+    val isLoopPlaying: Boolean = false,
 
     // ─── 문장 경계 보정 ───────────────────────────────────────────────
     // 파형 확장 표시 범위: 구간 앞/뒤로 얼마나 더 보여줄지 (ms)
@@ -143,6 +145,7 @@ class PracticeViewModel @Inject constructor(
 
     private var recordingJob: Job? = null
     private var userScriptRecordingJob: Job? = null
+    private var isLoopActive = false
 
     init {
         val questionId = savedStateHandle.get<Int>("questionId") ?: 0
@@ -297,7 +300,7 @@ class PracticeViewModel @Inject constructor(
 
     fun playOriginal() {
         val state = _uiState.value
-        if (state.isPlayingOriginal || state.isPlayingUser || state.isRecording || state.isComparisonPlaying) return
+        if (state.isPlayingOriginal || state.isPlayingUser || state.isRecording || state.isComparisonPlaying || state.isLoopPlaying) return
         val segment      = state.currentSegment ?: return
         val effectiveStart = effectiveSegmentStartMs(segment)
         val effectiveEnd   = effectiveSegmentEndMs(segment)
@@ -346,6 +349,78 @@ class PracticeViewModel @Inject constructor(
     fun stopOriginal() {
         audioPlayer.stop()
         _uiState.update { it.copy(isPlayingOriginal = false, originalPlayProgress = 0f) }
+    }
+
+    // ==================== 구간 반복 재생 ====================
+
+    fun toggleLoopPlayback() {
+        if (_uiState.value.isLoopPlaying) {
+            stopLoopPlayback()
+        } else {
+            startLoopPlayback()
+        }
+    }
+
+    fun stopLoopPlayback() {
+        isLoopActive = false
+        audioPlayer.stop()
+        _uiState.update { it.copy(isLoopPlaying = false, originalPlayProgress = 0f) }
+    }
+
+    private fun startLoopPlayback() {
+        val state = _uiState.value
+        if (state.isLoopPlaying || state.isPlayingOriginal || state.isComparisonPlaying ||
+            state.isRecordingUserScript || state.isPlayingUserAudio) return
+        val segment = state.currentSegment ?: return
+        if (state.assetPath == null) return   // TTS 소스는 루프 미지원
+
+        isLoopActive = true
+        _uiState.update { it.copy(isLoopPlaying = true, originalPlayProgress = 0f) }
+        audioPlayer.setSpeed(state.comparisonSpeed)
+
+        // 진행 바 폴링 (playOriginal과 동일한 방식)
+        viewModelScope.launch {
+            while (_uiState.value.isLoopPlaying) {
+                val posMs = audioPlayer.currentPosition.toLong()
+                val wStart = _uiState.value.originalWaveformStartMs
+                val wEnd   = _uiState.value.originalWaveformEndMs
+                val wDur   = (wEnd - wStart).toFloat()
+                val progress = if (wDur > 0f) {
+                    ((posMs - wStart).toFloat() / wDur).coerceIn(0f, 1f)
+                } else 0f
+                _uiState.update { it.copy(originalPlayProgress = progress) }
+                kotlinx.coroutines.delay(50)
+            }
+        }
+
+        playOneLoop()
+    }
+
+    /** 한 회 재생 완료 시 isLoopActive이면 다시 재생 (구간 경계는 매번 최신값 사용) */
+    private fun playOneLoop() {
+        if (!isLoopActive) {
+            _uiState.update { it.copy(isLoopPlaying = false, originalPlayProgress = 0f) }
+            return
+        }
+        val state = _uiState.value
+        val segment = state.currentSegment ?: run {
+            isLoopActive = false
+            _uiState.update { it.copy(isLoopPlaying = false, originalPlayProgress = 0f) }
+            return
+        }
+        val startMs = effectiveSegmentStartMs(segment)
+        val endMs   = effectiveSegmentEndMs(segment)
+
+        when (val source = state.assetPath) {
+            is com.opic.android.audio.AudioSource.AssetPath ->
+                audioPlayer.playRangeFromAssets(source.path, startMs, endMs) { playOneLoop() }
+            is com.opic.android.audio.AudioSource.FilePath ->
+                audioPlayer.playRangeFromFile(source.path, startMs, endMs) { playOneLoop() }
+            null -> {
+                isLoopActive = false
+                _uiState.update { it.copy(isLoopPlaying = false, originalPlayProgress = 0f) }
+            }
+        }
     }
 
     // ==================== 녹음 재생 ====================
@@ -586,18 +661,31 @@ class PracticeViewModel @Inject constructor(
     fun playUserScriptAudio() {
         val state = _uiState.value
         val path = userRecordingPath(state.currentIndex).takeIf { File(it).exists() } ?: return
-        if (state.isPlayingUserAudio || state.isComparisonPlaying) return
+        if (state.isPlayingUserAudio || state.isComparisonPlaying || state.isLoopPlaying) return
 
-        _uiState.update { it.copy(isPlayingUserAudio = true, userPlayProgress = 0f) }
-        // PLAY 버튼은 항상 처음(0)부터 재생, userStartFraction은 동시재생에만 적용
-        audioPlayer.playFromFile(path) {
-            _uiState.update { it.copy(isPlayingUserAudio = false, userPlayProgress = 0f) }
+        // userStartFraction 위치부터 재생 (동시재생과 동일한 시작점)
+        val startMs = (state.userStartFraction * state.userAudioDurationMs).toLong().coerceAtLeast(0L)
+        val initialProgress = if (state.userAudioDurationMs > 0) {
+            (startMs.toFloat() / state.userAudioDurationMs).coerceIn(0f, 1f)
+        } else 0f
+
+        _uiState.update { it.copy(isPlayingUserAudio = true, userPlayProgress = initialProgress) }
+
+        val onComplete = { _uiState.update { it.copy(isPlayingUserAudio = false, userPlayProgress = 0f) } }
+
+        if (startMs > 0) {
+            // endMs를 충분히 크게 설정 → 자연 완료(onCompletionListener)에 의존
+            audioPlayer.playRangeFromFile(path, startMs, startMs + 3_600_000L, onComplete)
+        } else {
+            audioPlayer.playFromFile(path, onComplete)
         }
-        // 진행 바 폴링 (50ms 간격)
+
+        // 진행 바 폴링 (절대 파일 위치 기준, 사용자 파형 전체와 동기화)
         viewModelScope.launch {
             while (_uiState.value.isPlayingUserAudio) {
-                val pos = audioPlayer.currentPosition
-                val dur = audioPlayer.duration
+                val pos = audioPlayer.currentPosition.toLong()
+                val dur = if (state.userAudioDurationMs > 0) state.userAudioDurationMs
+                          else audioPlayer.duration.toLong()
                 if (dur > 0) {
                     _uiState.update { it.copy(userPlayProgress = (pos.toFloat() / dur).coerceIn(0f, 1f)) }
                 }
@@ -770,6 +858,7 @@ class PracticeViewModel @Inject constructor(
     }
 
     private fun stopAll() {
+        isLoopActive = false
         audioPlayer.stop()
         dualPlaybackManager.stop()
         if (_uiState.value.isRecording) audioRecorder.stop()
@@ -778,6 +867,7 @@ class PracticeViewModel @Inject constructor(
             it.copy(
                 isPlayingOriginal = false,
                 isPlayingUser = false,
+                isLoopPlaying = false,
                 isRecording = false,
                 micLevel = 0f,
                 sttListening = false,

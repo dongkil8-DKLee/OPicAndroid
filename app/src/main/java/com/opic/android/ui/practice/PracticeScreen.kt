@@ -243,7 +243,17 @@ private fun PracticeContent(
                         onPlayOriginal = { viewModel.playOriginal() },
                         onStopOriginal = { viewModel.stopOriginal() },
                         originalPlayProgress = state.originalPlayProgress,
-                        onAutoSync = if (state.hasUserAudio) { { viewModel.autoSyncUserStart() } } else null
+                        onAutoSync = if (state.hasUserAudio) { { viewModel.autoSyncUserStart() } } else null,
+                        // 구간 반복
+                        isLoopPlaying = state.isLoopPlaying,
+                        onToggleLoop = { viewModel.toggleLoopPlayback() },
+                        // 타이밍 컨트롤
+                        isTimingModeEnabled = state.showTimingPanel,
+                        onToggleTimingMode = { viewModel.toggleTimingPanel() },
+                        expandBeforeMs = state.expandBeforeMs,
+                        expandAfterMs = state.expandAfterMs,
+                        onExpandBeforeChange = { viewModel.setExpandBefore(it) },
+                        onExpandAfterChange = { viewModel.setExpandAfter(it) }
                     )
 
                     // ===== 드래그 핸들 2 =====
@@ -384,19 +394,6 @@ private fun PracticeSentenceSection(
                 )
             }
 
-            // 타이밍 보정 토글
-            TextButton(
-                onClick = { viewModel.toggleTimingPanel() },
-                modifier = Modifier.padding(horizontal = 0.dp)
-            ) {
-                Text(
-                    " ± 타이밍",
-                    fontSize = 11.sp,
-                    color = if (state.showTimingPanel) OPicColors.Primary else Color.Gray,
-                    fontWeight = if (state.showTimingPanel) FontWeight.Bold else FontWeight.Normal
-                )
-            }
-
             Spacer(modifier = Modifier.weight(1f))
 
             IconButton(onClick = onExpandToggle, modifier = Modifier.size(28.dp)) {
@@ -406,52 +403,6 @@ private fun PracticeSentenceSection(
                     tint = Color.Gray,
                     modifier = Modifier.size(18.dp)
                 )
-            }
-        }
-
-        // 타이밍 보정 패널 (토글)
-        if (state.showTimingPanel) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFF5F5F5), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                // ── 파형 표시 확장 범위: 앞/뒤 ±500ms 단위 조절 ──────────
-                // ★ 1회 클릭 단위(500L)와 최대값(3000L)은 ViewModel.setExpandBefore/After에서 변경
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("파형 확장", fontSize = 10.sp, color = Color.Gray)
-                    Spacer(modifier = Modifier.weight(1f))
-                    // 앞
-                    Text("앞", fontSize = 10.sp, color = Color.Gray)
-                    TextButton(onClick = { viewModel.setExpandBefore(state.expandBeforeMs - 500L) },
-                        modifier = Modifier.size(28.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                        Text("−", fontSize = 13.sp, color = OPicColors.TimerRed)
-                    }
-                    Text("${state.expandBeforeMs}ms", fontSize = 10.sp, color = OPicColors.Primary,
-                        modifier = Modifier.width(44.dp))
-                    TextButton(onClick = { viewModel.setExpandBefore(state.expandBeforeMs + 500L) },
-                        modifier = Modifier.size(28.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                        Text("+", fontSize = 13.sp, color = OPicColors.TimerGreen)
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    // 뒤
-                    Text("뒤", fontSize = 10.sp, color = Color.Gray)
-                    TextButton(onClick = { viewModel.setExpandAfter(state.expandAfterMs - 500L) },
-                        modifier = Modifier.size(28.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                        Text("−", fontSize = 13.sp, color = OPicColors.TimerRed)
-                    }
-                    Text("${state.expandAfterMs}ms", fontSize = 10.sp, color = OPicColors.Primary,
-                        modifier = Modifier.width(44.dp))
-                    TextButton(onClick = { viewModel.setExpandAfter(state.expandAfterMs + 500L) },
-                        modifier = Modifier.size(28.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                        Text("+", fontSize = 13.sp, color = OPicColors.TimerGreen)
-                    }
-                }
             }
         }
 

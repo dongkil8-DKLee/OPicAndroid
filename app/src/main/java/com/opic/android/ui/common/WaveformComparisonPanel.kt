@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
@@ -34,11 +35,12 @@ import androidx.compose.ui.unit.sp
 import com.opic.android.ui.theme.OPicColors
 
 /**
- * 두 파형 + 원본재생 + 동시재생 버튼 + 볼륨 밸런스 슬라이더 패널.
+ * 두 파형 + 원본재생/루프/녹음/녹음재생/동시재생 버튼 + 볼륨 밸런스 슬라이더 패널.
  *
- * 원본 파형 마커 설정 방식:
- *   [시작] / [종료] 버튼 클릭 후 파형을 탭하면 해당 마커 위치 설정.
- *   드래그 대신 버튼+탭 방식으로 핀치 줌과 제스처 충돌 없음.
+ * 원본 파형 상단 Row: [《][-][타이밍][시작] Spacer [종료][-][》]
+ *   - 타이밍 모드 ON → 《 - - 》 활성화
+ *   - 시작/종료: 탭으로 마커 위치 설정
+ * 하단 Row: [▶원본][🔁구간반복][🎤녹음][▶녹음재생][⇄동시재생] Spacer 속도:-/+
  */
 @Composable
 fun WaveformComparisonPanel(
@@ -61,7 +63,7 @@ fun WaveformComparisonPanel(
     segmentEndMarker: Float = 1f,
     onSegmentStartMarkerChange: ((Float) -> Unit)? = null,
     onSegmentEndMarkerChange: ((Float) -> Unit)? = null,
-    // REC / PLAY 버튼 (선택적)
+    // REC 버튼 (선택적)
     isRecordingUser: Boolean = false,
     isPlayingUser: Boolean = false,
     hasUserAudio: Boolean = false,
@@ -74,14 +76,27 @@ fun WaveformComparisonPanel(
     onPlayOriginal: (() -> Unit)? = null,
     onStopOriginal: (() -> Unit)? = null,
     originalPlayProgress: Float = 0f,
+    // 구간 반복
+    isLoopPlaying: Boolean = false,
+    onToggleLoop: (() -> Unit)? = null,
     // 자동 싱크: 사용자 파형에서 음성 시작점 자동 감지 (null이면 버튼 미표시)
     onAutoSync: (() -> Unit)? = null,
+    // 타이밍 모드 (파형 확장 컨트롤 활성화)
+    isTimingModeEnabled: Boolean = false,
+    onToggleTimingMode: (() -> Unit)? = null,
+    expandBeforeMs: Long = 1000L,
+    expandAfterMs: Long = 1000L,
+    onExpandBeforeChange: ((Long) -> Unit)? = null,
+    onExpandAfterChange: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     // 마커 설정 모드: None / Start / End
-    // [시작] 버튼 클릭 → Start 모드, 파형 탭 → 시작 마커 설정 후 None으로 복귀
-    // [종료] 버튼 클릭 → End 모드, 파형 탭 → 종료 마커 설정 후 None으로 복귀
     var markerMode by remember { mutableStateOf(MarkerMode.None) }
+
+    // 재생 중이면 마커 모드 해제
+    if (isPlaying || isPlayingOriginal || isLoopPlaying) markerMode = MarkerMode.None
+
+    val isBusy = isPlaying || isPlayingOriginal || isLoopPlaying || isRecordingUser
 
     Column(
         modifier = modifier
@@ -89,44 +104,59 @@ fun WaveformComparisonPanel(
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
-        // ── 원본 음성 Row: [▶원본][시작] Spacer [종료] ──────────────────
+        // ── Row 1: [《][-][타이밍][시작] Spacer [종료][-][》] ─────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 원본 단독 Play/Stop
-            if (onPlayOriginal != null) {
-                if (isPlayingOriginal) {
-                    TextButton(
-                        onClick = { onStopOriginal?.invoke() },
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Text(" 원본", fontSize = 10.sp)
-                    }
-                } else {
-                    TextButton(
-                        onClick = onPlayOriginal,
-                        enabled = !isPlaying && !isRecordingUser && !isPlayingUser,
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Text(" 원본", fontSize = 10.sp)
-                    }
+            // 《 (+expandBefore)
+            if (onExpandBeforeChange != null) {
+                TextButton(
+                    onClick = { onExpandBeforeChange(expandBeforeMs + 500L) },
+                    enabled = isTimingModeEnabled && !isBusy,
+                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Text("《", fontSize = 11.sp,
+                        color = if (isTimingModeEnabled && !isBusy) OPicColors.Primary else Color.Gray.copy(alpha = 0.4f))
                 }
-            } else {
-                Text("원본 음성", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(start = 2.dp))
             }
 
-            // [시작] 버튼 — Play 버튼 바로 옆에 배치, 클릭 시 Start 모드 토글 (주황 강조)
-            if (onSegmentStartMarkerChange != null && !isPlaying && !isPlayingOriginal) {
+            // - (-expandBefore)
+            if (onExpandBeforeChange != null) {
+                TextButton(
+                    onClick = { onExpandBeforeChange(expandBeforeMs - 500L) },
+                    enabled = isTimingModeEnabled && !isBusy,
+                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Text("−", fontSize = 12.sp,
+                        color = if (isTimingModeEnabled && !isBusy) OPicColors.TimerRed else Color.Gray.copy(alpha = 0.4f))
+                }
+            }
+
+            // [타이밍] 토글
+            if (onToggleTimingMode != null) {
+                TextButton(
+                    onClick = onToggleTimingMode,
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Text(
+                        "타이밍",
+                        fontSize = 10.sp,
+                        color = if (isTimingModeEnabled) OPicColors.Primary else Color.Gray
+                    )
+                }
+            }
+
+            // [시작] 마커 버튼
+            if (onSegmentStartMarkerChange != null && !isBusy) {
                 TextButton(
                     onClick = {
                         markerMode = if (markerMode == MarkerMode.Start) MarkerMode.None else MarkerMode.Start
                     },
-                    contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                     modifier = Modifier.height(28.dp)
                 ) {
                     Text(
@@ -137,12 +167,12 @@ fun WaveformComparisonPanel(
                 }
             }
 
-            // 탭 힌트 (마커 설정 모드 활성 시 표시)
-            if (!isPlaying && !isPlayingOriginal && markerMode != MarkerMode.None) {
+            // 탭 힌트 (마커 모드 활성 시)
+            if (!isBusy && markerMode != MarkerMode.None) {
                 Text(
                     text = when (markerMode) {
-                        MarkerMode.Start -> " 📍탭=시작"
-                        MarkerMode.End   -> " 📍탭=종료"
+                        MarkerMode.Start -> "↑탭"
+                        MarkerMode.End   -> "↑탭"
                         MarkerMode.None  -> ""
                     },
                     fontSize = 9.sp,
@@ -156,13 +186,29 @@ fun WaveformComparisonPanel(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // [종료] 버튼 — 오른쪽 끝에 배치, 클릭 시 End 모드 토글 (빨강 강조)
-            if (onSegmentEndMarkerChange != null && !isPlaying && !isPlayingOriginal) {
+            // 타이밍 수치 표시 (타이밍 모드 활성 시)
+            if (isTimingModeEnabled) {
+                Text(
+                    "${expandBeforeMs}ms",
+                    fontSize = 9.sp,
+                    color = OPicColors.Primary.copy(alpha = 0.7f)
+                )
+                Text(" / ", fontSize = 9.sp, color = Color.Gray)
+                Text(
+                    "${expandAfterMs}ms",
+                    fontSize = 9.sp,
+                    color = OPicColors.Primary.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+
+            // [종료] 마커 버튼
+            if (onSegmentEndMarkerChange != null && !isBusy) {
                 TextButton(
                     onClick = {
                         markerMode = if (markerMode == MarkerMode.End) MarkerMode.None else MarkerMode.End
                     },
-                    contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                     modifier = Modifier.height(28.dp)
                 ) {
                     Text(
@@ -172,29 +218,49 @@ fun WaveformComparisonPanel(
                     )
                 }
             }
+
+            // - (-expandAfter)
+            if (onExpandAfterChange != null) {
+                TextButton(
+                    onClick = { onExpandAfterChange(expandAfterMs - 500L) },
+                    enabled = isTimingModeEnabled && !isBusy,
+                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Text("−", fontSize = 12.sp,
+                        color = if (isTimingModeEnabled && !isBusy) OPicColors.TimerRed else Color.Gray.copy(alpha = 0.4f))
+                }
+            }
+
+            // 》 (+expandAfter)
+            if (onExpandAfterChange != null) {
+                TextButton(
+                    onClick = { onExpandAfterChange(expandAfterMs + 500L) },
+                    enabled = isTimingModeEnabled && !isBusy,
+                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Text("》", fontSize = 11.sp,
+                        color = if (isTimingModeEnabled && !isBusy) OPicColors.Primary else Color.Gray.copy(alpha = 0.4f))
+                }
+            }
         }
 
         // 원본 WaveformView
-        // - 드래그 비활성화 (onStart/EndMarkerChange = null)
-        // - 탭으로 마커 설정 (onTap: markerMode에 따라 시작/종료 마커 업데이트 후 None 복귀)
-        // - 핀치 줌 활성화 (zoomEnabled = true)
         WaveformView(
             samples = originalWaveform,
             waveformColor = OPicColors.LevelGauge,
             playbackProgress = when {
-                isPlayingOriginal -> originalPlayProgress
-                // 동시재생: comparisonOriginalProgress(0~1)는 세그먼트 내 진행률.
-                // 파형은 expand 포함 전체 범위를 표시하므로,
-                // segmentStartMarker~segmentEndMarker 구간으로 선형 매핑하여 올바른 위치에 표시.
+                isPlayingOriginal || isLoopPlaying -> originalPlayProgress
                 isPlaying -> (segmentStartMarker + originalProgress * (segmentEndMarker - segmentStartMarker))
                     .coerceIn(0f, 1f)
-                else              -> null
+                else -> null
             },
-            startMarkerFraction = if (!isPlaying && !isPlayingOriginal) segmentStartMarker else null,
-            endMarkerFraction   = if (!isPlaying && !isPlayingOriginal) segmentEndMarker   else null,
-            onStartMarkerChange = null,  // 드래그 비활성화
-            onEndMarkerChange   = null,  // 드래그 비활성화
-            onTap = if (!isPlaying && !isPlayingOriginal && markerMode != MarkerMode.None) { fraction ->
+            startMarkerFraction = if (!isBusy) segmentStartMarker else null,
+            endMarkerFraction   = if (!isBusy) segmentEndMarker   else null,
+            onStartMarkerChange = null,
+            onEndMarkerChange   = null,
+            onTap = if (!isBusy && markerMode != MarkerMode.None) { fraction ->
                 when (markerMode) {
                     MarkerMode.Start -> {
                         onSegmentStartMarkerChange?.invoke(fraction)
@@ -213,39 +279,12 @@ fun WaveformComparisonPanel(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // ── 내 녹음 Row: [▶/⏹ 내녹음]  드래그힌트  [Auto] ──────────────
+        // ── 내 녹음 Row: 드래그힌트 Spacer [Auto] ─────────────────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 내 녹음 단독 Play/Stop
-            if (onPlayUser != null) {
-                if (isPlayingUser) {
-                    TextButton(
-                        onClick = { onStopUser?.invoke() },
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Text(" 내녹음", fontSize = 10.sp)
-                    }
-                } else {
-                    TextButton(
-                        onClick = onPlayUser,
-                        enabled = hasUserAudio && !isRecordingUser && !isPlaying && !isPlayingOriginal,
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Text(" 내녹음", fontSize = 10.sp)
-                    }
-                }
-            } else {
-                Text("내 녹음", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(start = 2.dp))
-            }
-
-            // 드래그 힌트
-            if (!isPlaying && !isPlayingUser && !isPlayingOriginal) {
+            if (!isPlaying && !isPlayingUser && !isPlayingOriginal && !isLoopPlaying) {
                 Text(
                     text = " ← 드래그로 시작 위치 조절",
                     fontSize = 9.sp,
@@ -255,8 +294,8 @@ fun WaveformComparisonPanel(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Auto Sync 버튼
-            if (!isPlaying && !isPlayingUser && !isRecordingUser && !isPlayingOriginal && onAutoSync != null && hasUserAudio) {
+            if (!isPlaying && !isPlayingUser && !isRecordingUser && !isPlayingOriginal && !isLoopPlaying
+                && onAutoSync != null && hasUserAudio) {
                 TextButton(
                     onClick = onAutoSync,
                     modifier = Modifier.height(24.dp),
@@ -267,7 +306,7 @@ fun WaveformComparisonPanel(
             }
         }
 
-        // 사용자 파형 (시작 마커 드래그 가능 — zoomEnabled=false이므로 핀치 충돌 없음)
+        // 사용자 파형 (시작 마커 드래그 가능)
         WaveformView(
             samples = userWaveform,
             waveformColor = OPicColors.TimerGreen,
@@ -283,7 +322,7 @@ fun WaveformComparisonPanel(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // ── 볼륨 밸런스 슬라이더 ────────────────────────────────────
+        // ── 볼륨 밸런스 슬라이더 ─────────────────────────────────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -300,15 +339,64 @@ fun WaveformComparisonPanel(
                     inactiveTrackColor = OPicColors.Border
                 )
             )
-            Text("내 녹음", fontSize = 10.sp, color = Color.Gray)
+            Text(" 녹음", fontSize = 10.sp, color = Color.Gray)
         }
 
-        // ── 하단 Row: [Rec][동시재생] Spacer 속도:[−][1.0x][+] ──────
+        // ── 하단 Row: [▶원본][🔁구간반복][🎤녹음][▶녹음재생][⇄동시재생] Spacer 속도 ──
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // REC 버튼
+            // ▶/⏹ 원본
+            if (onPlayOriginal != null) {
+                if (isPlayingOriginal) {
+                    TextButton(
+                        onClick = { onStopOriginal?.invoke() },
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Text(" 원본", fontSize = 10.sp)
+                    }
+                } else {
+                    TextButton(
+                        onClick = onPlayOriginal,
+                        enabled = !isBusy && !isPlaying && !isPlayingUser,
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Text(" 원본", fontSize = 10.sp)
+                    }
+                }
+            }
+
+            // 🔁/⏹ 구간반복
+            if (onToggleLoop != null) {
+                if (isLoopPlaying) {
+                    TextButton(
+                        onClick = onToggleLoop,
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(13.dp),
+                            tint = OPicColors.TimerRed)
+                        Text(" 구간", fontSize = 10.sp, color = OPicColors.TimerRed)
+                    }
+                } else {
+                    TextButton(
+                        onClick = onToggleLoop,
+                        enabled = !isPlaying && !isPlayingOriginal && !isPlayingUser && !isRecordingUser,
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Icon(Icons.Filled.Repeat, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Text(" 구간", fontSize = 10.sp)
+                    }
+                }
+            }
+
+            // 🎤/⏹ 녹음
             if (onStartRecording != null) {
                 if (isRecordingUser) {
                     TextButton(
@@ -316,41 +404,67 @@ fun WaveformComparisonPanel(
                         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                         modifier = Modifier.height(28.dp)
                     ) {
-                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(14.dp), tint = OPicColors.RecordActive)
-                        Text(" Stop", fontSize = 11.sp, color = OPicColors.RecordActive)
+                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(13.dp),
+                            tint = OPicColors.RecordActive)
+                        Text(" Stop", fontSize = 10.sp, color = OPicColors.RecordActive)
                     }
                 } else {
                     TextButton(
                         onClick = onStartRecording,
-                        enabled = !isPlayingUser && !isPlaying && !isPlayingOriginal,
+                        enabled = !isPlayingUser && !isPlaying && !isPlayingOriginal && !isLoopPlaying,
                         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                         modifier = Modifier.height(28.dp)
                     ) {
-                        Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Text(" Rec", fontSize = 11.sp)
+                        Icon(Icons.Filled.Mic, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Text(" Rec", fontSize = 10.sp)
                     }
                 }
             }
 
-            // 동시재생 버튼
+            // ▶/⏹ 녹음재생
+            if (onPlayUser != null) {
+                if (isPlayingUser) {
+                    TextButton(
+                        onClick = { onStopUser?.invoke() },
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Text(" 녹음", fontSize = 10.sp)
+                    }
+                } else {
+                    TextButton(
+                        onClick = onPlayUser,
+                        enabled = hasUserAudio && !isRecordingUser && !isPlaying && !isPlayingOriginal && !isLoopPlaying,
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Text(" 녹음", fontSize = 10.sp)
+                    }
+                }
+            }
+
+            // ⇄/⏹ 동시재생
             if (isPlaying) {
                 TextButton(
                     onClick = onTogglePlayback,
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                     modifier = Modifier.height(28.dp)
                 ) {
-                    Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(14.dp), tint = OPicColors.RecordActive)
-                    Text(" 정지", fontSize = 11.sp, color = OPicColors.RecordActive)
+                    Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(13.dp),
+                        tint = OPicColors.RecordActive)
+                    Text(" 정지", fontSize = 10.sp, color = OPicColors.RecordActive)
                 }
             } else {
                 TextButton(
                     onClick = onTogglePlayback,
-                    enabled = enabled && userWaveform.isNotEmpty(),
+                    enabled = enabled && userWaveform.isNotEmpty() && !isPlayingOriginal && !isLoopPlaying && !isRecordingUser,
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                     modifier = Modifier.height(28.dp)
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Text(" 동시재생", fontSize = 11.sp)
+                    Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null, modifier = Modifier.size(13.dp))
+                    Text(" 동시", fontSize = 10.sp)
                 }
             }
 
