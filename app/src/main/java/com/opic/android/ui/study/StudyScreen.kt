@@ -151,7 +151,16 @@ private fun StudyContent(
             .fillMaxSize()
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        // ===== 필터 패널 (슬라이드 다운) =====
+        // ===== 타이틀 선택 + Prev/Next + 필터아이콘 =====
+        TitleSelector(
+            state        = state,
+            filterState  = filterState,
+            viewModel    = viewModel,
+            showFilter   = showFilter,
+            onToggleFilter = { showFilter = !showFilter }
+        )
+
+        // ===== 필터 패널 (타이틀 아래로 슬라이드 다운) =====
         AnimatedVisibility(
             visible = showFilter,
             enter   = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
@@ -166,7 +175,6 @@ private fun StudyContent(
                     onSortChanged       = { viewModel.onSortChanged(it) },
                     onStudyFilterChanged = { viewModel.onStudyFilterChanged(it) },
                     extraRow2Content = {
-                        // Study 전용: Group Play 버튼 (모드 Picker는 FilterPanel Row2에 학습 옆으로)
                         Button(
                             onClick  = { viewModel.toggleGroupPlay() },
                             enabled  = !state.isRecording,
@@ -189,7 +197,6 @@ private fun StudyContent(
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                        Spacer(modifier = Modifier.width(6.dp))
                         BottomSheetPicker(
                             label      = "모드",
                             selected   = state.groupPlayMode,
@@ -197,21 +204,11 @@ private fun StudyContent(
                             onSelected = { viewModel.onGroupPlayModeChanged(it) },
                             modifier   = Modifier.weight(1f)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
                     }
                 )
                 Spacer(modifier = Modifier.height(4.dp))
             }
         }
-
-        // ===== 타이틀 선택 + Prev/Next + 필터아이콘 =====
-        TitleSelector(
-            state        = state,
-            filterState  = filterState,
-            viewModel    = viewModel,
-            showFilter   = showFilter,
-            onToggleFilter = { showFilter = !showFilter }
-        )
 
         Spacer(modifier = Modifier.height(4.dp))
 
