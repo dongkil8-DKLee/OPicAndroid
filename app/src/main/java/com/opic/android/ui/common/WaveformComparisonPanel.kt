@@ -95,6 +95,8 @@ fun WaveformComparisonPanel(
     expandAfterMs: Long = 1000L,
     onExpandBeforeChange: ((Long) -> Unit)? = null,
     onExpandAfterChange: ((Long) -> Unit)? = null,
+    // false이면 하단 5개 버튼 Row를 숨김 (외부 공유 버튼 행으로 이동 시)
+    showButtonRow: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var markerMode by remember { mutableStateOf(MarkerMode.None) }
@@ -313,7 +315,7 @@ fun WaveformComparisonPanel(
             height = 40.dp
         )
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(2.dp))
 
         // ── 볼륨 밸런스 슬라이더 (세로 높이 축소) ──────────────────────
         Row(
@@ -366,7 +368,7 @@ fun WaveformComparisonPanel(
         }
 
         // ── 하단: [▶원본재생] [🔁구간재생] [🎤] [⭕녹음재생] [⇄동시재생] ──
-        Row(
+        if (showButtonRow) Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
@@ -379,7 +381,7 @@ fun WaveformComparisonPanel(
                         modifier = Modifier.size(48.dp)
                     ) {
                         Icon(Icons.Filled.Stop, contentDescription = "원본 정지",
-                            modifier = Modifier.size(40.dp))
+                            modifier = Modifier.size(28.dp))
                     }
                 } else {
                     IconButton(
@@ -388,7 +390,7 @@ fun WaveformComparisonPanel(
                         modifier = Modifier.size(48.dp)
                     ) {
                         Icon(Icons.Filled.PlayArrow, contentDescription = "원본 재생",
-                            modifier = Modifier.size(40.dp))
+                            modifier = Modifier.size(28.dp))
                     }
                 }
             }
@@ -401,7 +403,7 @@ fun WaveformComparisonPanel(
                         modifier = Modifier.size(48.dp)
                     ) {
                         Icon(Icons.Filled.Stop, contentDescription = "구간 정지",
-                            tint = OPicColors.TimerRed, modifier = Modifier.size(40.dp))
+                            tint = OPicColors.TimerRed, modifier = Modifier.size(28.dp))
                     }
                 } else {
                     IconButton(
@@ -410,7 +412,7 @@ fun WaveformComparisonPanel(
                         modifier = Modifier.size(48.dp)
                     ) {
                         Icon(Icons.Filled.Repeat, contentDescription = "구간 반복",
-                            modifier = Modifier.size(40.dp))
+                            modifier = Modifier.size(28.dp))
                     }
                 }
             }
@@ -423,7 +425,7 @@ fun WaveformComparisonPanel(
                 IconButton(
                     onClick  = { if (isRecordingUser) onStopRecording?.invoke() else onStartRecording() },
                     enabled  = isRecordingUser || recEnabled,
-                    modifier = Modifier.size(56.dp)                        // ★ MIC_BUTTON_SIZE
+                    modifier = Modifier.size(28.dp)                        // ★ MIC_BUTTON_SIZE
                 ) {
                     Icon(
                         imageVector = if (isRecordingUser) Icons.Filled.Stop else Icons.Filled.Mic,
@@ -447,7 +449,7 @@ fun WaveformComparisonPanel(
                 }
                 Box(
                     modifier = Modifier
-                        .size(48.dp)                                       // ★ CIRCLE_SIZE
+                        .size(28.dp)                                       // ★ CIRCLE_SIZE
                         .border(2.dp, circleColor, CircleShape)            // ★ BORDER_WIDTH
                         .clickable(enabled = isPlayingUser || isUserPlayEnabled) {
                             if (isPlayingUser) onStopUser?.invoke() else onPlayUser.invoke()
@@ -470,7 +472,7 @@ fun WaveformComparisonPanel(
                     modifier = Modifier.size(48.dp)
                 ) {
                     Icon(Icons.Filled.Stop, contentDescription = "동시 정지",
-                        tint = OPicColors.RecordActive, modifier = Modifier.size(40.dp))
+                        tint = OPicColors.RecordActive, modifier = Modifier.size(28.dp))
                 }
             } else {
                 IconButton(
@@ -479,7 +481,7 @@ fun WaveformComparisonPanel(
                     modifier = Modifier.size(48.dp)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = "동시 재생",
-                        modifier = Modifier.size(40.dp))
+                        modifier = Modifier.size(28.dp))
                 }
             }
 
