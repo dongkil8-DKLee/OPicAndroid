@@ -33,7 +33,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FilterList
@@ -461,24 +460,6 @@ private fun IconButtonRow(
             Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "집중학습",
                 tint     = if (hasQuestion) OPicColors.Primary else Color.Gray,
                 modifier = Modifier.size(28.dp))
-        }
-
-        // AI 모범 답안 버튼
-        IconButton(
-            onClick  = { viewModel.generateModelAnswer() },
-            enabled  = hasQuestion && !state.aiLoading,
-            modifier = Modifier.size(48.dp)
-        ) {
-            if (state.aiLoading) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-            } else {
-                Icon(
-                    Icons.Filled.AutoAwesome,
-                    contentDescription = "AI 모범 답안",
-                    tint     = if (hasQuestion) OPicColors.LevelGauge else Color.Gray,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
         }
     }
 }

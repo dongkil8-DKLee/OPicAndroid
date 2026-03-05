@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.opic.android.ai.ClaudeApiService
 import com.opic.android.audio.AudioFileResolver
 import com.opic.android.audio.AudioPlayer
 import com.opic.android.audio.AudioRecorder
@@ -17,6 +18,7 @@ import com.opic.android.util.WavSampleReader
 import com.opic.android.data.local.dao.QuestionDao
 import com.opic.android.data.local.dao.VocabularyDao
 import com.opic.android.data.local.entity.VocabularyEntity
+import com.opic.android.data.prefs.AppPreferences
 import com.opic.android.ui.common.filter.StudyFilterController
 import com.opic.android.util.AnalysisResult
 import com.opic.android.util.DictionaryApi
@@ -117,7 +119,13 @@ data class PracticeUiState(
     val showStatsPanel: Boolean = false,
 
     /** 필터 패널 표시 여부 (로컬 UI 토글) */
-    val showPracticeFilterPanel: Boolean = false
+    val showPracticeFilterPanel: Boolean = false,
+
+    // AI STT 피드백
+    val aiLoading: Boolean = false,
+    val aiError: String? = null,
+    val aiSttFeedback: String = "",
+    val showAiDialog: Boolean = false
 )
 
 @HiltViewModel
@@ -132,6 +140,8 @@ class PracticeViewModel @Inject constructor(
     private val ttsManager: TtsManager,
     private val sttManager: SttManager,
     private val dualPlaybackManager: DualPlaybackManager,
+    private val appPrefs: AppPreferences,
+    private val claudeApiService: ClaudeApiService,
     val filterController: StudyFilterController        // public — PracticeScreen에서 state 직접 구독
 ) : ViewModel() {
 
@@ -868,6 +878,30 @@ class PracticeViewModel @Inject constructor(
 
     fun toggleStatsPanel() {
         _uiState.update { it.copy(showStatsPanel = !it.showStatsPanel, showTimingPanel = false) }
+    }
+
+    // ==================== AI STT 피드백 ====================
+
+    fun generateSttFeedback() {
+        val sttText = _uiState.value.userScriptSttText?.takeIf { it.isNotBlank() } ?: return
+        val questionTitle = _uiState.value.questionTitle
+        val targetGrade = appPrefs.targetGrade
+
+        _uiState.update { it.copy(aiLoading = true, aiError = null, aiSttFeedback = "", showAiDialog = true) }
+        viewModelScope.launch {
+            val result = claudeApiService.generateSttFeedback(questionTitle, sttText, targetGrade)
+            _uiState.update {
+                it.copy(
+                    aiLoading = false,
+                    aiSttFeedback = result.getOrElse { "" },
+                    aiError = result.exceptionOrNull()?.message
+                )
+            }
+        }
+    }
+
+    fun dismissAiDialog() {
+        _uiState.update { it.copy(showAiDialog = false) }
     }
 
     // ==================== Utility ====================

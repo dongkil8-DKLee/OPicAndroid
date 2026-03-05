@@ -20,9 +20,11 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,6 +34,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
@@ -40,8 +43,10 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -137,9 +142,8 @@ private fun PracticeContent(
     onBack: () -> Unit,
     onNavigateToQuestion: (Int) -> Unit = {}
 ) {
-    var expandedSection    by remember { mutableStateOf<String?>(null) }
-    var splitFraction      by remember { mutableFloatStateOf(0.40f) }
-    var innerSplitFraction by remember { mutableFloatStateOf(0.85f) }
+    var expandedSection by remember { mutableStateOf<String?>(null) }
+    var splitFraction   by remember { mutableFloatStateOf(0.40f) }
 
     Column(
         modifier = Modifier
@@ -192,115 +196,128 @@ private fun PracticeContent(
                         )
                     }
 
-                    // ===== 음성 비교 패널 (항상 표시) =====
+                    // ===== 탭 패널: 발음 학습 / 문장 학습 =====
+                    var selectedTab by remember { mutableStateOf(0) }
+
                     val isBusyForComparison = state.isPlayingOriginal || state.isPlayingUser ||
                             state.isRecording || state.isRecordingUserScript ||
                             state.isPlayingUserAudio || state.sttListening ||
                             state.userScriptSttListening
 
-                    // ── 원본 파형 마커 위치 계산 (ms → fraction) ──────────────
-                    // originalWaveformStartMs/EndMs: loadWaveforms() 에서 저장된 파형 범위
                     val waveformDurationMs = (state.originalWaveformEndMs - state.originalWaveformStartMs).toFloat()
                     val currentSeg = state.currentSegment
-                    // 시작 마커: segment.startMs + startOffset → 파형 내 fraction
                     val segStartMarker = if (currentSeg != null && waveformDurationMs > 0f) {
                         val effectiveStartMs = currentSeg.startMs + (state.sentenceStartOffsets[state.currentIndex] ?: 0L)
                         ((effectiveStartMs - state.originalWaveformStartMs) / waveformDurationMs).coerceIn(0f, 0.95f)
                     } else 0f
-                    // 끝 마커: segment.endMs + endOffset → 파형 내 fraction
                     val segEndMarker = if (currentSeg != null && waveformDurationMs > 0f) {
                         val effectiveEndMs = currentSeg.endMs + (state.sentenceEndOffsets[state.currentIndex] ?: 0L)
                         ((effectiveEndMs - state.originalWaveformStartMs) / waveformDurationMs).coerceIn(0.05f, 1f)
                     } else 1f
 
-                    WaveformComparisonPanel(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight((1f - splitFraction) * innerSplitFraction),
-                        originalWaveform = state.originalWaveform,
-                        userWaveform = state.userWaveform,
-                        isPlaying = state.isComparisonPlaying,
-                        originalProgress = state.comparisonOriginalProgress,
-                        userProgress = state.comparisonUserProgress,
-                        balance = state.comparisonBalance,
-                        enabled = !isBusyForComparison,
-                        onTogglePlayback = { viewModel.toggleComparisonPlayback() },
-                        onBalanceChange = { viewModel.setComparisonBalance(it) },
-                        userStartFraction = state.userStartFraction,
-                        onUserStartFractionChange = { viewModel.setUserStartFraction(it) },
-                        userPlayProgress = state.userPlayProgress,
-                        comparisonSpeed = state.comparisonSpeed,
-                        onComparisonSpeedChange = { viewModel.setComparisonSpeed(it) },
-                        // ── 원본 파형 경계 마커 (주황=시작, 빨강=끝) ──────────────
-                        // ★ 마커 드래그 → fraction → ms 변환 후 ViewModel에 저장
-                        segmentStartMarker = segStartMarker,
-                        segmentEndMarker   = segEndMarker,
-                        onSegmentStartMarkerChange = if (currentSeg != null && waveformDurationMs > 0f) { fraction ->
-                            val absoluteMs = state.originalWaveformStartMs + (fraction * waveformDurationMs).toLong()
-                            val offsetMs   = absoluteMs - currentSeg.startMs
-                            viewModel.setSentenceStartOffset(state.currentIndex, offsetMs)
-                        } else null,
-                        onSegmentEndMarkerChange = if (currentSeg != null && waveformDurationMs > 0f) { fraction ->
-                            val absoluteMs = state.originalWaveformStartMs + (fraction * waveformDurationMs).toLong()
-                            val offsetMs   = absoluteMs - currentSeg.endMs
-                            viewModel.setSentenceEndOffset(state.currentIndex, offsetMs)
-                        } else null,
-                        isRecordingUser = state.isRecordingUserScript,
-                        isPlayingUser = state.isPlayingUserAudio,
-                        hasUserAudio = state.hasUserAudio,
-                        onStartRecording = { viewModel.toggleUserScriptRecording() },
-                        onStopRecording = { viewModel.stopUserScriptRecording() },
-                        onPlayUser = { viewModel.playUserScriptAudio() },
-                        onStopUser = { viewModel.stopUserScriptAudio() },
-                        // 원본 단독 재생
-                        isPlayingOriginal = state.isPlayingOriginal,
-                        onPlayOriginal = { viewModel.playOriginal() },
-                        onStopOriginal = { viewModel.stopOriginal() },
-                        originalPlayProgress = state.originalPlayProgress,
-                        onAutoSync = if (state.hasUserAudio) { { viewModel.autoSyncUserStart() } } else null,
-                        // 구간 반복
-                        isLoopPlaying = state.isLoopPlaying,
-                        onToggleLoop = { viewModel.toggleLoopPlayback() },
-                        // 타이밍 컨트롤
-                        isTimingModeEnabled = state.showTimingPanel,
-                        onToggleTimingMode = { viewModel.toggleTimingPanel() },
-                        expandBeforeMs = state.expandBeforeMs,
-                        expandAfterMs = state.expandAfterMs,
-                        onExpandBeforeChange = { viewModel.setExpandBefore(it) },
-                        onExpandAfterChange = { viewModel.setExpandAfter(it) }
-                    )
-
-                    // ===== 드래그 핸들 2 =====
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(12.dp)
-                            .draggable(
-                                state = rememberDraggableState { delta ->
-                                    innerSplitFraction = (innerSplitFraction + delta / (totalHeightPx * (1f - splitFraction)))
-                                        .coerceIn(0.15f, 0.92f)
-                                },
-                                orientation = Orientation.Vertical
-                            ),
-                        contentAlignment = Alignment.Center
+                            .weight(1f - splitFraction)
                     ) {
-                        Box(
+                        // 탭 행
+                        Row(
                             modifier = Modifier
-                                .size(width = 40.dp, height = 4.dp)
-                                .background(Color.Gray.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
-                        )
-                    }
+                                .fillMaxWidth()
+                                .height(36.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            listOf("발음 학습", "문장 학습").forEachIndexed { index, label ->
+                                val isSelected = selectedTab == index
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clickable { selectedTab = index },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                        color = if (isSelected) OPicColors.Primary else Color.Gray
+                                    )
+                                    if (isSelected) {
+                                        Box(
+                                            modifier = Modifier
+                                                .align(Alignment.BottomCenter)
+                                                .fillMaxWidth(0.6f)
+                                                .height(2.dp)
+                                                .background(OPicColors.Primary)
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
-                    // ===== 발화 연습 섹션 (하단, 초기 최소 크기) =====
-                    UserScriptSection(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight((1f - splitFraction) * (1f - innerSplitFraction)),
-                        state = state,
-                        viewModel = viewModel,
-                        isExpanded = false,
-                        onExpandToggle = { expandedSection = "userscript" }
-                    )
+                        // 탭 컨텐츠
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            if (selectedTab == 0) {
+                                WaveformComparisonPanel(
+                                    modifier = Modifier.fillMaxSize(),
+                                    originalWaveform = state.originalWaveform,
+                                    userWaveform = state.userWaveform,
+                                    isPlaying = state.isComparisonPlaying,
+                                    originalProgress = state.comparisonOriginalProgress,
+                                    userProgress = state.comparisonUserProgress,
+                                    balance = state.comparisonBalance,
+                                    enabled = !isBusyForComparison,
+                                    onTogglePlayback = { viewModel.toggleComparisonPlayback() },
+                                    onBalanceChange = { viewModel.setComparisonBalance(it) },
+                                    userStartFraction = state.userStartFraction,
+                                    onUserStartFractionChange = { viewModel.setUserStartFraction(it) },
+                                    userPlayProgress = state.userPlayProgress,
+                                    comparisonSpeed = state.comparisonSpeed,
+                                    onComparisonSpeedChange = { viewModel.setComparisonSpeed(it) },
+                                    segmentStartMarker = segStartMarker,
+                                    segmentEndMarker   = segEndMarker,
+                                    onSegmentStartMarkerChange = if (currentSeg != null && waveformDurationMs > 0f) { fraction ->
+                                        val absoluteMs = state.originalWaveformStartMs + (fraction * waveformDurationMs).toLong()
+                                        val offsetMs   = absoluteMs - currentSeg.startMs
+                                        viewModel.setSentenceStartOffset(state.currentIndex, offsetMs)
+                                    } else null,
+                                    onSegmentEndMarkerChange = if (currentSeg != null && waveformDurationMs > 0f) { fraction ->
+                                        val absoluteMs = state.originalWaveformStartMs + (fraction * waveformDurationMs).toLong()
+                                        val offsetMs   = absoluteMs - currentSeg.endMs
+                                        viewModel.setSentenceEndOffset(state.currentIndex, offsetMs)
+                                    } else null,
+                                    isRecordingUser = state.isRecordingUserScript,
+                                    isPlayingUser = state.isPlayingUserAudio,
+                                    hasUserAudio = state.hasUserAudio,
+                                    onStartRecording = { viewModel.toggleUserScriptRecording() },
+                                    onStopRecording = { viewModel.stopUserScriptRecording() },
+                                    onPlayUser = { viewModel.playUserScriptAudio() },
+                                    onStopUser = { viewModel.stopUserScriptAudio() },
+                                    isPlayingOriginal = state.isPlayingOriginal,
+                                    onPlayOriginal = { viewModel.playOriginal() },
+                                    onStopOriginal = { viewModel.stopOriginal() },
+                                    originalPlayProgress = state.originalPlayProgress,
+                                    onAutoSync = if (state.hasUserAudio) { { viewModel.autoSyncUserStart() } } else null,
+                                    isLoopPlaying = state.isLoopPlaying,
+                                    onToggleLoop = { viewModel.toggleLoopPlayback() },
+                                    isTimingModeEnabled = state.showTimingPanel,
+                                    onToggleTimingMode = { viewModel.toggleTimingPanel() },
+                                    expandBeforeMs = state.expandBeforeMs,
+                                    expandAfterMs = state.expandAfterMs,
+                                    onExpandBeforeChange = { viewModel.setExpandBefore(it) },
+                                    onExpandAfterChange = { viewModel.setExpandAfter(it) }
+                                )
+                            } else {
+                                UserScriptSection(
+                                    modifier = Modifier.fillMaxSize(),
+                                    state = state,
+                                    viewModel = viewModel,
+                                    isExpanded = false,
+                                    onExpandToggle = { expandedSection = "userscript" }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         } else {
@@ -327,6 +344,43 @@ private fun PracticeContent(
                 )
             }
         }
+    }
+
+    // ===== AI STT 피드백 다이얼로그 =====
+    if (state.showAiDialog) {
+        val aiScrollState = rememberScrollState()
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissAiDialog() },
+            title = { Text("AI STT 피드백", fontWeight = FontWeight.Bold) },
+            text = {
+                Box(modifier = Modifier.heightIn(min = 80.dp, max = 360.dp)) {
+                    when {
+                        state.aiLoading -> Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Claude AI 피드백 생성 중...", fontSize = 13.sp, color = Color.Gray)
+                        }
+                        state.aiError != null -> Text(
+                            text = state.aiError,
+                            color = OPicColors.TimerRed,
+                            fontSize = 13.sp
+                        )
+                        else -> Text(
+                            text = state.aiSttFeedback,
+                            fontSize = 14.sp,
+                            lineHeight = 22.sp,
+                            modifier = Modifier.verticalScroll(aiScrollState)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissAiDialog() }) { Text("닫기") }
+            }
+        )
     }
 }
 
@@ -796,6 +850,25 @@ private fun UserScriptSection(
             }
 
             Spacer(modifier = Modifier.weight(1f))
+
+            // AI STT 피드백 버튼
+            val hasStt = !state.userScriptSttText.isNullOrBlank()
+            IconButton(
+                onClick = { viewModel.generateSttFeedback() },
+                enabled = hasStt && !state.aiLoading,
+                modifier = Modifier.size(32.dp)
+            ) {
+                if (state.aiLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(
+                        Icons.Filled.AutoAwesome,
+                        contentDescription = "AI 피드백",
+                        tint = if (hasStt) OPicColors.LevelGauge else Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
 
             IconButton(onClick = onExpandToggle, modifier = Modifier.size(28.dp)) {
                 Icon(
