@@ -1,6 +1,7 @@
 package com.opic.android
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -15,11 +16,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.navigation.compose.rememberNavController
 import com.opic.android.data.prefs.AppPreferences
 import com.opic.android.ui.navigation.BottomNavState
@@ -54,6 +58,19 @@ class MainActivity : ComponentActivity() {
 
             // 테마 색상 즉시 적용 (recompose 트리거)
             if (isDark) OPicColors.applyDark() else OPicColors.applyLight()
+
+            // ── 상태바 아이콘 색상 — 테마 전환 시 자동 반영 ──────────────
+            // Light 테마: 배경이 밝음 → isAppearanceLightStatusBars=true  → 아이콘 검정
+            // Dark  테마: 배경이 어두움 → isAppearanceLightStatusBars=false → 아이콘 흰색
+            // enableEdgeToEdge()로 상태바 배경은 앱 배경색이 그대로 투과됨
+            val view = LocalView.current
+            if (!view.isInEditMode) {
+                SideEffect {
+                    val window = (view.context as Activity).window
+                    WindowCompat.getInsetsController(window, view)
+                        .isAppearanceLightStatusBars = !isDark
+                }
+            }
 
             OPicTheme(darkTheme = isDark) {
                 val navController = rememberNavController()
