@@ -144,7 +144,20 @@ private fun PracticeContent(
     onNavigateToQuestion: (Int) -> Unit = {}
 ) {
     var selectedTab   by remember { mutableStateOf(0) }
-    var splitFraction by remember { mutableStateOf(0.45f) }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ★ 화면 비율 조정 포인트 ★
+    //   splitFraction = 상단(문장 섹션) 높이 비율
+    //   1 - splitFraction = 하단(탭 패널) 높이 비율
+    //
+    //   예) 0.45f → 문장 45%, 탭 55%
+    //       0.35f → 문장 35%, 탭 65%  (탭 공간 더 넓게)
+    //       0.55f → 문장 55%, 탭 45%  (문장 목록 더 넓게)
+    //
+    //   드래그 허용 범위: coerceIn(0.20f, 0.75f)
+    //     → 아래 draggableState 람다 안의 coerceIn 값을 바꾸면 됨
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    var splitFraction by remember { mutableStateOf(0.45f) }   // ← 초기 비율 여기서 변경
 
     // WaveformComparisonPanel에 전달할 값 사전 계산
     val isBusyForComparison = state.isPlayingOriginal || state.isPlayingUser ||
@@ -181,6 +194,7 @@ private fun PracticeContent(
             val density = LocalDensity.current
             val totalHeightPx = with(density) { maxHeight.toPx() }
             val draggableState = rememberDraggableState { delta ->
+                // ← 드래그 허용 범위: coerceIn(최소비율, 최대비율) 변경으로 조정
                 splitFraction = (splitFraction + delta / totalHeightPx).coerceIn(0.20f, 0.75f)
             }
 
@@ -397,130 +411,141 @@ private fun PracticeSharedButtonRow(
     val isBusy = state.isComparisonPlaying || state.isPlayingOriginal || state.isLoopPlaying ||
             state.isRecordingUserScript || state.isPlayingUserAudio || state.userScriptSttListening
 
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ★ 버튼 간격 조정 포인트 ★
+    //   모든 버튼 슬롯을 동일한 Box(size(SLOT))로 감싸서 위치 고정
+    //
+    //   전체 간격 조절: horizontalArrangement = Arrangement.SpaceEvenly
+    //     → Arrangement.spacedBy(N.dp) 로 바꾸면 고정 간격 설정 가능
+    //   버튼 슬롯 크기: val BUTTON_SLOT = 48.dp ← 이 값 변경
+    //   아이콘 크기:    val ICON_SIZE   = 28.dp ← 이 값 변경
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    val BUTTON_SLOT = 48.dp   // ← 슬롯 크기 (모든 버튼에 동일 적용)
+    val ICON_SIZE   = 28.dp   // ← 아이콘 크기
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(OPicColors.Surface, RoundedCornerShape(8.dp))
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
+        horizontalArrangement = Arrangement.SpaceEvenly,  // ← 간격 방식 변경 포인트
         verticalAlignment = Alignment.CenterVertically
     ) {
         // ── ▶/⏹ 원본재생 ──────────────────────────────────────────────
-        if (state.isPlayingOriginal) {
-            IconButton(
-                onClick = { viewModel.stopOriginal() },
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(Icons.Filled.Stop, contentDescription = "원본 정지",
-                    modifier = Modifier.size(28.dp))
-            }
-        } else {
-            IconButton(
-                onClick = { viewModel.playOriginal() },
-                enabled = !state.isComparisonPlaying && !state.isLoopPlaying && !state.isRecordingUserScript,
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = "원본 재생",
-                    modifier = Modifier.size(28.dp))
+        Box(modifier = Modifier.size(BUTTON_SLOT), contentAlignment = Alignment.Center) {
+            if (state.isPlayingOriginal) {
+                IconButton(onClick = { viewModel.stopOriginal() }, modifier = Modifier.fillMaxSize()) {
+                    Icon(Icons.Filled.Stop, contentDescription = "원본 정지",
+                        modifier = Modifier.size(ICON_SIZE))
+                }
+            } else {
+                IconButton(
+                    onClick = { viewModel.playOriginal() },
+                    enabled = !state.isComparisonPlaying && !state.isLoopPlaying && !state.isRecordingUserScript,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(Icons.Filled.PlayArrow, contentDescription = "원본 재생",
+                        modifier = Modifier.size(ICON_SIZE))
+                }
             }
         }
 
         // ── ↺/⏹ 구간반복 ──────────────────────────────────────────────
-        if (state.isLoopPlaying) {
-            IconButton(
-                onClick = { viewModel.toggleLoopPlayback() },
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(Icons.Filled.Stop, contentDescription = "구간 정지",
-                    tint = OPicColors.TimerRed, modifier = Modifier.size(28.dp))
-            }
-        } else {
-            IconButton(
-                onClick = { viewModel.toggleLoopPlayback() },
-                enabled = !state.isComparisonPlaying && !state.isPlayingOriginal &&
-                        !state.isPlayingUserAudio && !state.isRecordingUserScript,
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(Icons.Filled.Repeat, contentDescription = "구간 반복",
-                    modifier = Modifier.size(28.dp))
+        Box(modifier = Modifier.size(BUTTON_SLOT), contentAlignment = Alignment.Center) {
+            if (state.isLoopPlaying) {
+                IconButton(onClick = { viewModel.toggleLoopPlayback() }, modifier = Modifier.fillMaxSize()) {
+                    Icon(Icons.Filled.Stop, contentDescription = "구간 정지",
+                        tint = OPicColors.TimerRed, modifier = Modifier.size(ICON_SIZE))
+                }
+            } else {
+                IconButton(
+                    onClick = { viewModel.toggleLoopPlayback() },
+                    enabled = !state.isComparisonPlaying && !state.isPlayingOriginal &&
+                            !state.isPlayingUserAudio && !state.isRecordingUserScript,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(Icons.Filled.Repeat, contentDescription = "구간 반복",
+                        modifier = Modifier.size(ICON_SIZE))
+                }
             }
         }
 
         // ── 🎤/⏹ 녹음(tab0) or STT(tab1) ─────────────────────────────
-        if (selectedTab == 0) {
-            val recEnabled = !state.isPlayingUserAudio && !state.isComparisonPlaying &&
-                    !state.isPlayingOriginal && !state.isLoopPlaying
-            IconButton(
-                onClick = {
-                    if (state.isRecordingUserScript) viewModel.stopUserScriptRecording()
-                    else viewModel.toggleUserScriptRecording()
-                },
-                enabled = state.isRecordingUserScript || recEnabled,
-                modifier = Modifier.size(28.dp)
-            ) {
-                Icon(
-                    imageVector = if (state.isRecordingUserScript) Icons.Filled.Stop else Icons.Filled.Mic,
-                    contentDescription = if (state.isRecordingUserScript) "녹음 중지" else "녹음",
-                    tint = if (state.isRecordingUserScript || recEnabled) OPicColors.RecordActive else Color.Gray,
-                    modifier = Modifier.size(44.dp)
-                )
-            }
-        } else {
-            val sttEnabled = !state.isRecordingUserScript && !state.isComparisonPlaying &&
-                    !state.isPlayingOriginal && !state.isLoopPlaying
-            if (state.userScriptSttListening) {
+        Box(modifier = Modifier.size(BUTTON_SLOT), contentAlignment = Alignment.Center) {
+            if (selectedTab == 0) {
+                val recEnabled = !state.isPlayingUserAudio && !state.isComparisonPlaying &&
+                        !state.isPlayingOriginal && !state.isLoopPlaying
                 IconButton(
-                    onClick = { viewModel.stopUserScriptStt() },
-                    modifier = Modifier.size(48.dp)
+                    onClick = {
+                        if (state.isRecordingUserScript) viewModel.stopUserScriptRecording()
+                        else viewModel.toggleUserScriptRecording()
+                    },
+                    enabled = state.isRecordingUserScript || recEnabled,
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    Icon(Icons.Filled.Stop, contentDescription = "STT 정지",
-                        tint = OPicColors.RecordActive, modifier = Modifier.size(28.dp))
+                    Icon(
+                        imageVector = if (state.isRecordingUserScript) Icons.Filled.Stop else Icons.Filled.Mic,
+                        contentDescription = if (state.isRecordingUserScript) "녹음 중지" else "녹음",
+                        tint = if (state.isRecordingUserScript || recEnabled) OPicColors.RecordActive else Color.Gray,
+                        modifier = Modifier.size(ICON_SIZE)
+                    )
                 }
             } else {
-                IconButton(
-                    onClick = { viewModel.startUserScriptStt() },
-                    enabled = sttEnabled,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(Icons.Filled.Mic, contentDescription = "STT 시작",
-                        tint = if (sttEnabled) OPicColors.RecordActive else Color.Gray,
-                        modifier = Modifier.size(28.dp))
+                val sttEnabled = !state.isRecordingUserScript && !state.isComparisonPlaying &&
+                        !state.isPlayingOriginal && !state.isLoopPlaying
+                if (state.userScriptSttListening) {
+                    IconButton(onClick = { viewModel.stopUserScriptStt() }, modifier = Modifier.fillMaxSize()) {
+                        Icon(Icons.Filled.Stop, contentDescription = "STT 정지",
+                            tint = OPicColors.RecordActive, modifier = Modifier.size(ICON_SIZE))
+                    }
+                } else {
+                    IconButton(
+                        onClick = { viewModel.startUserScriptStt() },
+                        enabled = sttEnabled,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(Icons.Filled.Mic, contentDescription = "STT 시작",
+                            tint = if (sttEnabled) OPicColors.RecordActive else Color.Gray,
+                            modifier = Modifier.size(ICON_SIZE))
+                    }
                 }
             }
         }
 
-        // ── ⭕/⏹ 녹음재생 ──────────────────────────────────────────────
-        val isUserPlayEnabled = state.hasUserAudio && !state.isRecordingUserScript &&
-                !state.isComparisonPlaying && !state.isPlayingOriginal && !state.isLoopPlaying
-        val circleColor = when {
-            state.isPlayingUserAudio -> OPicColors.RecordActive
-            isUserPlayEnabled        -> OPicColors.PlayButton
-            else                     -> Color.Gray
-        }
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .border(2.dp, circleColor, CircleShape)
-                .clickable(enabled = state.isPlayingUserAudio || isUserPlayEnabled) {
-                    if (state.isPlayingUserAudio) viewModel.stopUserScriptAudio()
-                    else viewModel.playUserScriptAudio()
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = if (state.isPlayingUserAudio) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                contentDescription = if (state.isPlayingUserAudio) "녹음 정지" else "녹음 재생",
-                tint = circleColor,
-                modifier = Modifier.size(40.dp)
-            )
+        // ── ⭕/⏹ 녹음재생 (원형 outline 스타일) ──────────────────────
+        Box(modifier = Modifier.size(BUTTON_SLOT), contentAlignment = Alignment.Center) {
+            val isUserPlayEnabled = state.hasUserAudio && !state.isRecordingUserScript &&
+                    !state.isComparisonPlaying && !state.isPlayingOriginal && !state.isLoopPlaying
+            val circleColor = when {
+                state.isPlayingUserAudio -> OPicColors.RecordActive
+                isUserPlayEnabled        -> OPicColors.PlayButton
+                else                     -> Color.Gray
+            }
+            Box(
+                modifier = Modifier
+                    .size(ICON_SIZE + 4.dp)   // ← 원 크기: ICON_SIZE보다 약간 크게
+                    .border(2.dp, circleColor, CircleShape)
+                    .clickable(enabled = state.isPlayingUserAudio || isUserPlayEnabled) {
+                        if (state.isPlayingUserAudio) viewModel.stopUserScriptAudio()
+                        else viewModel.playUserScriptAudio()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (state.isPlayingUserAudio) Icons.Filled.Stop else Icons.Filled.PlayArrow,
+                    contentDescription = if (state.isPlayingUserAudio) "녹음 정지" else "녹음 재생",
+                    tint = circleColor,
+                    modifier = Modifier.size(ICON_SIZE)
+                )
+            }
         }
 
         // ── ↔/✨ 카드뒤집기 (tab0=동시재생, tab1=AI 피드백) ─────────────
         val density = LocalDensity.current
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .size(BUTTON_SLOT)
                 .graphicsLayer {
                     rotationY = rotation
                     cameraDistance = 12f * density.density
@@ -795,45 +820,42 @@ private fun SessionStatsPanel(state: PracticeUiState) {
         modifier = Modifier
             .fillMaxWidth()
             .background(OPicColors.LightBg, RoundedCornerShape(6.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
     ) {
+        // 학습 통계 1줄 요약
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "$completedCount/$total",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = OPicColors.Primary
-                )
-                Text("완료", fontSize = 9.sp, color = Color.Gray)
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "$recordedCount/$total",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = OPicColors.TimerGreen
-                )
-                Text("녹음", fontSize = 9.sp, color = Color.Gray)
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = if (avgAccuracy != null) "$avgAccuracy%" else "—",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = when {
-                        avgAccuracy == null -> Color.Gray
-                        avgAccuracy >= 80   -> Color(0xFF2ECC71)
-                        avgAccuracy >= 50   -> OPicColors.TimerOrange
-                        else                -> OPicColors.TimerRed
-                    }
-                )
-                Text("평균정확도", fontSize = 9.sp, color = Color.Gray)
-            }
+            Text("완료", fontSize = 11.sp, color = Color.Gray)
+            Text(
+                text = "$completedCount/$total",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = OPicColors.Primary
+            )
+            Text("·", fontSize = 12.sp, color = OPicColors.Border)
+            Text("녹음", fontSize = 11.sp, color = Color.Gray)
+            Text(
+                text = "$recordedCount/$total",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = OPicColors.TimerGreen
+            )
+            Text("·", fontSize = 12.sp, color = OPicColors.Border)
+            Text("평균정확도", fontSize = 11.sp, color = Color.Gray)
+            Text(
+                text = if (avgAccuracy != null) "$avgAccuracy%" else "—",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = when {
+                    avgAccuracy == null -> Color.Gray
+                    avgAccuracy >= 80   -> Color(0xFF2ECC71)
+                    avgAccuracy >= 50   -> OPicColors.TimerOrange
+                    else                -> OPicColors.TimerRed
+                }
+            )
         }
 
         if (weakSentences.isNotEmpty()) {
