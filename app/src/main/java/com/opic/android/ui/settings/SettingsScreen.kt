@@ -24,6 +24,10 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -171,6 +175,9 @@ fun SettingsScreen(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // === AI 설정 ===
+                AiSettingsSection(state = state, viewModel = viewModel)
+
                 // === Theme Mode ===
                 Text("Theme", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Row(
@@ -584,4 +591,63 @@ private fun FolderPickerRow(
             modifier = Modifier.weight(1f)
         )
     }
+}
+
+// ==================== AI 설정 섹션 ====================
+
+@Composable
+private fun AiSettingsSection(
+    state: SettingsUiState,
+    viewModel: SettingsViewModel
+) {
+    var showApiKey by remember { mutableStateOf(false) }
+
+    Text("AI 설정 (Claude)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = OPicColors.Primary)
+
+    // API Key 입력
+    OutlinedTextField(
+        value = state.claudeApiKey,
+        onValueChange = { viewModel.onApiKeyChanged(it) },
+        label = { Text("Claude API Key", fontSize = 12.sp) },
+        placeholder = { Text("sk-ant-...", fontSize = 12.sp, color = Color.Gray) },
+        singleLine = true,
+        visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
+        trailingIcon = {
+            IconButton(onClick = { showApiKey = !showApiKey }) {
+                Icon(
+                    if (showApiKey) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        },
+        modifier = Modifier.fillMaxWidth()
+    )
+    Text(
+        "API 키는 기기 내에만 저장됩니다. anthropic.com/console에서 발급 가능합니다.",
+        fontSize = 11.sp,
+        color = Color.Gray
+    )
+
+    Spacer(modifier = Modifier.height(4.dp))
+
+    // 개인 프로필
+    Text("개인 프로필 (AI 모범 답안 개인화)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+
+    ProfileField("직업", state.profileJob) { viewModel.onProfileJobChanged(it) }
+    ProfileField("취미", state.profileHobbies) { viewModel.onProfileHobbiesChanged(it) }
+    ProfileField("가족 관계", state.profileFamily) { viewModel.onProfileFamilyChanged(it) }
+    ProfileField("국적/거주지", state.profileCountry) { viewModel.onProfileCountryChanged(it) }
+    ProfileField("기타 (자유 서술)", state.profileBackground) { viewModel.onProfileBackgroundChanged(it) }
+}
+
+@Composable
+private fun ProfileField(label: String, value: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label, fontSize = 12.sp) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
 }

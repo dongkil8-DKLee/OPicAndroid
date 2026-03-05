@@ -13,6 +13,7 @@ import com.opic.android.data.local.dao.VocabularyDao
 import com.opic.android.data.local.entity.QuestionEntity
 import com.opic.android.data.local.entity.VocabularyEntity
 import com.opic.android.data.prefs.AppPreferences
+import com.opic.android.data.prefs.UserProfile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +53,14 @@ data class SettingsUiState(
     // Theme
     val themeMode: String = "light",
 
+    // AI 설정
+    val claudeApiKey: String = "",
+    val profileJob: String = "",
+    val profileHobbies: String = "",
+    val profileFamily: String = "",
+    val profileCountry: String = "",
+    val profileBackground: String = "",
+
     // 피드백
     val snackbarMessage: String? = null
 )
@@ -78,7 +87,13 @@ class SettingsViewModel @Inject constructor(
                 soundDir = appPrefs.soundDir,
                 targetGrade = appPrefs.targetGrade,
                 selectedVoice = appPrefs.selectedVoice,
-                themeMode = appPrefs.themeMode
+                themeMode = appPrefs.themeMode,
+                claudeApiKey = appPrefs.claudeApiKey,
+                profileJob = appPrefs.userProfile.job,
+                profileHobbies = appPrefs.userProfile.hobbies,
+                profileFamily = appPrefs.userProfile.family,
+                profileCountry = appPrefs.userProfile.country,
+                profileBackground = appPrefs.userProfile.background
             )
         }
         viewModelScope.launch {
@@ -112,6 +127,30 @@ class SettingsViewModel @Inject constructor(
         if (voiceName.isNotBlank()) {
             ttsManager.setVoice(voiceName)
         }
+    }
+
+    // ==================== AI 설정 ====================
+
+    fun onApiKeyChanged(key: String) {
+        appPrefs.claudeApiKey = key
+        _uiState.update { it.copy(claudeApiKey = key) }
+    }
+
+    fun onProfileJobChanged(v: String)        { _uiState.update { it.copy(profileJob = v) };        saveProfile() }
+    fun onProfileHobbiesChanged(v: String)    { _uiState.update { it.copy(profileHobbies = v) };    saveProfile() }
+    fun onProfileFamilyChanged(v: String)     { _uiState.update { it.copy(profileFamily = v) };     saveProfile() }
+    fun onProfileCountryChanged(v: String)    { _uiState.update { it.copy(profileCountry = v) };    saveProfile() }
+    fun onProfileBackgroundChanged(v: String) { _uiState.update { it.copy(profileBackground = v) }; saveProfile() }
+
+    private fun saveProfile() {
+        val s = _uiState.value
+        appPrefs.userProfile = UserProfile(
+            job        = s.profileJob,
+            hobbies    = s.profileHobbies,
+            family     = s.profileFamily,
+            country    = s.profileCountry,
+            background = s.profileBackground
+        )
     }
 
     // ==================== Theme ====================

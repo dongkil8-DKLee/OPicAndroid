@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.opic.android.ai.ClaudeApiService
 import com.opic.android.audio.AudioFileResolver
 import com.opic.android.audio.AudioPlayer
 import com.opic.android.audio.AudioRecorder
@@ -13,6 +14,7 @@ import com.opic.android.data.local.dao.QuestionDao
 import com.opic.android.data.local.dao.QuestionWithProgress
 import com.opic.android.data.local.dao.StudyProgressDao
 import com.opic.android.data.local.entity.StudyProgressEntity
+import com.opic.android.data.prefs.AppPreferences
 import com.opic.android.data.prefs.StudyPreferences
 import com.opic.android.ui.common.filter.StudyFilterController
 import com.opic.android.util.AnalysisResult
@@ -91,7 +93,13 @@ data class StudyUiState(
     // 속도/자막/집중모드
     val playbackSpeed: Float = 1.0f,
     val highlightedWordIndex: Int = -1,
-    val focusMode: Boolean = false
+    val focusMode: Boolean = false,
+
+    // AI 모범 답안
+    val aiLoading: Boolean = false,
+    val aiModelAnswer: String = "",
+    val aiError: String? = null,
+    val showAiDialog: Boolean = false
 )
 
 /** 그룹 재생 플레이리스트 항목 */
@@ -113,6 +121,8 @@ class StudyViewModel @Inject constructor(
     private val ttsManager: TtsManager,
     private val sttManager: SttManager,
     private val prefs: StudyPreferences,
+    private val appPrefs: AppPreferences,
+    private val claudeApiService: ClaudeApiService,
     val filterController: StudyFilterController       // public — StudyScreen에서 state 직접 구독
 ) : ViewModel() {
 
@@ -712,6 +722,30 @@ class StudyViewModel @Inject constructor(
                     studyCount = 0, lastModified = null, isFavorite = 0, sttText = null, analysisResult = null)
             )
         }
+    }
+
+    // ==================== AI 모범 답안 ====================
+
+    fun generateModelAnswer() {
+        val q = _uiState.value.currentQuestion ?: return
+        val questionText = q.questionText?.takeIf { it.isNotBlank() } ?: q.title
+        val targetGrade = appPrefs.targetGrade
+
+        _uiState.update { it.copy(aiLoading = true, aiError = null, aiModelAnswer = "", showAiDialog = true) }
+        viewModelScope.launch {
+            val result = claudeApiService.generateModelAnswer(questionText, targetGrade)
+            _uiState.update {
+                it.copy(
+                    aiLoading = false,
+                    aiModelAnswer = result.getOrElse { "" },
+                    aiError = result.exceptionOrNull()?.message
+                )
+            }
+        }
+    }
+
+    fun dismissAiDialog() {
+        _uiState.update { it.copy(showAiDialog = false) }
     }
 
     override fun onCleared() {

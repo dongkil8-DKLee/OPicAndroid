@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FilterList
@@ -43,6 +45,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -139,6 +142,46 @@ private fun StudyContent(
     var splitFraction  by remember { mutableFloatStateOf(0.44f) }
     val questionScrollState = rememberScrollState()
     val answerScrollState   = rememberScrollState()
+
+    // AI 모범 답안 다이얼로그
+    if (state.showAiDialog) {
+        val aiScrollState = rememberScrollState()
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissAiDialog() },
+            title = { Text("AI 모범 답안", fontWeight = FontWeight.Bold) },
+            text = {
+                Box(modifier = Modifier.heightIn(min = 80.dp, max = 360.dp)) {
+                    when {
+                        state.aiLoading -> Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Claude AI 답변 생성 중...", fontSize = 13.sp, color = Color.Gray)
+                        }
+                        state.aiError != null -> Text(
+                            text = state.aiError,
+                            color = OPicColors.TimerRed,
+                            fontSize = 13.sp
+                        )
+                        else -> Text(
+                            text = state.aiModelAnswer,
+                            fontSize = 14.sp,
+                            lineHeight = 22.sp,
+                            modifier = Modifier.verticalScroll(aiScrollState)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissAiDialog() }) {
+                    Text("닫기")
+                }
+            }
+        )
+    }
 
     LaunchedEffect(showFilter) {
         if (showFilter) {
@@ -360,6 +403,7 @@ private fun IconButtonRow(
     isBusy: Boolean,
     onPractice: () -> Unit
 ) {
+    val hasQuestion = state.currentQuestion != null
     Row(
         modifier              = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -413,10 +457,28 @@ private fun IconButtonRow(
             )
         }
 
-        IconButton(onClick = onPractice, enabled = state.currentQuestion != null, modifier = Modifier.size(48.dp)) {
+        IconButton(onClick = onPractice, enabled = hasQuestion, modifier = Modifier.size(48.dp)) {
             Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "집중학습",
-                tint     = if (state.currentQuestion != null) OPicColors.Primary else Color.Gray,
+                tint     = if (hasQuestion) OPicColors.Primary else Color.Gray,
                 modifier = Modifier.size(28.dp))
+        }
+
+        // AI 모범 답안 버튼
+        IconButton(
+            onClick  = { viewModel.generateModelAnswer() },
+            enabled  = hasQuestion && !state.aiLoading,
+            modifier = Modifier.size(48.dp)
+        ) {
+            if (state.aiLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            } else {
+                Icon(
+                    Icons.Filled.AutoAwesome,
+                    contentDescription = "AI 모범 답안",
+                    tint     = if (hasQuestion) OPicColors.LevelGauge else Color.Gray,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
         }
     }
 }

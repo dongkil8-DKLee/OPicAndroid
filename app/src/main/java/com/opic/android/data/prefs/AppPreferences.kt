@@ -51,6 +51,30 @@ class AppPreferences @Inject constructor(
             _themeModeFlow.value = v
         }
 
+    // ─── Claude AI 설정 ───
+
+    var claudeApiKey: String
+        get() = prefs.getString("claude_api_key", "") ?: ""
+        set(v) = prefs.edit().putString("claude_api_key", v).apply()
+
+    var userProfile: UserProfile
+        get() = UserProfile(
+            job        = prefs.getString("profile_job", "") ?: "",
+            hobbies    = prefs.getString("profile_hobbies", "") ?: "",
+            family     = prefs.getString("profile_family", "") ?: "",
+            country    = prefs.getString("profile_country", "") ?: "",
+            background = prefs.getString("profile_background", "") ?: ""
+        )
+        set(v) {
+            prefs.edit()
+                .putString("profile_job", v.job)
+                .putString("profile_hobbies", v.hobbies)
+                .putString("profile_family", v.family)
+                .putString("profile_country", v.country)
+                .putString("profile_background", v.background)
+                .apply()
+        }
+
     // ─── Practice 화면 문제 목록 공유 (in-memory, Study 필터 변경 시 갱신) ───
     /** 현재 Study 필터 기준 정렬된 (questionId, title) 목록 */
     var practiceQuestionList: List<Pair<Int, String>> = emptyList()
