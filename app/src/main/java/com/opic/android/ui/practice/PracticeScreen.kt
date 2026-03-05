@@ -551,24 +551,11 @@ private fun PracticeSentenceSection(
             .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
             .padding(8.dp)
     ) {
-        // 헤더: 통계 + ±타이밍 + 확대/축소 (Play 버튼은 WaveformComparisonPanel으로 이동)
+        // 헤더: 확대/축소
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 학습 통계 토글
-            TextButton(
-                onClick = { viewModel.toggleStatsPanel() },
-                modifier = Modifier.padding(horizontal = 0.dp)
-            ) {
-                Text(
-                    "문장 학습",
-                    fontSize = 11.sp,
-                    color = if (state.showStatsPanel) OPicColors.Primary else Color.Gray,
-                    fontWeight = if (state.showStatsPanel) FontWeight.Bold else FontWeight.Normal
-                )
-            }
-
             Spacer(modifier = Modifier.weight(1f))
 
             IconButton(onClick = onExpandToggle, modifier = Modifier.size(28.dp)) {
@@ -581,10 +568,8 @@ private fun PracticeSentenceSection(
             }
         }
 
-        // 학습 통계 패널 (토글)
-        if (state.showStatsPanel) {
-            SessionStatsPanel(state = state)
-        }
+        // 학습 통계 패널 (항상 표시)
+        SessionStatsPanel(state = state)
 
         // 문장 테이블 (내부 스크롤)
         Column(
@@ -637,7 +622,7 @@ private fun SessionStatsPanel(state: PracticeUiState) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFF0F7FF), RoundedCornerShape(6.dp))
+            .background(OPicColors.LightBg, RoundedCornerShape(6.dp))
             .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
         // ── 요약 수치 Row ──────────────────────────────────────────
