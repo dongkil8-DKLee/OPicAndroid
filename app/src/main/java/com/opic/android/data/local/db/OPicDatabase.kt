@@ -2,6 +2,8 @@ package com.opic.android.data.local.db
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.opic.android.data.local.dao.ApiKeyDao
 import com.opic.android.data.local.dao.QuestionDao
 import com.opic.android.data.local.dao.StudyProgressDao
@@ -15,6 +17,12 @@ import com.opic.android.data.local.entity.TestResultEntity
 import com.opic.android.data.local.entity.TestSessionEntity
 import com.opic.android.data.local.entity.UserEntity
 import com.opic.android.data.local.entity.VocabularyEntity
+
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE Questions ADD COLUMN ai_answer TEXT")
+    }
+}
 
 /**
  * Room Database — Python opic.db 7개 테이블 1:1 매핑.
@@ -31,7 +39,7 @@ import com.opic.android.data.local.entity.VocabularyEntity
         ApiKeyEntity::class,
         VocabularyEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class OPicDatabase : RoomDatabase() {

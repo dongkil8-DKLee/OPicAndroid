@@ -33,6 +33,7 @@ data class QuestionWithProgress(
     @ColumnInfo(name = "question_audio") val questionAudio: String?,
     @ColumnInfo(name = "answer_audio") val answerAudio: String?,
     @ColumnInfo(name = "user_script") val userScript: String?,
+    @ColumnInfo(name = "ai_answer") val aiAnswer: String?,
     @ColumnInfo(name = "study_count") val studyCount: Int?,
     @ColumnInfo(name = "is_favorite") val isFavorite: Int?,
     @ColumnInfo(name = "last_modified") val lastModified: String?,
@@ -106,6 +107,9 @@ interface QuestionDao {
     @Query("UPDATE Questions SET user_script = :script WHERE question_id = :id")
     suspend fun updateUserScript(id: Int, script: String)
 
+    @Query("UPDATE Questions SET ai_answer = :script WHERE question_id = :id")
+    suspend fun updateAiAnswer(id: Int, script: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(questions: List<QuestionEntity>)
 
@@ -153,7 +157,7 @@ interface QuestionDao {
     /** 타이틀로 문제 상세 + 학습 진도 로드 */
     @Query("""
         SELECT q.question_id, q.title, q."set" AS q_set, q.type AS q_type, q.combo,
-               q.question_text, q.answer_script, q.question_audio, q.answer_audio, q.user_script,
+               q.question_text, q.answer_script, q.question_audio, q.answer_audio, q.user_script, q.ai_answer,
                IFNULL(usp.study_count, 0) AS study_count,
                IFNULL(usp.is_favorite, 0) AS is_favorite,
                usp.last_modified, usp.stt_text, usp.analysis_result

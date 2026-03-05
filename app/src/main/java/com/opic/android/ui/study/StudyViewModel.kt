@@ -99,7 +99,11 @@ data class StudyUiState(
     val aiLoading: Boolean = false,
     val aiModelAnswer: String = "",
     val aiError: String? = null,
-    val showAiDialog: Boolean = false
+
+    // AI 답변 탭
+    val answerTabIndex: Int = 0,
+    val editingAiAnswer: Boolean = false,
+    val aiAnswerDraft: String = ""
 )
 
 /** 그룹 재생 플레이리스트 항목 */
@@ -228,7 +232,12 @@ class StudyViewModel @Inject constructor(
                 editingUserScript    = false,
                 questionDraft        = "",
                 answerDraft          = "",
-                userScriptDraft      = ""
+                userScriptDraft      = "",
+                answerTabIndex       = 0,
+                editingAiAnswer      = false,
+                aiAnswerDraft        = "",
+                aiLoading            = false,
+                aiError              = null
             )
         }
         prefs.title = title
@@ -731,21 +740,47 @@ class StudyViewModel @Inject constructor(
         val questionText = q.questionText?.takeIf { it.isNotBlank() } ?: q.title
         val targetGrade = appPrefs.targetGrade
 
-        _uiState.update { it.copy(aiLoading = true, aiError = null, aiModelAnswer = "", showAiDialog = true) }
+        _uiState.update { it.copy(aiLoading = true, aiError = null, aiModelAnswer = "") }
         viewModelScope.launch {
             val result = claudeApiService.generateModelAnswer(questionText, targetGrade)
-            _uiState.update {
-                it.copy(
-                    aiLoading = false,
-                    aiModelAnswer = result.getOrElse { "" },
-                    aiError = result.exceptionOrNull()?.message
-                )
+            result.onSuccess { answer ->
+                questionDao.updateAiAnswer(q.questionId, answer)
+                _uiState.update {
+                    it.copy(
+                        aiLoading = false,
+                        aiModelAnswer = answer,
+                        currentQuestion = it.currentQuestion?.copy(aiAnswer = answer)
+                    )
+                }
+            }.onFailure { e ->
+                _uiState.update { it.copy(aiLoading = false, aiError = e.message) }
             }
         }
     }
 
-    fun dismissAiDialog() {
-        _uiState.update { it.copy(showAiDialog = false) }
+    fun onAnswerTabSelected(index: Int) = _uiState.update { it.copy(answerTabIndex = index) }
+
+    fun toggleEditAiAnswer() = _uiState.update {
+        it.copy(editingAiAnswer = true, aiAnswerDraft = it.currentQuestion?.aiAnswer ?: it.aiModelAnswer)
+    }
+
+    fun cancelEditAiAnswer() = _uiState.update { it.copy(editingAiAnswer = false, aiAnswerDraft = "") }
+
+    fun updateAiAnswerDraft(text: String) = _uiState.update { it.copy(aiAnswerDraft = text) }
+
+    fun saveAiAnswerScript() {
+        val q = _uiState.value.currentQuestion ?: return
+        val draft = _uiState.value.aiAnswerDraft
+        viewModelScope.launch {
+            questionDao.updateAiAnswer(q.questionId, draft)
+            _uiState.update {
+                it.copy(
+                    editingAiAnswer = false,
+                    aiAnswerDraft = "",
+                    currentQuestion = it.currentQuestion?.copy(aiAnswer = draft)
+                )
+            }
+        }
     }
 
     override fun onCleared() {

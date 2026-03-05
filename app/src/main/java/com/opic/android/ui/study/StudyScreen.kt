@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -44,7 +43,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -54,6 +52,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -141,46 +141,6 @@ private fun StudyContent(
     var splitFraction  by remember { mutableFloatStateOf(0.44f) }
     val questionScrollState = rememberScrollState()
     val answerScrollState   = rememberScrollState()
-
-    // AI 모범 답안 다이얼로그
-    if (state.showAiDialog) {
-        val aiScrollState = rememberScrollState()
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissAiDialog() },
-            title = { Text("AI 모범 답안", fontWeight = FontWeight.Bold) },
-            text = {
-                Box(modifier = Modifier.heightIn(min = 80.dp, max = 360.dp)) {
-                    when {
-                        state.aiLoading -> Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Claude AI 답변 생성 중...", fontSize = 13.sp, color = Color.Gray)
-                        }
-                        state.aiError != null -> Text(
-                            text = state.aiError,
-                            color = OPicColors.TimerRed,
-                            fontSize = 13.sp
-                        )
-                        else -> Text(
-                            text = state.aiModelAnswer,
-                            fontSize = 14.sp,
-                            lineHeight = 22.sp,
-                            modifier = Modifier.verticalScroll(aiScrollState)
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { viewModel.dismissAiDialog() }) {
-                    Text("닫기")
-                }
-            }
-        )
-    }
 
     LaunchedEffect(showFilter) {
         if (showFilter) {
@@ -302,25 +262,14 @@ private fun StudyContent(
                     ) {
                         Box(modifier = Modifier.size(width = 40.dp, height = 4.dp).background(Color.Gray.copy(alpha = 0.4f), RoundedCornerShape(2.dp)))
                     }
-                    ScriptSection(
-                        modifier             = Modifier.fillMaxWidth().weight(1f - splitFraction),
-                        label                = "Answer",
-                        scriptText           = state.currentQuestion?.answerScript,
-                        highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.ANSWER) state.highlightedWordIndex else -1,
-                        isEditing            = state.editingAnswer,
-                        draft                = state.answerDraft,
-                        onToggleEdit         = { viewModel.toggleEditAnswer() },
-                        onCancelEdit         = { viewModel.cancelEditAnswer() },
-                        onDraftChange        = { viewModel.updateAnswerDraft(it) },
-                        onSave               = { viewModel.saveAnswerScript() },
-                        fontSize             = state.fontSize,
-                        isPlaying            = state.playingTarget == StudyPlayTarget.ANSWER,
-                        canPlay              = !isBusy && state.currentQuestion != null,
-                        onPlay               = { viewModel.playAnswerAudio() },
-                        onStop               = { viewModel.stopAudio() },
-                        isExpanded           = false,
-                        onExpandToggle       = { expandedScript = "answer" },
-                        scrollState          = answerScrollState
+                    AnswerTabSection(
+                        modifier       = Modifier.fillMaxWidth().weight(1f - splitFraction),
+                        state          = state,
+                        viewModel      = viewModel,
+                        isBusy         = isBusy,
+                        isExpanded     = false,
+                        onExpandToggle = { expandedScript = "answer" },
+                        scrollState    = answerScrollState
                     )
                 }
             }
@@ -346,25 +295,14 @@ private fun StudyContent(
                 scrollState          = questionScrollState
             )
         } else {
-            ScriptSection(
-                modifier             = Modifier.weight(1f),
-                label                = "Answer",
-                scriptText           = state.currentQuestion?.answerScript,
-                highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.ANSWER) state.highlightedWordIndex else -1,
-                isEditing            = state.editingAnswer,
-                draft                = state.answerDraft,
-                onToggleEdit         = { viewModel.toggleEditAnswer() },
-                onCancelEdit         = { viewModel.cancelEditAnswer() },
-                onDraftChange        = { viewModel.updateAnswerDraft(it) },
-                onSave               = { viewModel.saveAnswerScript() },
-                fontSize             = state.fontSize,
-                isPlaying            = state.playingTarget == StudyPlayTarget.ANSWER,
-                canPlay              = !isBusy && state.currentQuestion != null,
-                onPlay               = { viewModel.playAnswerAudio() },
-                onStop               = { viewModel.stopAudio() },
-                isExpanded           = true,
-                onExpandToggle       = { expandedScript = null },
-                scrollState          = answerScrollState
+            AnswerTabSection(
+                modifier       = Modifier.weight(1f),
+                state          = state,
+                viewModel      = viewModel,
+                isBusy         = isBusy,
+                isExpanded     = true,
+                onExpandToggle = { expandedScript = null },
+                scrollState    = answerScrollState
             )
         }
 
@@ -606,6 +544,155 @@ private fun SentenceAutoScrollText(
                         )
                     }
                     .padding(vertical = 2.dp)
+            )
+        }
+    }
+}
+
+// ==================== Answer 탭 섹션 (기본 답변 / AI 답변) ====================
+
+@Composable
+private fun AnswerTabSection(
+    modifier: Modifier = Modifier,
+    state: StudyUiState,
+    viewModel: StudyViewModel,
+    isBusy: Boolean,
+    isExpanded: Boolean,
+    onExpandToggle: () -> Unit,
+    scrollState: ScrollState
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        TabRow(selectedTabIndex = state.answerTabIndex) {
+            Tab(
+                selected = state.answerTabIndex == 0,
+                onClick  = { viewModel.onAnswerTabSelected(0) },
+                text     = { Text("기본 답변", fontSize = 12.sp) }
+            )
+            Tab(
+                selected = state.answerTabIndex == 1,
+                onClick  = { viewModel.onAnswerTabSelected(1) },
+                text     = { Text("AI 답변", fontSize = 12.sp) }
+            )
+        }
+        when (state.answerTabIndex) {
+            0 -> ScriptSection(
+                modifier             = Modifier.fillMaxWidth().weight(1f),
+                label                = "Answer",
+                scriptText           = state.currentQuestion?.answerScript,
+                highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.ANSWER) state.highlightedWordIndex else -1,
+                isEditing            = state.editingAnswer,
+                draft                = state.answerDraft,
+                onToggleEdit         = { viewModel.toggleEditAnswer() },
+                onCancelEdit         = { viewModel.cancelEditAnswer() },
+                onDraftChange        = { viewModel.updateAnswerDraft(it) },
+                onSave               = { viewModel.saveAnswerScript() },
+                fontSize             = state.fontSize,
+                isPlaying            = state.playingTarget == StudyPlayTarget.ANSWER,
+                canPlay              = !isBusy && state.currentQuestion != null,
+                onPlay               = { viewModel.playAnswerAudio() },
+                onStop               = { viewModel.stopAudio() },
+                isExpanded           = isExpanded,
+                onExpandToggle       = onExpandToggle,
+                scrollState          = scrollState
+            )
+            else -> AiAnswerSection(
+                modifier  = Modifier.fillMaxWidth().weight(1f),
+                state     = state,
+                viewModel = viewModel
+            )
+        }
+    }
+}
+
+// ==================== AI 답변 섹션 ====================
+
+@Composable
+private fun AiAnswerSection(
+    modifier: Modifier = Modifier,
+    state: StudyUiState,
+    viewModel: StudyViewModel
+) {
+    val aiAnswer      = state.currentQuestion?.aiAnswer
+    val aiScrollState = rememberScrollState()
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .border(1.dp, OPicColors.Border, RoundedCornerShape(8.dp))
+            .padding(8.dp)
+    ) {
+        // 헤더 행
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("AI 모범 답안", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Spacer(modifier = Modifier.width(6.dp))
+            if (state.aiLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            if (state.editingAiAnswer) {
+                TextButton(onClick = { viewModel.cancelEditAiAnswer() }) {
+                    Text("Cancel", fontSize = 12.sp, color = Color.Gray)
+                }
+                TextButton(onClick = { viewModel.saveAiAnswerScript() }) {
+                    Text("Save", fontSize = 12.sp, color = OPicColors.Primary)
+                }
+            } else if (!aiAnswer.isNullOrBlank()) {
+                TextButton(onClick = { viewModel.toggleEditAiAnswer() }) {
+                    Text("Edit", fontSize = 12.sp)
+                }
+            }
+        }
+
+        // 생성 버튼
+        Button(
+            onClick  = { viewModel.generateModelAnswer() },
+            enabled  = !state.aiLoading && state.currentQuestion != null,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+            colors   = ButtonDefaults.buttonColors(
+                containerColor = OPicColors.Primary,
+                contentColor   = Color.White
+            ),
+            shape    = RoundedCornerShape(8.dp),
+            contentPadding = PaddingValues(vertical = 6.dp)
+        ) {
+            Text(
+                text     = if (aiAnswer.isNullOrBlank()) "AI 답변 생성" else "재생성",
+                fontSize = 12.sp
+            )
+        }
+
+        // 에러
+        if (state.aiError != null) {
+            Text(
+                text     = state.aiError,
+                color    = OPicColors.TimerRed,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+        }
+
+        // 컨텐츠
+        if (state.editingAiAnswer) {
+            OutlinedTextField(
+                value         = state.aiAnswerDraft,
+                onValueChange = { viewModel.updateAiAnswerDraft(it) },
+                modifier      = Modifier.fillMaxWidth().weight(1f),
+                textStyle     = MaterialTheme.typography.bodyMedium.copy(fontSize = state.fontSize.sp)
+            )
+        } else if (!aiAnswer.isNullOrBlank()) {
+            Column(modifier = Modifier.weight(1f).verticalScroll(aiScrollState)) {
+                Text(
+                    text     = aiAnswer,
+                    fontSize = state.fontSize.sp,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                )
+            }
+        } else if (!state.aiLoading) {
+            Text(
+                text     = "아직 AI 답변이 없습니다.\n버튼을 눌러 생성하세요.",
+                color    = OPicColors.DisabledBg,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(vertical = 8.dp)
             )
         }
     }

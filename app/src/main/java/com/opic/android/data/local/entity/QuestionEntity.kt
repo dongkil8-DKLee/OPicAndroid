@@ -39,5 +39,8 @@ data class QuestionEntity(
     val answerAudio: String?,
 
     @ColumnInfo(name = "user_script")
-    val userScript: String?
+    val userScript: String?,
+
+    @ColumnInfo(name = "ai_answer")
+    val aiAnswer: String? = null
 )
