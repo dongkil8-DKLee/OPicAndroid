@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="256"
+    android:viewportHeight="256">
+
+    <!-- Path 1: 작은 말풍선 (뒤) -->
+    <path android:pathData="M 146.58,26 H 56.17 C 30.19,26 8,48.76 8,75.71 V 120.71 C 8,139.96 19.67,158.07 37.69,166.26 L 37.79,188.37 C 37.79,193.18 41.62,197.28 47.76,197.28 C 50.79,197.28 52.73,195.82 54.94,194.01 L 76.11,176.61 L 70.06,168.8 L 51.85,181.85 V 160.89 C 51.85,157.73 50.41,156.01 47.76,155.44 C 32.84,152.01 20.19,137.17 20.19,120.71 V 75.71 C 20.19,55.94 36.41,39.91 56.17,39.91 H 146.58 C 160.1,39.91 170.66,48.11 175.75,57.92 H 190.24 C 183.91,39.15 167.51,26 146.58,26 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="11.2263"
+                android:startY="26"
+                android:endX="110.821"
+                android:endY="203.534">
+                <item android:offset="0" android:color="#FF00A698"/>
+                <item android:offset="1" android:color="#FF088A80"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Path 2: 큰 말풍선 테두리 -->
+    <path android:pathData="M 200.18,58.28 H 108.48 C 81.77,58.28 61.69,81.51 61.69,107.7 V 150.25 C 61.69,175.71 79.71,199.62 108.48,199.62 H 167.79 L 200.18,226.17 C 202.74,228.34 205.08,229.47 208.02,229.47 C 214.62,229.47 216.86,223.75 216.86,220.32 V 196.61 C 234.88,188.41 247.53,171.47 247.53,150.25 V 107.7 C 247.53,81.51 227.04,58.28 200.18,58.28 Z M 235.34,150.25 C 235.34,166.71 223.67,182.56 207.83,186.61 C 205.37,187.37 203.93,189.37 203.93,192.07 V 211.84 L 173.04,188.7 C 171.88,187.75 170.62,187.18 169.08,187.18 H 108.48 C 87.79,187.18 74.47,169.07 74.47,151.11 V 108.56 C 74.47,88.79 89.92,70.68 109.68,70.68 H 200.18 C 219.95,70.68 235.34,87.98 235.34,107.7 V 150.25 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="64.8241"
+                android:startY="58.2773"
+                android:endX="142.272"
+                android:endY="244.525">
+                <item android:offset="0" android:color="#FF008B7E"/>
+                <item android:offset="0.505208" android:color="#FF08A697"/>
+                <item android:offset="1" android:color="#FF088A80"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Path 3: 큰 말풍선 내부 -->
+    <path android:pathData="M 203.63,79.59 H 116.12 C 96.74,79.59 83.12,96.89 83.12,114.95 V 156.91 C 83.12,174.41 94.17,186.71 109.61,186.71 H 169.85 C 171.01,186.71 172.17,187.18 173.13,187.94 L 203.63,211.84 V 191.22 C 203.63,188.61 205.27,186.61 207.73,185.94 C 222.11,181.71 235.34,168.08 235.34,151.02 V 107.33 C 235.34,90.96 222.02,79.59 203.63,79.59 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="104.339"
+                android:startY="79.585"
+                android:endX="128.42"
+                android:endY="209.11">
+                <item android:offset="0" android:color="#FF28B6A7"/>
+                <item android:offset="1" android:color="#FF21B6A3"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Path 4: 파형 -->
+    <path android:pathData="M 213.77,129.9 H 194.49 L 186.49,120.38 C 185.24,118.76 183.39,118.19 181.54,118.86 C 180.29,119.33 179.23,120.38 178.66,121.72 L 169.56,144.47 L 156.24,98.81 C 155.58,96.53 153.83,95.38 151.68,95.66 C 149.73,95.76 148.18,97.01 147.61,98.91 L 135.94,132.7 L 128.72,117.43 C 127.86,115.72 126.42,115.05 124.67,115.14 C 123.13,115.24 121.68,116.1 120.82,117.52 L 112.63,129.9 H 100.07 C 96.74,129.9 95.09,132.08 95.09,134.45 C 95.09,137.16 97.13,139.06 100.07,139.06 H 115.26 C 116.91,139.06 118.36,138.11 119.51,136.21 L 124.67,128.31 L 132.96,146.84 C 133.92,148.93 135.76,149.69 137.91,149.41 C 139.85,149.12 141.3,147.78 141.87,145.79 L 151.68,116.95 L 164.62,159.5 C 165.28,161.78 166.93,163.12 169.08,162.93 C 170.92,162.84 172.37,161.69 173.13,159.7 L 184.61,131.84 L 189.01,137.26 C 189.97,138.4 191.32,139.06 192.86,139.06 H 213.77 C 216.81,139.06 217.97,136.69 217.97,134.88 C 217.97,132.08 215.82,129.9 213.77,129.9 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="97.167"
+                android:startY="95.6045"
+                android:endX="113.416"
+                android:endY="177.409">
+                <item android:offset="0" android:color="#FF088A80"/>
+                <item android:offset="1" android:color="#FF068A81"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+</vector>
