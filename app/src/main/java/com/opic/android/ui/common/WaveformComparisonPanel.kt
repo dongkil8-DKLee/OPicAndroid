@@ -315,26 +315,24 @@ fun WaveformComparisonPanel(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // ── 볼륨 밸런스 슬라이더 (50% 축소) ─────────────────────────────
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Row(
-                modifier = Modifier.fillMaxWidth(0.5f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("원본", fontSize = 10.sp, color = Color.Gray)
-                Slider(
-                    value = balance,
-                    onValueChange = onBalanceChange,
-                    modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
-                    enabled = enabled,
-                    colors = SliderDefaults.colors(
-                        thumbColor = OPicColors.Primary,
-                        activeTrackColor = OPicColors.Primary,
-                        inactiveTrackColor = OPicColors.Border
-                    )
+        // ── 볼륨 밸런스 슬라이더 (세로 높이 축소) ──────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth().height(28.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("원본", fontSize = 10.sp, color = Color.Gray)
+            Slider(
+                value = balance,
+                onValueChange = onBalanceChange,
+                modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                enabled = enabled,
+                colors = SliderDefaults.colors(
+                    thumbColor = OPicColors.Primary,
+                    activeTrackColor = OPicColors.Primary,
+                    inactiveTrackColor = OPicColors.Border
                 )
-                Text("녹음", fontSize = 10.sp, color = Color.Gray)
-            }
+            )
+            Text("녹음", fontSize = 10.sp, color = Color.Gray)
         }
 
         // ── 속도 조절 (버튼 위 우측) ──
@@ -373,76 +371,73 @@ fun WaveformComparisonPanel(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // ▶/⏹ 원본재생
+            // ▶/⏹ 원본재생 — 아이콘만 (2x: 40dp)
             if (onPlayOriginal != null) {
                 if (isPlayingOriginal) {
-                    TextButton(
+                    IconButton(
                         onClick = { onStopOriginal?.invoke() },
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier.height(44.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
-                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Text(" 원본재생", fontSize = 11.sp)
+                        Icon(Icons.Filled.Stop, contentDescription = "원본 정지",
+                            modifier = Modifier.size(40.dp))
                     }
                 } else {
-                    TextButton(
+                    IconButton(
                         onClick = onPlayOriginal,
                         enabled = !isBusy && !isPlaying && !isPlayingUser,
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier.height(44.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Text(" 원본재생", fontSize = 11.sp)
+                        Icon(Icons.Filled.PlayArrow, contentDescription = "원본 재생",
+                            modifier = Modifier.size(40.dp))
                     }
                 }
             }
 
-            // 🔁/⏹ 구간재생
+            // 🔁/⏹ 구간재생 — 아이콘만 (2x: 40dp)
             if (onToggleLoop != null) {
                 if (isLoopPlaying) {
-                    TextButton(
+                    IconButton(
                         onClick = onToggleLoop,
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier.height(44.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
-                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(20.dp),
-                            tint = OPicColors.TimerRed)
-                        Text(" 구간재생", fontSize = 11.sp, color = OPicColors.TimerRed)
+                        Icon(Icons.Filled.Stop, contentDescription = "구간 정지",
+                            tint = OPicColors.TimerRed, modifier = Modifier.size(40.dp))
                     }
                 } else {
-                    TextButton(
+                    IconButton(
                         onClick = onToggleLoop,
                         enabled = !isPlaying && !isPlayingOriginal && !isPlayingUser && !isRecordingUser,
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        modifier = Modifier.height(44.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
-                        Icon(Icons.Filled.Repeat, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Text(" 구간재생", fontSize = 11.sp)
+                        Icon(Icons.Filled.Repeat, contentDescription = "구간 반복",
+                            modifier = Modifier.size(40.dp))
                     }
                 }
             }
 
-            // 🎤/⏹ 녹음
+            // 🎤/⏹ 녹음 — 아이콘 2x: 44dp (container 56dp)
+            // ★ MIC_BUTTON_SIZE = 56.dp  : 클릭 영역
+            // ★ MIC_ICON_SIZE   = 44.dp  : 아이콘 크기 (원래 28dp → 2배)
             if (onStartRecording != null) {
                 val recEnabled = !isPlayingUser && !isPlaying && !isPlayingOriginal && !isLoopPlaying
                 IconButton(
                     onClick  = { if (isRecordingUser) onStopRecording?.invoke() else onStartRecording() },
                     enabled  = isRecordingUser || recEnabled,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(56.dp)                        // ★ MIC_BUTTON_SIZE
                 ) {
                     Icon(
                         imageVector = if (isRecordingUser) Icons.Filled.Stop else Icons.Filled.Mic,
                         contentDescription = if (isRecordingUser) "녹음 중지" else "녹음",
                         tint = if (isRecordingUser || recEnabled) OPicColors.RecordActive else Color.Gray,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(44.dp)                    // ★ MIC_ICON_SIZE
                     )
                 }
             }
 
-            // ⭕/⏹ 녹음재생 — 원형 outline 버튼 + 텍스트
-            // ★ CIRCLE_SIZE  = 24.dp  : 원 전체 크기
-            // ★ BORDER_WIDTH = 1.5.dp : 테두리 두께
-            // ★ ICON_SIZE    = 28.dp  : 삼각형/정지 아이콘 크기
+            // ⭕/⏹ 녹음재생 — 원형 outline (2x: 원 48dp, 아이콘 40dp)
+            // ★ CIRCLE_SIZE  = 48.dp  : 원 전체 크기 (원래 24dp → 2배)
+            // ★ BORDER_WIDTH = 2.dp   : 테두리 두께
+            // ★ ICON_SIZE    = 40.dp  : 삼각형/정지 아이콘 크기
             if (onPlayUser != null) {
                 val isUserPlayEnabled = hasUserAudio && !isRecordingUser && !isPlaying && !isPlayingOriginal && !isLoopPlaying
                 val circleColor = when {
@@ -450,51 +445,41 @@ fun WaveformComparisonPanel(
                     isUserPlayEnabled -> OPicColors.PlayButton
                     else              -> Color.Gray
                 }
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.height(44.dp)
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)                                       // ★ CIRCLE_SIZE
+                        .border(2.dp, circleColor, CircleShape)            // ★ BORDER_WIDTH
+                        .clickable(enabled = isPlayingUser || isUserPlayEnabled) {
+                            if (isPlayingUser) onStopUser?.invoke() else onPlayUser.invoke()
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)                                   // ★ CIRCLE_SIZE
-                            .border(1.5.dp, circleColor, CircleShape)      // ★ BORDER_WIDTH
-                            .clickable(enabled = isPlayingUser || isUserPlayEnabled) {
-                                if (isPlayingUser) onStopUser?.invoke() else onPlayUser.invoke()
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = if (isPlayingUser) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                            contentDescription = if (isPlayingUser) "녹음 정지" else "녹음 재생",
-                            tint     = circleColor,
-                            modifier = Modifier.size(28.dp)                // ★ ICON_SIZE
-                        )
-                    }
-                    Text("녹음재생", fontSize = 10.sp, color = circleColor)
+                    Icon(
+                        imageVector = if (isPlayingUser) Icons.Filled.Stop else Icons.Filled.PlayArrow,
+                        contentDescription = if (isPlayingUser) "녹음 정지" else "녹음 재생",
+                        tint     = circleColor,
+                        modifier = Modifier.size(40.dp)                    // ★ ICON_SIZE
+                    )
                 }
             }
 
-            // ⇄/⏹ 동시재생
+            // ⇄/⏹ 동시재생 — 아이콘만 (2x: 40dp)
             if (isPlaying) {
-                TextButton(
+                IconButton(
                     onClick = onTogglePlayback,
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                    modifier = Modifier.height(44.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
-                    Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(20.dp),
-                        tint = OPicColors.RecordActive)
-                    Text(" 정지", fontSize = 11.sp, color = OPicColors.RecordActive)
+                    Icon(Icons.Filled.Stop, contentDescription = "동시 정지",
+                        tint = OPicColors.RecordActive, modifier = Modifier.size(40.dp))
                 }
             } else {
-                TextButton(
+                IconButton(
                     onClick = onTogglePlayback,
                     enabled = enabled && userWaveform.isNotEmpty() && !isPlayingOriginal && !isLoopPlaying && !isRecordingUser,
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                    modifier = Modifier.height(44.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Text(" 동시재생", fontSize = 11.sp)
+                    Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = "동시 재생",
+                        modifier = Modifier.size(40.dp))
                 }
             }
 

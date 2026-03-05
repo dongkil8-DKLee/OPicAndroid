@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.opic.android.ui.theme.OPicColors
@@ -150,17 +151,19 @@ fun BottomSheetPicker(
     selected: String,
     options: List<String>,
     onSelected: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    pillHeight: Dp = 44.dp,
+    cornerRadius: Dp = 10.dp
 ) {
     var showSheet by remember { mutableStateOf(false) }
 
     // Pill 버튼
     Box(
         modifier = modifier
-            .height(44.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .height(pillHeight)
+            .clip(RoundedCornerShape(cornerRadius))
             .background(OPicColors.LightBg)
-            .border(1.dp, OPicColors.Border, RoundedCornerShape(10.dp))
+            .border(1.dp, OPicColors.Border, RoundedCornerShape(cornerRadius))
             .clickable { showSheet = true },
         contentAlignment = Alignment.Center
     ) {

@@ -549,11 +549,13 @@ private fun TitleSelector(
         }
 
         BottomSheetPicker(
-            label      = "",
-            selected   = state.selectedTitle,
-            options    = filterState.titles,
-            onSelected = { viewModel.onTitleSelected(it) },
-            modifier   = Modifier.weight(1f)
+            label        = "",
+            selected     = state.selectedTitle,
+            options      = filterState.titles,
+            onSelected   = { viewModel.onTitleSelected(it) },
+            modifier     = Modifier.weight(1f),
+            pillHeight   = 40.dp,
+            cornerRadius = 8.dp
         )
 
         IconButton(onClick = { viewModel.onNextTitle() }, modifier = Modifier.size(36.dp)) {
