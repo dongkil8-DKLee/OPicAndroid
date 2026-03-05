@@ -4,12 +4,21 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -17,8 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -90,25 +98,24 @@ fun OPicBottomBar(navController: NavHostController) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(50.dp)
-            .background(OPicColors.NavBarBg)
-            .padding(horizontal = 3.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+            .height(56.dp)
+            .background(OPicColors.NavBarBg),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        NavPill(
-            text = "← Back",
+        NavArrowButton(
+            icon = Icons.AutoMirrored.Outlined.ArrowBack,
+            label = "Back",
             enabled = canGoBack,
-            isActive = false,
             onClick = debounced {
                 if (effectiveBackAction != null) effectiveBackAction.invoke()
                 else if (navController.previousBackStackEntry != null) navController.popBackStack()
             },
-            modifier = Modifier.weight(1.2f)
+            modifier = Modifier.weight(1f)
         )
 
-        NavPill(
-            text = "Study",
+        NavTabButton(
+            icon = Icons.AutoMirrored.Outlined.MenuBook,
+            label = "Study",
             enabled = middleEnabled,
             isActive = isOnStudy && middleEnabled,
             onClick = debounced {
@@ -117,21 +124,23 @@ fun OPicBottomBar(navController: NavHostController) {
                     launchSingleTop = true
                 }
             },
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1.2f)
         )
 
-        NavPill(
-            text = "Home",
+        NavTabButton(
+            icon = Icons.Outlined.Home,
+            label = "Home",
             enabled = middleEnabled,
             isActive = isOnHome && middleEnabled,
             onClick = debounced {
                 navController.popBackStack(Screen.Report.route, inclusive = false)
             },
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1.2f)
         )
 
-        NavPill(
-            text = "Test",
+        NavTabButton(
+            icon = Icons.Outlined.Edit,
+            label = "Test",
             enabled = middleEnabled,
             isActive = isOnTest && middleEnabled,
             onClick = debounced {
@@ -140,53 +149,112 @@ fun OPicBottomBar(navController: NavHostController) {
                     launchSingleTop = true
                 }
             },
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1.2f)
         )
 
-        NavPill(
-            text = "Next →",
+        NavArrowButton(
+            icon = Icons.AutoMirrored.Outlined.ArrowForward,
+            label = "Next",
             enabled = canGoNext,
-            isActive = false,
             onClick = debounced { effectiveNextAction?.invoke() },
-            modifier = Modifier.weight(1.2f)
+            modifier = Modifier.weight(1f)
         )
     }
 }
 
+/** Study / Home / Test — 아이콘 + 텍스트 + 하단 골드 언더라인 */
 @Composable
-private fun NavPill(
-    text: String,
+private fun NavTabButton(
+    icon: ImageVector,
+    label: String,
     enabled: Boolean,
     isActive: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val pillBg = when {
-        isActive  -> OPicColors.NavTextSelected.copy(alpha = 0.18f)
-        else      -> Color.Transparent
+    val contentColor = when {
+        !enabled -> OPicColors.NavTextNormal.copy(alpha = 0.30f)
+        isActive -> OPicColors.NavTextSelected
+        else     -> OPicColors.NavTextNormal
     }
-    val textColor = when {
-        !enabled  -> OPicColors.NavTextNormal.copy(alpha = 0.30f)
-        isActive  -> OPicColors.NavTextSelected
-        else      -> OPicColors.NavTextNormal
-    }
-    val weight = if (isActive) FontWeight.Bold else FontWeight.Normal
 
     Box(
         modifier = modifier
             .fillMaxHeight()
-            .clip(RoundedCornerShape(50.dp))
-            .background(pillBg)
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = text,
-            color = textColor,
-            fontWeight = weight,
-            fontSize = 12.sp,
-            maxLines = 1,
-            textAlign = TextAlign.Center
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(bottom = if (isActive) 2.dp else 0.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = contentColor,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                color = contentColor,
+                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                fontSize = 10.sp,
+                maxLines = 1,
+                textAlign = TextAlign.Center
+            )
+        }
+
+        // 하단 골드 언더라인 (활성 탭만)
+        if (isActive) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth(0.6f)
+                    .height(2.dp)
+                    .background(OPicColors.NavTextSelected)
+            )
+        }
+    }
+}
+
+/** Back / Next — 아이콘만 (작은 화살표 버튼) */
+@Composable
+private fun NavArrowButton(
+    icon: ImageVector,
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val contentColor = if (enabled) OPicColors.NavTextNormal else OPicColors.NavTextNormal.copy(alpha = 0.30f)
+
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = contentColor,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                color = contentColor,
+                fontWeight = FontWeight.Normal,
+                fontSize = 9.sp,
+                maxLines = 1,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }

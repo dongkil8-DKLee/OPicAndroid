@@ -59,8 +59,6 @@ import com.opic.android.data.local.entity.VocabularyEntity
 import com.opic.android.ui.theme.OPicColors
 import java.util.Locale
 
-private val CardBg = Color(0xFFF5F5F5)
-
 @Composable
 fun VocabularyScreen(
     viewModel: VocabularyViewModel = hiltViewModel()
@@ -232,7 +230,7 @@ private fun VocabularyCard(
             .fillMaxWidth()
             .clickable { onTap() },
         colors = CardDefaults.cardColors(
-            containerColor = CardBg
+            containerColor = OPicColors.LightBg
         ),
         shape = RoundedCornerShape(12.dp)
     ) {
