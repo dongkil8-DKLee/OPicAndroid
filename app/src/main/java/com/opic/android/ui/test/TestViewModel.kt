@@ -1,6 +1,8 @@
 package com.opic.android.ui.test
 
 import android.content.Context
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -186,24 +188,14 @@ class TestViewModel @Inject constructor(
 
     private fun onPlaybackFinished() {
         _uiState.update { it.copy(phase = TestPhase.BEEP_WAIT) }
-        // Beep → 150ms 대기 → 자동 녹음 시작
+        // 시스템 알림음(ToneGenerator) → 200ms 대기 → 자동 녹음 시작
         viewModelScope.launch {
             try {
-                when (val beepSource = audioFileResolver.resolve("beep")) {
-                    is com.opic.android.audio.AudioSource.AssetPath ->
-                        audioPlayer.playFromAssets(beepSource.path) {
-                            viewModelScope.launch { delay(150); startRecording() }
-                        }
-                    is com.opic.android.audio.AudioSource.FilePath ->
-                        audioPlayer.playFromFile(beepSource.path) {
-                            viewModelScope.launch { delay(150); startRecording() }
-                        }
-                    null -> { delay(300); startRecording() }
-                }
-            } catch (_: Exception) {
-                delay(300)
-                startRecording()
-            }
+                ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
+                    .startTone(ToneGenerator.TONE_PROP_BEEP, 200)
+            } catch (_: Exception) { }
+            delay(250)
+            startRecording()
         }
     }
 
