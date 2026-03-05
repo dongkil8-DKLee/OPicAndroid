@@ -83,8 +83,8 @@ class TtsManager @Inject constructor(
         val engine = tts ?: return emptyList()
         val voices = engine.voices ?: return emptyList()
         return voices
-            .filter { it.locale.language == "en" }
-            .sortedWith(compareBy({ it.isNetworkConnectionRequired }, { it.locale.country }, { it.name }))
+            .filter { it.locale.language == "en" && !it.isNetworkConnectionRequired }
+            .sortedWith(compareBy({ it.locale.country }, { it.name }))
             .map { v ->
                 val country = when (v.locale.country.uppercase()) {
                     "US" -> "미국"
@@ -94,10 +94,8 @@ class TtsManager @Inject constructor(
                     "CA" -> "캐나다"
                     else -> v.locale.country.ifBlank { v.locale.displayLanguage }
                 }
-                val mode = if (v.isNetworkConnectionRequired) "온라인" else "오프라인"
-
-                // Google TTS 패턴: en-us-x-sfg-local, en-gb-x-rjs-network
-                val googleMatch = Regex("""^en-[a-z]{2}-x-([a-z0-9]+)-(local|network)$""")
+                // Google TTS 패턴: en-us-x-sfg-local
+                val googleMatch = Regex("""^en-[a-z]{2}-x-([a-z0-9]+)-local$""")
                     .find(v.name.lowercase())
                 val label = googleMatch?.groupValues?.get(1)?.uppercase()
                     ?: v.name
@@ -107,7 +105,7 @@ class TtsManager @Inject constructor(
                         .trim()
                         .ifBlank { v.name }
 
-                VoiceOption(name = v.name, displayName = "$label · $country ($mode)")
+                VoiceOption(name = v.name, displayName = "$label · $country")
             }
     }
 
