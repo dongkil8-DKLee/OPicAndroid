@@ -192,18 +192,24 @@ fun SettingsScreen(
                 // === TTS Voice Selection ===
                 Text("TTS Voice", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 if (state.availableVoices.isNotEmpty()) {
-                    val voiceOptions = listOf("Default") + state.availableVoices
+                    val voiceOptions = remember(state.availableVoices) {
+                        listOf("Default") + state.availableVoices
+                    }
+                    val displayOptions = remember(voiceOptions) {
+                        voiceOptions.map { if (it == "Default") it else formatVoiceName(it) }
+                    }
+                    val displayToRaw = remember(voiceOptions) {
+                        voiceOptions.associateBy { if (it == "Default") it else formatVoiceName(it) }
+                    }
+                    val selectedDisplay = remember(state.selectedVoice, displayToRaw) {
+                        displayToRaw.entries.find { it.value == state.selectedVoice.ifBlank { "Default" } }?.key
+                            ?: state.selectedVoice.ifBlank { "Default" }
+                    }
                     BottomSheetPicker(
                         label = "TTS Voice",
-                        selected = state.selectedVoice.ifBlank { "Default" }.let { raw ->
-                            if (raw == "Default") "Default" else formatVoiceName(raw)
-                        },
-                        options = voiceOptions.map { if (it == "Default") it else formatVoiceName(it) },
-                        onSelected = { display ->
-                            val raw = if (display == "Default") "Default"
-                                      else voiceOptions.find { formatVoiceName(it) == display } ?: display
-                            viewModel.onVoiceSelected(raw)
-                        }
+                        selected = selectedDisplay,
+                        options = displayOptions,
+                        onSelected = { display -> viewModel.onVoiceSelected(displayToRaw[display] ?: "Default") }
                     )
                 } else {
                     Text("음성 목록 로딩 중...", fontSize = 12.sp, color = Color.Gray)
@@ -427,13 +433,12 @@ fun SettingsScreen(
  *     "en-US-language"      → "language"
  */
 private fun formatVoiceName(raw: String): String {
+    if (raw == "Default") return raw
     val lower = raw.lowercase()
-    val isNetwork = lower.endsWith("-network")
-    val suffix = if (isNetwork) " 온라인" else " 오프라인"
+    val suffix = if (lower.endsWith("-network")) " 온라인" else " 오프라인"
     val base = raw
         .replace(Regex("^en-[a-zA-Z]{2}-x-", RegexOption.IGNORE_CASE), "")
-        .removeSuffix("-local")
-        .removeSuffix("-network")
+        .replace(Regex("-(local|network)$", RegexOption.IGNORE_CASE), "")
         .uppercase()
     return if (base.isBlank()) raw else "$base$suffix"
 }
@@ -505,10 +510,12 @@ private fun SetFilterDropdown(
 
 // ==================== 등급 드롭다운 ====================
 
+private val GRADE_OPTIONS = listOf("AL", "IH", "IM3", "IM2", "IM1", "IL", "NH")
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GradeDropdown(selected: String, onSelected: (String) -> Unit) {
-    val grades = listOf("AL", "IH", "IM3", "IM2", "IM1", "IL", "NH")
+    val grades = GRADE_OPTIONS
     var expanded by remember { mutableStateOf(false) }
 
     ExposedDropdownMenuBox(

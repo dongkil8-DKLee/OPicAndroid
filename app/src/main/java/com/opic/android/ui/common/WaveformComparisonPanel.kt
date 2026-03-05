@@ -290,7 +290,7 @@ fun WaveformComparisonPanel(
             ) {
                 TextButton(
                     onClick = onAutoSync,
-                    enabled = !isPlaying && !isPlayingUser && !isRecordingUser && !isPlayingOriginal && !isLoopPlaying && hasUserAudio,
+                    enabled = !isBusy && !isPlayingUser && hasUserAudio,
                     modifier = Modifier.height(24.dp),
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
                 ) {

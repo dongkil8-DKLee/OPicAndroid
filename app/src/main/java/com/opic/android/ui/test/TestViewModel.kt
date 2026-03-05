@@ -188,13 +188,19 @@ class TestViewModel @Inject constructor(
 
     private fun onPlaybackFinished() {
         _uiState.update { it.copy(phase = TestPhase.BEEP_WAIT) }
-        // 시스템 알림음(ToneGenerator) → 200ms 대기 → 자동 녹음 시작
+        // 시스템 알림음(ToneGenerator) → 250ms 대기 → 자동 녹음 시작
         viewModelScope.launch {
             try {
-                ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
-                    .startTone(ToneGenerator.TONE_PROP_BEEP, 200)
-            } catch (_: Exception) { }
-            delay(250)
+                val toneGen = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
+                try {
+                    toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 200)
+                    delay(250)
+                } finally {
+                    toneGen.release()
+                }
+            } catch (_: Exception) {
+                delay(250)
+            }
             startRecording()
         }
     }
