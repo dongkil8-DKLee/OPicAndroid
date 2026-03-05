@@ -15,6 +15,9 @@ import javax.inject.Singleton
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
+/** 음성 선택 UI용 데이터: raw name(저장용) + displayName(표시용) */
+data class VoiceOption(val name: String, val displayName: String)
+
 /**
  * Python pyttsx3 대응.
  * Android TextToSpeech 엔진으로 텍스트 → WAV 파일 생성.
@@ -67,14 +70,45 @@ class TtsManager @Inject constructor(
         }
     }
 
-    /** 사용 가능한 영어 음성 목록 조회 */
-    fun getAvailableEnglishVoices(): List<String> {
+    /** 사용 가능한 영어 음성 목록 — raw name 리스트 (하위 호환용) */
+    fun getAvailableEnglishVoices(): List<String> =
+        getAvailableEnglishVoiceOptions().map { it.name }
+
+    /**
+     * 사용 가능한 영어 음성 목록 (온라인 포함).
+     * 오프라인 우선 → 지역(US/GB/…) → 이름 순 정렬.
+     * displayName은 기기 locale 정보를 활용해 사람이 읽기 쉽게 생성.
+     */
+    fun getAvailableEnglishVoiceOptions(): List<VoiceOption> {
         val engine = tts ?: return emptyList()
         val voices = engine.voices ?: return emptyList()
         return voices
-            .filter { it.locale.language == "en" && !it.isNetworkConnectionRequired }
-            .map { it.name }
-            .sorted()
+            .filter { it.locale.language == "en" }
+            .sortedWith(compareBy({ it.isNetworkConnectionRequired }, { it.locale.country }, { it.name }))
+            .map { v ->
+                val country = when (v.locale.country.uppercase()) {
+                    "US" -> "미국"
+                    "GB" -> "영국"
+                    "AU" -> "호주"
+                    "IN" -> "인도"
+                    "CA" -> "캐나다"
+                    else -> v.locale.country.ifBlank { v.locale.displayLanguage }
+                }
+                val mode = if (v.isNetworkConnectionRequired) "온라인" else "오프라인"
+
+                // Google TTS 패턴: en-us-x-sfg-local, en-gb-x-rjs-network
+                val googleMatch = Regex("""^en-[a-z]{2}-x-([a-z0-9]+)-(local|network)$""")
+                    .find(v.name.lowercase())
+                val label = googleMatch?.groupValues?.get(1)?.uppercase()
+                    ?: v.name
+                        .replace(Regex("""^en[-_][a-zA-Z]{2}[-_](x[-_])?""", RegexOption.IGNORE_CASE), "")
+                        .replace(Regex("""[-_](local|network)$""", RegexOption.IGNORE_CASE), "")
+                        .replace(Regex("""[-_]"""), " ")
+                        .trim()
+                        .ifBlank { v.name }
+
+                VoiceOption(name = v.name, displayName = "$label · $country ($mode)")
+            }
     }
 
     /**

@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.opic.android.audio.TtsManager
+import com.opic.android.audio.VoiceOption
 import com.opic.android.data.local.dao.QuestionDao
 import com.opic.android.data.local.dao.VocabularyDao
 import com.opic.android.data.local.entity.QuestionEntity
@@ -47,7 +48,7 @@ data class SettingsUiState(
     val csvPath: String = "",
 
     // TTS Voice
-    val availableVoices: List<String> = emptyList(),
+    val availableVoiceOptions: List<VoiceOption> = emptyList(),
     val selectedVoice: String = "",
 
     // Theme
@@ -105,14 +106,13 @@ class SettingsViewModel @Inject constructor(
     // ==================== TTS Voice ====================
 
     private fun loadAvailableVoices() {
-        // TTS init이 비동기이므로 약간 지연 후 조회
         viewModelScope.launch {
             ttsManager.init()
             // TTS 초기화 완료 대기 (최대 3초)
             repeat(30) {
-                val voices = ttsManager.getAvailableEnglishVoices()
-                if (voices.isNotEmpty()) {
-                    _uiState.update { it.copy(availableVoices = voices) }
+                val options = ttsManager.getAvailableEnglishVoiceOptions()
+                if (options.isNotEmpty()) {
+                    _uiState.update { it.copy(availableVoiceOptions = options) }
                     return@launch
                 }
                 kotlinx.coroutines.delay(100)

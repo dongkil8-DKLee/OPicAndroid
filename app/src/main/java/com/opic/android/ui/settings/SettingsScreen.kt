@@ -198,25 +198,28 @@ fun SettingsScreen(
 
                 // === TTS Voice Selection ===
                 Text("TTS Voice", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                if (state.availableVoices.isNotEmpty()) {
-                    val voiceOptions = remember(state.availableVoices) {
-                        listOf("Default") + state.availableVoices
+                if (state.availableVoiceOptions.isNotEmpty()) {
+                    val displayList = remember(state.availableVoiceOptions) {
+                        listOf("Default") + state.availableVoiceOptions.map { it.displayName }
                     }
-                    val displayOptions = remember(voiceOptions) {
-                        voiceOptions.map { if (it == "Default") it else formatVoiceName(it) }
-                    }
-                    val displayToRaw = remember(voiceOptions) {
-                        voiceOptions.associateBy { if (it == "Default") it else formatVoiceName(it) }
-                    }
-                    val selectedDisplay = remember(state.selectedVoice, displayToRaw) {
-                        displayToRaw.entries.find { it.value == state.selectedVoice.ifBlank { "Default" } }?.key
-                            ?: state.selectedVoice.ifBlank { "Default" }
+                    val selectedDisplay = remember(state.selectedVoice, state.availableVoiceOptions) {
+                        if (state.selectedVoice.isBlank()) "Default"
+                        else state.availableVoiceOptions.find { it.name == state.selectedVoice }?.displayName
+                            ?: "Default"
                     }
                     BottomSheetPicker(
-                        label = "TTS Voice",
+                        label    = "TTS Voice",
                         selected = selectedDisplay,
-                        options = displayOptions,
-                        onSelected = { display -> viewModel.onVoiceSelected(displayToRaw[display] ?: "Default") }
+                        options  = displayList,
+                        onSelected = { display ->
+                            if (display == "Default") {
+                                viewModel.onVoiceSelected("Default")
+                            } else {
+                                val rawName = state.availableVoiceOptions
+                                    .find { it.displayName == display }?.name ?: return@BottomSheetPicker
+                                viewModel.onVoiceSelected(rawName)
+                            }
+                        }
                     )
                 } else {
                     Text("음성 목록 로딩 중...", fontSize = 12.sp, color = Color.Gray)
@@ -429,25 +432,6 @@ fun SettingsScreen(
             SnackbarHost(hostState = snackbarHostState)
         }
     }
-}
-
-// ==================== TTS Voice 이름 포맷 ====================
-
-/**
- * Android TTS 엔진 음성 이름을 사람이 읽기 쉽게 변환.
- * 예) "en-us-x-sfg-local"   → "SFG 오프라인"
- *     "en-us-x-sfg-network" → "SFG 온라인"
- *     "en-US-language"      → "language"
- */
-private fun formatVoiceName(raw: String): String {
-    if (raw == "Default") return raw
-    val lower = raw.lowercase()
-    val suffix = if (lower.endsWith("-network")) " 온라인" else " 오프라인"
-    val base = raw
-        .replace(Regex("^en-[a-zA-Z]{2}-x-", RegexOption.IGNORE_CASE), "")
-        .replace(Regex("-(local|network)$", RegexOption.IGNORE_CASE), "")
-        .uppercase()
-    return if (base.isBlank()) raw else "$base$suffix"
 }
 
 // ==================== 데이터 입력 필드 ====================
