@@ -64,6 +64,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.opic.android.audio.EngineOption
 import com.opic.android.ui.common.filter.BottomSheetPicker
 import com.opic.android.ui.theme.OPicColors
 
@@ -194,6 +195,29 @@ fun SettingsScreen(
                             Text(label, fontSize = 13.sp)
                         }
                     }
+                }
+
+                // === TTS Engine Selection ===
+                Text("TTS 엔진", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                if (state.availableEngines.isNotEmpty()) {
+                    val engineDisplayList = remember(state.availableEngines) {
+                        listOf("기본 (시스템 설정)") + state.availableEngines.map { it.label }
+                    }
+                    val selectedEngineDisplay = remember(state.selectedEnginePackage, state.availableEngines) {
+                        if (state.selectedEnginePackage.isBlank()) "기본 (시스템 설정)"
+                        else state.availableEngines.find { it.packageName == state.selectedEnginePackage }?.label
+                            ?: "기본 (시스템 설정)"
+                    }
+                    BottomSheetPicker(
+                        label    = "TTS 엔진",
+                        selected = selectedEngineDisplay,
+                        options  = engineDisplayList,
+                        onSelected = { display ->
+                            val pkg = if (display == "기본 (시스템 설정)") ""
+                                      else state.availableEngines.find { it.label == display }?.packageName ?: ""
+                            viewModel.onEngineSelected(pkg)
+                        }
+                    )
                 }
 
                 // === TTS Voice Selection ===

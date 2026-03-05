@@ -18,6 +18,9 @@ import kotlin.coroutines.suspendCoroutine
 /** 음성 선택 UI용 데이터: raw name(저장용) + displayName(표시용) */
 data class VoiceOption(val name: String, val displayName: String)
 
+/** TTS 엔진 정보 */
+data class EngineOption(val packageName: String, val label: String)
+
 /**
  * Python pyttsx3 대응.
  * Android TextToSpeech 엔진으로 텍스트 → WAV 파일 생성.
@@ -34,27 +37,52 @@ class TtsManager @Inject constructor(
 
     private var tts: TextToSpeech? = null
     private var isInitialized = false
+    private var currentEnginePackage: String? = null
 
     private val cacheDir: File by lazy {
         File(context.cacheDir, "tts").also { it.mkdirs() }
     }
 
-    fun init() {
-        if (tts != null) return
-        tts = TextToSpeech(context) { status ->
+    /**
+     * TTS 초기화. enginePackage가 null이면 시스템 기본 엔진 사용.
+     * 이미 같은 엔진으로 초기화되어 있으면 재초기화하지 않음.
+     */
+    fun init(enginePackage: String? = null) {
+        val target = enginePackage?.ifBlank { null }
+        if (tts != null && currentEnginePackage == target) return
+
+        // 기존 엔진 해제 후 재초기화
+        tts?.stop()
+        tts?.shutdown()
+        tts = null
+        isInitialized = false
+        currentEnginePackage = target
+
+        val callback: (Int) -> Unit = { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts?.language = Locale.US
-                // 저장된 음성 적용
                 val savedVoice = appPrefs.selectedVoice
-                if (savedVoice.isNotBlank()) {
-                    setVoice(savedVoice)
-                }
+                if (savedVoice.isNotBlank()) setVoice(savedVoice)
                 isInitialized = true
-                Log.d(TAG, "TTS 초기화 완료")
+                Log.d(TAG, "TTS 초기화 완료 (엔진: ${target ?: "기본"})")
             } else {
-                Log.e(TAG, "TTS 초기화 실패: status=$status")
+                Log.e(TAG, "TTS 초기화 실패: status=$status (엔진: ${target ?: "기본"})")
             }
         }
+
+        tts = if (target != null) {
+            TextToSpeech(context, callback, target)
+        } else {
+            TextToSpeech(context, callback)
+        }
+    }
+
+    /** 기기에 설치된 TTS 엔진 목록 */
+    fun getInstalledEngines(): List<EngineOption> {
+        val engine = tts ?: return emptyList()
+        return engine.engines
+            .sortedBy { it.label }
+            .map { EngineOption(packageName = it.name, label = it.label) }
     }
 
     /** TTS 음성 변경 */
@@ -166,5 +194,6 @@ class TtsManager @Inject constructor(
         tts?.shutdown()
         tts = null
         isInitialized = false
+        currentEnginePackage = null
     }
 }

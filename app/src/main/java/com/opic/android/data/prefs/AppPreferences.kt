@@ -44,6 +44,10 @@ class AppPreferences @Inject constructor(
         get() = prefs.getString("selected_voice", "") ?: ""
         set(v) = prefs.edit().putString("selected_voice", v).apply()
 
+    var ttsEnginePackage: String
+        get() = prefs.getString("tts_engine_package", "") ?: ""
+        set(v) = prefs.edit().putString("tts_engine_package", v).apply()
+
     var themeMode: String
         get() = prefs.getString("theme_mode", "light") ?: "light"
         set(v) {

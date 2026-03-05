@@ -7,6 +7,7 @@ import android.provider.DocumentsContract
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.opic.android.audio.EngineOption
 import com.opic.android.audio.TtsManager
 import com.opic.android.audio.VoiceOption
 import com.opic.android.data.local.dao.QuestionDao
@@ -47,7 +48,9 @@ data class SettingsUiState(
     // CSV
     val csvPath: String = "",
 
-    // TTS Voice
+    // TTS Engine & Voice
+    val availableEngines: List<EngineOption> = emptyList(),
+    val selectedEnginePackage: String = "",
     val availableVoiceOptions: List<VoiceOption> = emptyList(),
     val selectedVoice: String = "",
 
@@ -88,6 +91,7 @@ class SettingsViewModel @Inject constructor(
                 soundDir = appPrefs.soundDir,
                 targetGrade = appPrefs.targetGrade,
                 selectedVoice = appPrefs.selectedVoice,
+                selectedEnginePackage = appPrefs.ttsEnginePackage,
                 themeMode = appPrefs.themeMode,
                 claudeApiKey = appPrefs.claudeApiKey,
                 profileJob = appPrefs.userProfile.job,
@@ -107,8 +111,36 @@ class SettingsViewModel @Inject constructor(
 
     private fun loadAvailableVoices() {
         viewModelScope.launch {
-            ttsManager.init()
+            val savedEngine = appPrefs.ttsEnginePackage.ifBlank { null }
+            ttsManager.init(savedEngine)
             // TTS 초기화 완료 대기 (최대 3초)
+            repeat(30) {
+                val options = ttsManager.getAvailableEnglishVoiceOptions()
+                if (options.isNotEmpty()) {
+                    _uiState.update {
+                        it.copy(
+                            availableVoiceOptions = options,
+                            availableEngines = ttsManager.getInstalledEngines()
+                        )
+                    }
+                    return@launch
+                }
+                kotlinx.coroutines.delay(100)
+            }
+            // 음성 없어도 엔진 목록은 표시
+            _uiState.update { it.copy(availableEngines = ttsManager.getInstalledEngines()) }
+        }
+    }
+
+    fun onEngineSelected(packageName: String) {
+        val pkg = packageName.ifBlank { null }
+        appPrefs.ttsEnginePackage = pkg ?: ""
+        appPrefs.selectedVoice = ""   // 엔진 바뀌면 음성 초기화
+        _uiState.update {
+            it.copy(selectedEnginePackage = packageName, selectedVoice = "", availableVoiceOptions = emptyList())
+        }
+        viewModelScope.launch {
+            ttsManager.init(pkg)
             repeat(30) {
                 val options = ttsManager.getAvailableEnglishVoiceOptions()
                 if (options.isNotEmpty()) {
