@@ -335,7 +335,37 @@ fun WaveformComparisonPanel(
             Text(" 녹음", fontSize = 10.sp, color = Color.Gray)
         }
 
-        // ── 하단: [▶원본] [🔁구간] [🎤] [▶녹음] [⇄동시]  Spacer  속도 ──
+        // ── 속도 조절 (버튼 위 우측) ──
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Spacer(modifier = Modifier.weight(1f))
+            Text("속도", fontSize = 10.sp, color = Color.Gray)
+            Spacer(modifier = Modifier.width(2.dp))
+            TextButton(
+                onClick = { onComparisonSpeedChange((comparisonSpeed - 0.1f).coerceAtLeast(0.5f)) },
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                modifier = Modifier.height(28.dp)
+            ) {
+                Text("−", fontSize = 14.sp, color = OPicColors.TimerRed)
+            }
+            Text(
+                text = String.format("%.1f", comparisonSpeed) + "x",
+                fontSize = 11.sp,
+                color = OPicColors.Primary,
+                modifier = Modifier.width(36.dp)
+            )
+            TextButton(
+                onClick = { onComparisonSpeedChange((comparisonSpeed + 0.1f).coerceAtMost(1.5f)) },
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                modifier = Modifier.height(28.dp)
+            ) {
+                Text("+", fontSize = 14.sp, color = OPicColors.TimerGreen)
+            }
+        }
+
+        // ── 하단: [▶원본] [🔁구간] [🎤] [▶녹음] [⇄동시] ──
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -408,7 +438,7 @@ fun WaveformComparisonPanel(
 
             // ▶/⏹ 녹음재생 — 원형 outline 버튼
             // ★ 미세 튜닝 포인트:
-            // ★ CIRCLE_SIZE  = 48.dp  : 원 전체 크기
+            // ★ CIRCLE_SIZE  = 24.dp  : 원 전체 크기
             // ★ BORDER_WIDTH = 1.5.dp : 테두리 두께
             // ★ ICON_SIZE    = 28.dp  : 삼각형/정지 아이콘 크기
             // ★ IDLE_COLOR   = OPicColors.PlayButton   : 대기 상태 색상
@@ -423,7 +453,7 @@ fun WaveformComparisonPanel(
                 }
                 Box(
                     modifier = Modifier
-                        .size(48.dp)                                   // ★ CIRCLE_SIZE
+                        .size(24.dp)                                   // ★ CIRCLE_SIZE
                         .border(1.5.dp, circleColor, CircleShape)      // ★ BORDER_WIDTH
                         .clickable(enabled = isPlayingUser || isUserPlayEnabled) {
                             if (isPlayingUser) onStopUser?.invoke() else onPlayUser.invoke()
@@ -462,31 +492,6 @@ fun WaveformComparisonPanel(
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
-
-            // 속도 ± (범위 0.5~1.5, 0.1 단위)
-            Text("속도", fontSize = 10.sp, color = Color.Gray)
-            Spacer(modifier = Modifier.width(2.dp))
-            TextButton(
-                onClick = { onComparisonSpeedChange((comparisonSpeed - 0.1f).coerceAtLeast(0.5f)) },
-                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                modifier = Modifier.height(28.dp)
-            ) {
-                Text("−", fontSize = 14.sp, color = OPicColors.TimerRed)
-            }
-            Text(
-                text = String.format("%.1f", comparisonSpeed) + "x",
-                fontSize = 11.sp,
-                color = OPicColors.Primary,
-                modifier = Modifier.width(36.dp)
-            )
-            TextButton(
-                onClick = { onComparisonSpeedChange((comparisonSpeed + 0.1f).coerceAtMost(1.5f)) },
-                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                modifier = Modifier.height(28.dp)
-            ) {
-                Text("+", fontSize = 14.sp, color = OPicColors.TimerGreen)
-            }
         }
     }
 }
