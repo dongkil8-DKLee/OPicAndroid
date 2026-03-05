@@ -31,10 +31,10 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
@@ -60,6 +60,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.opic.android.ui.common.filter.BottomSheetPicker
 import com.opic.android.ui.theme.OPicColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -191,10 +192,18 @@ fun SettingsScreen(
                 // === TTS Voice Selection ===
                 Text("TTS Voice", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 if (state.availableVoices.isNotEmpty()) {
-                    VoiceDropdown(
-                        selected = state.selectedVoice.ifBlank { "Default" },
-                        options = listOf("Default") + state.availableVoices,
-                        onSelected = { viewModel.onVoiceSelected(it) }
+                    val voiceOptions = listOf("Default") + state.availableVoices
+                    BottomSheetPicker(
+                        label = "TTS Voice",
+                        selected = state.selectedVoice.ifBlank { "Default" }.let { raw ->
+                            if (raw == "Default") "Default" else formatVoiceName(raw)
+                        },
+                        options = voiceOptions.map { if (it == "Default") it else formatVoiceName(it) },
+                        onSelected = { display ->
+                            val raw = if (display == "Default") "Default"
+                                      else voiceOptions.find { formatVoiceName(it) == display } ?: display
+                            viewModel.onVoiceSelected(raw)
+                        }
                     )
                 } else {
                     Text("음성 목록 로딩 중...", fontSize = 12.sp, color = Color.Gray)
@@ -409,44 +418,24 @@ fun SettingsScreen(
     }
 }
 
-// ==================== TTS Voice 드롭다운 ====================
+// ==================== TTS Voice 이름 포맷 ====================
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun VoiceDropdown(selected: String, options: List<String>, onSelected: (String) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = it },
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        TextField(
-            value = selected,
-            onValueChange = {},
-            readOnly = true,
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            singleLine = true,
-            textStyle = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                .fillMaxWidth()
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            options.forEach { voice ->
-                DropdownMenuItem(
-                    text = { Text(voice, fontSize = 13.sp) },
-                    onClick = {
-                        onSelected(voice)
-                        expanded = false
-                    }
-                )
-            }
-        }
-    }
+/**
+ * Android TTS 엔진 음성 이름을 사람이 읽기 쉽게 변환.
+ * 예) "en-us-x-sfg-local"   → "SFG 오프라인"
+ *     "en-us-x-sfg-network" → "SFG 온라인"
+ *     "en-US-language"      → "language"
+ */
+private fun formatVoiceName(raw: String): String {
+    val lower = raw.lowercase()
+    val isNetwork = lower.endsWith("-network")
+    val suffix = if (isNetwork) " 온라인" else " 오프라인"
+    val base = raw
+        .replace(Regex("^en-[a-zA-Z]{2}-x-", RegexOption.IGNORE_CASE), "")
+        .removeSuffix("-local")
+        .removeSuffix("-network")
+        .uppercase()
+    return if (base.isBlank()) raw else "$base$suffix"
 }
 
 // ==================== 데이터 입력 필드 ====================
