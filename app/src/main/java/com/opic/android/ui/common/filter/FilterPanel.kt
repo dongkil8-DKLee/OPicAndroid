@@ -171,12 +171,14 @@ fun BottomSheetPicker(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text       = label,
-                    fontSize   = 9.sp,
-                    color      = OPicColors.TextOnLight.copy(alpha = 0.55f),
-                    lineHeight = 11.sp
-                )
+                if (label.isNotBlank()) {
+                    Text(
+                        text       = label,
+                        fontSize   = 9.sp,
+                        color      = OPicColors.TextOnLight.copy(alpha = 0.55f),
+                        lineHeight = 11.sp
+                    )
+                }
                 Text(
                     text       = selected,
                     fontSize   = 12.sp,
@@ -198,14 +200,16 @@ fun BottomSheetPicker(
             containerColor   = OPicColors.Surface,
             tonalElevation   = 0.dp
         ) {
-            Text(
-                text       = label,
-                fontWeight = FontWeight.Bold,
-                fontSize   = 16.sp,
-                color      = OPicColors.TextOnLight,
-                modifier   = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
-            )
-            HorizontalDivider(color = OPicColors.Border)
+            if (label.isNotBlank()) {
+                Text(
+                    text       = label,
+                    fontWeight = FontWeight.Bold,
+                    fontSize   = 16.sp,
+                    color      = OPicColors.TextOnLight,
+                    modifier   = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                )
+                HorizontalDivider(color = OPicColors.Border)
+            }
 
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
                 items(options) { option ->

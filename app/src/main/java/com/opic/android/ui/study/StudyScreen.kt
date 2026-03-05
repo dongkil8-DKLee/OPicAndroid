@@ -442,7 +442,7 @@ private fun IconButtonRow(
         }
         Box(
             modifier = Modifier
-                .size(40.dp)                                          // ★ CIRCLE_SIZE
+                .size(24.dp)                                          // ★ CIRCLE_SIZE
                 .border(1.5.dp, userCircleColor, CircleShape)         // ★ BORDER_WIDTH
                 .clickable(enabled = isUserPlaying || userPlayEnabled) {
                     if (isUserPlaying) viewModel.stopAudio() else viewModel.playUserAudio()
@@ -549,7 +549,7 @@ private fun TitleSelector(
         }
 
         BottomSheetPicker(
-            label      = "목록",
+            label      = "",
             selected   = state.selectedTitle,
             options    = filterState.titles,
             onSelected = { viewModel.onTitleSelected(it) },
