@@ -140,6 +140,62 @@ fun SettingsScreen(
         ActivityResultContracts.OpenDocument()
     ) { uri -> uri?.let { viewModel.importVocabCsv(it) } }
 
+    // Q&A CSV launcher
+    val qaCsvLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        if (uri != null) {
+            val content = viewModel.uiState.value.qaCsvContent
+            if (!content.isNullOrBlank()) {
+                try {
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(content.toByteArray(Charsets.UTF_8))
+                    }
+                    viewModel.clearSnackbar()
+                    viewModel.clearQaCsvContent()
+                } catch (_: Exception) {}
+            }
+            viewModel.clearQaCsvContent()
+        }
+    }
+    val qaImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let { viewModel.importQaCsvFromUri(it) } }
+
+    // DB 백업/복원 launcher
+    val dbBackupLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        if (uri != null) {
+            val bytes = viewModel.uiState.value.dbBackupBytes
+            if (bytes != null) {
+                try {
+                    context.contentResolver.openOutputStream(uri)?.use { out -> out.write(bytes) }
+                } catch (_: Exception) {}
+            }
+            viewModel.clearDbBackupBytes()
+        }
+    }
+    val dbRestoreLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let { viewModel.restoreDatabaseFromUri(it) } }
+
+    // Q&A CSV 준비 완료 → 파일 저장 다이얼로그
+    LaunchedEffect(state.qaCsvContent) {
+        if (!state.qaCsvContent.isNullOrBlank()) {
+            val date = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date())
+            qaCsvLauncher.launch("shadowtalk_qa_$date.csv")
+        }
+    }
+
+    // DB 백업 준비 완료 → 파일 저장 다이얼로그
+    LaunchedEffect(state.dbBackupBytes) {
+        if (state.dbBackupBytes != null) {
+            val date = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date())
+            dbBackupLauncher.launch("shadowtalk_backup_$date.db")
+        }
+    }
+
     // 삭제 확인 다이얼로그
     if (showDeleteDialog) {
         AlertDialog(
@@ -331,16 +387,18 @@ fun SettingsScreen(
 
                 HorizontalDivider(color = OPicColors.Border)
 
-                // ─── 4. 문제 편집 ─────────────────────────────────────
+                // ─── 4. 데이터 관리 (문제 편집 + 모든 CSV + DB 백업) ──
                 CategorySection(
-                    icon = Icons.Filled.Edit,
-                    iconTint = ColorEdit,
-                    title = "문제 편집",
-                    subtitle = "제목 · Set · Type · Combo · 오디오",
-                    expanded = expandedCategory == "edit",
-                    onToggle = { expandedCategory = if (expandedCategory == "edit") null else "edit" }
+                    icon = Icons.Filled.Storage,
+                    iconTint = ColorData,
+                    title = "데이터 관리",
+                    subtitle = "문제 편집 · CSV · DB 백업/복원",
+                    expanded = expandedCategory == "data",
+                    onToggle = { expandedCategory = if (expandedCategory == "data") null else "data" }
                 ) {
-                    // 주제 필터 + 네비게이터
+                    // ── 문제 편집 ──────────────────────────────────────
+                    SectionTitle("문제 편집")
+                    Spacer(Modifier.height(6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -373,8 +431,7 @@ fun SettingsScreen(
                             fontSize = 11.sp, color = Color.Gray
                         )
                     }
-                    Spacer(Modifier.height(8.dp))
-                    // 편집 폼
+                    Spacer(Modifier.height(6.dp))
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -417,9 +474,85 @@ fun SettingsScreen(
                             }
                         }
                     }
-                    Spacer(Modifier.height(10.dp))
-                    // CSV 내보내기/가져오기
-                    Text("문제 CSV", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // ── 전체 백업/복원 ─────────────────────────────────
+                    SectionTitle("전체 백업 (모든 데이터)")
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { viewModel.backupDatabase() },
+                            enabled = !state.isBackingUp,
+                            colors = ButtonDefaults.buttonColors(containerColor = OPicColors.Primary),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (state.isBackingUp) {
+                                androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White)
+                            } else {
+                                Icon(Icons.Filled.Upload, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("DB 백업", fontSize = 12.sp)
+                            }
+                        }
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = { dbRestoreLauncher.launch(arrayOf("*/*")) },
+                            enabled = !state.isRestoring,
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (state.isRestoring) {
+                                androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = OPicColors.Primary)
+                            } else {
+                                Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(14.dp), tint = OPicColors.Primary)
+                                Spacer(Modifier.width(4.dp))
+                                Text("DB 복원", fontSize = 12.sp, color = OPicColors.Primary)
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // ── Q&A 스크립트 CSV ───────────────────────────────
+                    SectionTitle("Q&A 스크립트 (question_text · answer_script · user_script · ai_answer)")
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { viewModel.prepareQaCsvExport() },
+                            enabled = !state.qaCsvExporting,
+                            colors = ButtonDefaults.buttonColors(containerColor = OPicColors.Primary),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (state.qaCsvExporting) {
+                                androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White)
+                            } else {
+                                Icon(Icons.Filled.Upload, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("내보내기", fontSize = 12.sp)
+                            }
+                        }
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = { qaImportLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "*/*")) },
+                            enabled = !state.importingCsv,
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (state.importingCsv) {
+                                androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = OPicColors.Primary)
+                            } else {
+                                Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(14.dp), tint = OPicColors.Primary)
+                                Spacer(Modifier.width(4.dp))
+                                Text("가져오기", fontSize = 12.sp, color = OPicColors.Primary)
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // ── 문제 전체 CSV (원시 데이터) ────────────────────
+                    SectionTitle("문제 전체 CSV (원시 데이터)")
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
@@ -443,20 +576,11 @@ fun SettingsScreen(
                             Text("내보내기", fontSize = 12.sp)
                         }
                     }
-                }
 
-                HorizontalDivider(color = OPicColors.Border)
+                    Spacer(Modifier.height(16.dp))
 
-                // ─── 5. 데이터 관리 ───────────────────────────────────
-                CategorySection(
-                    icon = Icons.Filled.Storage,
-                    iconTint = ColorData,
-                    title = "데이터 관리",
-                    subtitle = "단어장 CSV 내보내기/가져오기",
-                    expanded = expandedCategory == "data",
-                    onToggle = { expandedCategory = if (expandedCategory == "data") null else "data" }
-                ) {
-                    Text("단어장 CSV", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
+                    // ── 단어장 CSV ─────────────────────────────────────
+                    SectionTitle("단어장 CSV")
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
@@ -484,7 +608,7 @@ fun SettingsScreen(
 
                 HorizontalDivider(color = OPicColors.Border)
 
-                // ─── 6. 파일 경로 ─────────────────────────────────────
+                // ─── 5. 파일 경로 ─────────────────────────────────────
                 CategorySection(
                     icon = Icons.Filled.FolderOpen,
                     iconTint = ColorFolder,
@@ -578,6 +702,16 @@ private fun CategorySection(
 }
 
 // ==================== 공통 컴포넌트 ====================
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text = text,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = OPicColors.TextOnLight
+    )
+}
 
 @Composable
 private fun DataField(label: String, value: String, onValueChange: (String) -> Unit) {

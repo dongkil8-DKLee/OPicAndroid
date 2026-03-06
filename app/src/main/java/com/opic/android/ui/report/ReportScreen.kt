@@ -1,9 +1,6 @@
 package com.opic.android.ui.report
 
 import android.graphics.BitmapFactory
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,10 +24,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,7 +35,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,7 +46,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -63,9 +54,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.opic.android.R
 import com.opic.android.ui.theme.OPicColors
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 // Grade colors (SpeechAnalysisPanel.kt 기준)
 private val GradeA = Color(0xFF2ECC71)
@@ -92,85 +80,6 @@ fun ReportScreen(
     viewModel: ReportViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
-
-    // 통합 Q&A CSV 저장 launcher
-    val csvLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/csv")
-    ) { uri ->
-        if (uri != null) {
-            val content = viewModel.uiState.value.csvContent
-            if (!content.isNullOrBlank()) {
-                try {
-                    context.contentResolver.openOutputStream(uri)?.use { out ->
-                        out.write(content.toByteArray(Charsets.UTF_8))
-                    }
-                    Toast.makeText(context, "Q&A CSV 저장 완료", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(context, "저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-            }
-            viewModel.clearCsvContent()
-        }
-    }
-
-    // Q&A CSV 가져오기 launcher
-    val importLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) viewModel.importQaCsvFromUri(uri)
-    }
-
-    // DB 백업 저장 launcher
-    val dbBackupLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/octet-stream")
-    ) { uri ->
-        if (uri != null) {
-            val bytes = viewModel.uiState.value.dbBackupBytes
-            if (bytes != null) {
-                try {
-                    context.contentResolver.openOutputStream(uri)?.use { out ->
-                        out.write(bytes)
-                    }
-                    Toast.makeText(context, "DB 백업 저장 완료", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(context, "저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-            }
-            viewModel.clearDbBackupBytes()
-        }
-    }
-
-    // DB 복원 파일 선택 launcher
-    val dbRestoreLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) viewModel.restoreDatabaseFromUri(uri)
-    }
-
-    // Q&A CSV 준비 완료 → 파일 선택 다이얼로그
-    LaunchedEffect(state.csvContent) {
-        if (!state.csvContent.isNullOrBlank()) {
-            val date = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
-            csvLauncher.launch("shadowtalk_qa_$date.csv")
-        }
-    }
-
-    // DB 백업 준비 완료 → 파일 저장 다이얼로그
-    LaunchedEffect(state.dbBackupBytes) {
-        if (state.dbBackupBytes != null) {
-            val date = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
-            dbBackupLauncher.launch("shadowtalk_backup_$date.db")
-        }
-    }
-
-    // 가져오기/복원 결과 Toast
-    LaunchedEffect(state.importResult) {
-        if (!state.importResult.isNullOrBlank()) {
-            Toast.makeText(context, state.importResult, Toast.LENGTH_LONG).show()
-            viewModel.clearImportResult()
-        }
-    }
 
     Surface(modifier = Modifier.fillMaxSize()) {
         if (state.loading) {
@@ -206,15 +115,6 @@ fun ReportScreen(
 
                     // 섹션 5: Recent Tests (잠금/삭제 메뉴)
                     RecentTestsSection(state, viewModel, onSessionClick)
-
-                    // 섹션 6: 데이터 관리
-                DataManagementSection(
-                    state        = state,
-                    onExportQa   = { viewModel.prepareCsvExport() },
-                    onImportQa   = { importLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "*/*")) },
-                    onBackupDb   = { viewModel.backupDatabase() },
-                    onRestoreDb  = { dbRestoreLauncher.launch(arrayOf("*/*")) }
-                )
             }
 
             // ⚙️ 설정 버튼 — 우상단 오버레이
@@ -670,114 +570,6 @@ private fun RecentTestsSection(
                 }
             }
         }
-    }
-}
-
-// ==================== 섹션 6: 데이터 관리 ====================
-
-@Composable
-private fun DataManagementSection(
-    state: ReportUiState,
-    onExportQa: () -> Unit,
-    onImportQa: () -> Unit,
-    onBackupDb: () -> Unit,
-    onRestoreDb: () -> Unit
-) {
-    SectionCard(title = "데이터 관리") {
-        // 전체 백업
-        Text(
-            text = "전체 백업 (모든 데이터)",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            color = OPicColors.TextOnLight
-        )
-        Spacer(Modifier.height(6.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = onBackupDb,
-                enabled = !state.isBackingUp,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = OPicColors.Primary,
-                    contentColor = Color.White
-                ),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                if (state.isBackingUp) {
-                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White)
-                } else {
-                    Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("DB 백업", fontSize = 13.sp)
-                }
-            }
-            OutlinedButton(
-                onClick = onRestoreDb,
-                enabled = !state.isRestoring,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                if (state.isRestoring) {
-                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = OPicColors.Primary)
-                } else {
-                    Text("DB 복원", fontSize = 13.sp, color = OPicColors.Primary)
-                }
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        // Q&A 스크립트 편집
-        Text(
-            text = "스크립트 편집",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            color = OPicColors.TextOnLight
-        )
-        Spacer(Modifier.height(6.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = onExportQa,
-                enabled = !state.csvExporting,
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = OPicColors.Primary,
-                    contentColor = Color.White
-                ),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                if (state.csvExporting) {
-                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White)
-                } else {
-                    Text("Q&A 내보내기", fontSize = 13.sp)
-                }
-            }
-            OutlinedButton(
-                onClick = onImportQa,
-                enabled = !state.importingCsv,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                if (state.importingCsv) {
-                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = OPicColors.Primary)
-                } else {
-                    Text("Q&A 가져오기", fontSize = 13.sp, color = OPicColors.Primary)
-                }
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = "내보내기 컬럼: question_text, answer_script, user_script, ai_answer + 학습현황 포함\n가져오기: 같은 CSV를 수정 후 불러오면 DB 자동 업데이트",
-            fontSize = 11.sp,
-            color = OPicColors.DisabledBg,
-            lineHeight = 16.sp
-        )
     }
 }
 
