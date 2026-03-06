@@ -1,5 +1,7 @@
 package com.opic.android.ui.navigation
 
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -168,8 +170,23 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                 VocabularyScreen()
             }
 
-            composable(Screen.StudyFromSettings.route) {
+            composable(
+                route = Screen.StudyFromSettings.route,
+                arguments = listOf(
+                    navArgument("set") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                ),
+                enterTransition = { slideInHorizontally(initialOffsetX = { -it }) },
+                exitTransition  = { slideOutHorizontally(targetOffsetX = { -it }) },
+                popEnterTransition  = { slideInHorizontally(initialOffsetX = { -it }) },
+                popExitTransition   = { slideOutHorizontally(targetOffsetX = { -it }) }
+            ) { backStackEntry ->
+                val set = backStackEntry.arguments?.getString("set")
                 StudyScreen(
+                    initialTopicSet = set,
                     fromSettings = true,
                     onBack = { navController.popBackStack() }
                 )
@@ -177,7 +194,9 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
 
             composable(Screen.Settings.route) {
                 SettingsScreen(
-                    onStudyLink = { navController.navigate(Screen.StudyFromSettings.route) }
+                    onStudyLink = { set ->
+                        navController.navigate(Screen.StudyFromSettings.createRoute(set))
+                    }
                 )
             }
         }

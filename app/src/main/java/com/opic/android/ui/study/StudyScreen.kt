@@ -28,11 +28,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FilterList
@@ -111,17 +112,41 @@ fun StudyScreen(
         viewModel.setGradeFilter(initialGrade)
     }
 
-    Surface(modifier = Modifier.fillMaxSize()) {
-        if (state.loading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("학습 데이터 로딩 중...")
+    Box(modifier = Modifier.fillMaxSize()) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            if (state.loading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator()
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("학습 데이터 로딩 중...")
+                    }
                 }
+            } else {
+                StudyContent(state, filterState, viewModel, onPractice)
             }
-        } else {
-            StudyContent(state, filterState, viewModel, onPractice, fromSettings, onBack)
+        }
+
+        // Settings에서 진입 시 — 우상단 고정 닫기 버튼
+        if (fromSettings && onBack != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 10.dp, end = 10.dp)
+                    .size(36.dp)
+                    .shadow(elevation = 6.dp, shape = CircleShape)
+                    .clip(CircleShape)
+                    .background(OPicColors.Primary)
+                    .clickable { onBack() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = "닫기",
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }
@@ -131,9 +156,7 @@ private fun StudyContent(
     state: StudyUiState,
     filterState: StudyFilterState,
     viewModel: StudyViewModel,
-    onPractice: (Int) -> Unit,
-    fromSettings: Boolean = false,
-    onBack: (() -> Unit)? = null
+    onPractice: (Int) -> Unit
 ) {
     val context  = LocalContext.current
     val isBusy   = state.playingTarget != null || state.isRecording || state.groupPlaying
@@ -160,13 +183,11 @@ private fun StudyContent(
             filterState    = filterState,
             viewModel      = viewModel,
             showFilter     = showFilter,
-            onToggleFilter = { showFilter = !showFilter },
-            fromSettings   = fromSettings,
-            onBack         = onBack
+            onToggleFilter = { showFilter = !showFilter }
         )
 
-        // ===== 필터 패널 (fromSettings 모드에서는 숨김) =====
-        if (!fromSettings) AnimatedVisibility(
+        // ===== 필터 패널 (타이틀 아래로 슬라이드 다운) =====
+        AnimatedVisibility(
             visible = showFilter,
             enter   = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
             exit    = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
@@ -421,9 +442,7 @@ private fun TitleSelector(
     filterState: StudyFilterState,
     viewModel: StudyViewModel,
     showFilter: Boolean,
-    onToggleFilter: () -> Unit,
-    fromSettings: Boolean = false,
-    onBack: (() -> Unit)? = null
+    onToggleFilter: () -> Unit
 ) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = { viewModel.onPrevTitle() }, modifier = Modifier.size(36.dp)) {
@@ -450,22 +469,12 @@ private fun TitleSelector(
             modifier = Modifier.padding(start = 4.dp)
         )
 
-        if (fromSettings && onBack != null) {
-            IconButton(onClick = onBack, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "돌아가기",
-                    tint = OPicColors.Primary
-                )
-            }
-        } else {
-            IconButton(onClick = onToggleFilter, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    Icons.Filled.FilterList,
-                    contentDescription = "Filter",
-                    tint = if (showFilter) OPicColors.Primary else Color.Gray
-                )
-            }
+        IconButton(onClick = onToggleFilter, modifier = Modifier.size(32.dp)) {
+            Icon(
+                Icons.Filled.FilterList,
+                contentDescription = "Filter",
+                tint = if (showFilter) OPicColors.Primary else Color.Gray
+            )
         }
     }
 }
