@@ -149,6 +149,7 @@ fun SettingsScreen(
             if (!content.isNullOrBlank()) {
                 try {
                     context.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
                         out.write(content.toByteArray(Charsets.UTF_8))
                     }
                     viewModel.clearSnackbar()
