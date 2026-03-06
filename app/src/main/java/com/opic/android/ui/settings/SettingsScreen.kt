@@ -264,6 +264,15 @@ fun SettingsScreen(
                     expanded = expandedCategory == "study",
                     onToggle = { expandedCategory = if (expandedCategory == "study") null else "study" }
                 ) {
+                    // 음성 저장 폴더
+                    Text("음성 저장 폴더", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
+                    Spacer(Modifier.height(6.dp))
+                    FolderPickerRow(
+                        path = state.soundDir,
+                        placeholder = "폴더를 선택하세요...",
+                        onClick = { soundDirLauncher.launch(null) }
+                    )
+                    Spacer(Modifier.height(12.dp))
                     // TTS 엔진
                     if (state.availableEngines.isNotEmpty()) {
                         Text("TTS 엔진", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
@@ -313,15 +322,6 @@ fun SettingsScreen(
                     } else {
                         Text("음성 목록 로딩 중...", fontSize = 12.sp, color = Color.Gray)
                     }
-                    Spacer(Modifier.height(12.dp))
-                    // 음성 저장 폴더
-                    Text("음성 저장 폴더", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
-                    Spacer(Modifier.height(6.dp))
-                    FolderPickerRow(
-                        path = state.soundDir,
-                        placeholder = "폴더를 선택하세요...",
-                        onClick = { soundDirLauncher.launch(null) }
-                    )
                 }
 
                 HorizontalDivider(color = OPicColors.Border)
@@ -331,10 +331,20 @@ fun SettingsScreen(
                     icon = Icons.Filled.Psychology,
                     iconTint = ColorAi,
                     title = "AI 설정",
-                    subtitle = "Claude API Key · 개인 프로필",
+                    subtitle = "OPic 목표 등급 · API Key · 개인 프로필",
                     expanded = expandedCategory == "ai",
                     onToggle = { expandedCategory = if (expandedCategory == "ai") null else "ai" }
                 ) {
+                    // OPic 목표 등급
+                    Text("OPic 목표 등급", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
+                    Spacer(Modifier.height(6.dp))
+                    BottomSheetPicker(
+                        label = "목표 등급",
+                        selected = state.targetGrade,
+                        options = listOf("AL", "IH", "IM3", "IM2", "IM1", "IL", "NH"),
+                        onSelected = { viewModel.onTargetGradeChanged(it) }
+                    )
+                    Spacer(Modifier.height(12.dp))
                     var showApiKey by remember { mutableStateOf(false) }
                     // API Key
                     Text("Claude API Key", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
@@ -366,16 +376,6 @@ fun SettingsScreen(
                     ProfileField("가족 관계", state.profileFamily) { viewModel.onProfileFamilyChanged(it) }
                     ProfileField("국적/거주지", state.profileCountry) { viewModel.onProfileCountryChanged(it) }
                     ProfileField("기타 (자유 서술)", state.profileBackground) { viewModel.onProfileBackgroundChanged(it) }
-                    Spacer(Modifier.height(12.dp))
-                    // OPic 목표 등급
-                    Text("OPic 목표 등급", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
-                    Spacer(Modifier.height(6.dp))
-                    BottomSheetPicker(
-                        label = "목표 등급",
-                        selected = state.targetGrade,
-                        options = listOf("AL", "IH", "IM3", "IM2", "IM1", "IL", "NH"),
-                        onSelected = { viewModel.onTargetGradeChanged(it) }
-                    )
                 }
 
                 HorizontalDivider(color = OPicColors.Border)
