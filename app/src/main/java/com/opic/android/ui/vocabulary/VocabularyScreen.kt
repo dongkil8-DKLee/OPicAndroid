@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OndemandVideo
 import androidx.compose.material.icons.filled.Star
@@ -147,9 +148,11 @@ fun VocabularyScreen(
                         VocabularyCard(
                             word = word,
                             isExpanded = word.wordId in state.expandedWordIds,
+                            isAiLoading = state.aiLoadingWordId == word.wordId,
                             onTap = { viewModel.toggleWordExpanded(word.wordId) },
                             onToggleMemorized = { viewModel.toggleMemorized(word.wordId) },
                             onToggleFavorite = { viewModel.toggleFavorite(word.wordId) },
+                            onAiFill = { viewModel.fillWordWithAi(word) },
                             onEdit = { viewModel.showEditDialog(word) },
                             onDelete = { viewModel.deleteWord(word) },
                             onYouglish = {
@@ -215,9 +218,11 @@ fun VocabularyScreen(
 private fun VocabularyCard(
     word: VocabularyEntity,
     isExpanded: Boolean,
+    isAiLoading: Boolean,
     onTap: () -> Unit,
     onToggleMemorized: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onAiFill: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onYouglish: () -> Unit,
@@ -348,6 +353,28 @@ private fun VocabularyCard(
                         tint = if (word.isFavorite) OPicColors.TimerOrange else OPicColors.TextOnLight.copy(alpha = 0.5f),
                         modifier = Modifier.size(20.dp)
                     )
+                }
+
+                // AI 자동완성
+                IconButton(
+                    onClick = onAiFill,
+                    enabled = !isAiLoading,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    if (isAiLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = OPicColors.Primary
+                        )
+                    } else {
+                        Icon(
+                            Icons.Filled.AutoAwesome,
+                            contentDescription = "AI 자동완성",
+                            tint = OPicColors.Primary.copy(alpha = 0.7f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))

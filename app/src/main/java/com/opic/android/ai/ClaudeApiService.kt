@@ -14,6 +14,12 @@ import java.net.URL
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class VocabInfo(
+    val meaning: String,       // "n. 어휘, 단어; syn: term, expression"
+    val pronunciation: String, // "/vəˈkæbjʊləri/ (보캐뷸러리)"
+    val memo: String           // "[예문] ...\n[한글] ...\n[OPic] ..."
+)
+
 /**
  * Claude API HTTP 클라이언트.
  * 추가 의존성 없이 Android 내장 HttpURLConnection 사용.
@@ -72,6 +78,54 @@ class ClaudeApiService @Inject constructor(
                 "Generate natural, personalized model answers in English suitable for the requested OPic grade level.",
             userMessage = prompt
         )
+    }
+
+    /**
+     * 단어 정보 자동 입력.
+     * word → Claude → VocabInfo (meaning, pronunciation, memo)
+     */
+    suspend fun generateVocabInfo(word: String): Result<VocabInfo> = withContext(Dispatchers.IO) {
+        val apiKey = appPrefs.claudeApiKey
+        if (apiKey.isBlank()) {
+            return@withContext Result.failure(
+                Exception("Claude API 키가 설정되지 않았습니다.\nSettings > AI 설정에서 입력해주세요.")
+            )
+        }
+
+        val prompt = """
+단어: $word
+
+다음 형식으로 정확히 답하세요. 라벨 외 다른 내용은 쓰지 마세요:
+MEANING: [품사약어]. [한국어 뜻]; syn: [영어 동의어1], [영어 동의어2]
+PRONUNCIATION: /[IPA]/ ([한글 발음])
+EXAMPLE_EN: [자연스러운 영어 예문 1문장]
+EXAMPLE_KO: [위 예문의 한국어 번역]
+OPIC_EN: [OPic 스피킹에서 직접 쓸 수 있는 영어 예문 1문장]
+        """.trimIndent()
+
+        val raw = callClaudeApi(
+            apiKey = apiKey,
+            systemPrompt = "You are an English dictionary and OPic speaking expert. Answer strictly in the requested format.",
+            userMessage = prompt
+        )
+        raw.map { text ->
+            fun extract(label: String) = text.lines()
+                .firstOrNull { it.startsWith("$label:") }
+                ?.removePrefix("$label:")?.trim() ?: ""
+            val exampleEn = extract("EXAMPLE_EN")
+            val exampleKo = extract("EXAMPLE_KO")
+            val opicEn    = extract("OPIC_EN")
+            val memo = buildString {
+                if (exampleEn.isNotBlank()) appendLine("[예문] $exampleEn")
+                if (exampleKo.isNotBlank()) appendLine("[한글] $exampleKo")
+                if (opicEn.isNotBlank())    append("[OPic] $opicEn")
+            }.trim()
+            VocabInfo(
+                meaning       = extract("MEANING"),
+                pronunciation = extract("PRONUNCIATION"),
+                memo          = memo
+            )
+        }
     }
 
     /**

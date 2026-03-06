@@ -3,6 +3,7 @@ package com.opic.android.ui.vocabulary
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.opic.android.ai.ClaudeApiService
 import com.opic.android.data.local.dao.VocabularyDao
 import com.opic.android.data.local.entity.VocabularyEntity
 import com.opic.android.util.DictionaryApi
@@ -28,12 +29,14 @@ data class VocabularyUiState(
     val addMemo: String = "",
     val addPronunciation: String = "",
     val loadingPronunciation: Boolean = false,
-    val expandedWordIds: Set<Int> = emptySet() // 뜻 표시/숨김
+    val expandedWordIds: Set<Int> = emptySet(), // 뜻 표시/숨김
+    val aiLoadingWordId: Int? = null            // AI 자동완성 진행 중인 단어 ID
 )
 
 @HiltViewModel
 class VocabularyViewModel @Inject constructor(
-    private val vocabularyDao: VocabularyDao
+    private val vocabularyDao: VocabularyDao,
+    private val claudeApiService: ClaudeApiService
 ) : ViewModel() {
 
     companion object {
@@ -173,6 +176,33 @@ class VocabularyViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to update word", e)
             }
+        }
+    }
+
+    // ==================== AI 자동완성 ====================
+
+    /** 단어의 meaning/pronunciation/memo를 AI로 한번에 채웁니다 (기존 내용 덮어쓰기). */
+    fun fillWordWithAi(entity: VocabularyEntity) {
+        if (_uiState.value.aiLoadingWordId != null) return // 이미 진행 중
+        _uiState.update { it.copy(aiLoadingWordId = entity.wordId) }
+        viewModelScope.launch {
+            val result = claudeApiService.generateVocabInfo(entity.word)
+            result.onSuccess { info ->
+                try {
+                    val updated = entity.copy(
+                        meaning       = info.meaning.ifBlank { entity.meaning },
+                        pronunciation = info.pronunciation.ifBlank { entity.pronunciation },
+                        memo          = info.memo.ifBlank { entity.memo }
+                    )
+                    vocabularyDao.updateWord(updated)
+                    Log.d(TAG, "AI vocab filled: ${entity.word}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to save AI vocab info", e)
+                }
+            }.onFailure { e ->
+                Log.e(TAG, "AI vocab error: ${entity.word}", e)
+            }
+            _uiState.update { it.copy(aiLoadingWordId = null) }
         }
     }
 
