@@ -89,6 +89,7 @@ private val ColorData       = Color(0xFFE74C3C)   // 레드
 
 @Composable
 fun SettingsScreen(
+    onStudyLink: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -390,7 +391,16 @@ fun SettingsScreen(
                     onToggle = { expandedCategory = if (expandedCategory == "data") null else "data" }
                 ) {
                     // ── 문제 편집 ──────────────────────────────────────
-                    SectionTitle("문제 편집")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("문제 편집", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
+                        TextButton(onClick = onStudyLink) {
+                            Text("Study  ›", fontSize = 12.sp, color = OPicColors.Primary)
+                        }
+                    }
                     Spacer(Modifier.height(6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),

@@ -168,8 +168,17 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                 VocabularyScreen()
             }
 
+            composable(Screen.StudyFromSettings.route) {
+                StudyScreen(
+                    fromSettings = true,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
             composable(Screen.Settings.route) {
-                SettingsScreen()
+                SettingsScreen(
+                    onStudyLink = { navController.navigate(Screen.StudyFromSettings.route) }
+                )
             }
         }
     }

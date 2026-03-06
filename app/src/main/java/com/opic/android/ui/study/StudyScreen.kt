@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
@@ -92,6 +93,8 @@ fun StudyScreen(
     initialTopicType: String? = null,
     initialTopicSet: String? = null,
     initialGrade: String? = null,
+    fromSettings: Boolean = false,
+    onBack: (() -> Unit)? = null,
     onPractice: (Int) -> Unit = {},
     viewModel: StudyViewModel = hiltViewModel()
 ) {
@@ -118,7 +121,7 @@ fun StudyScreen(
                 }
             }
         } else {
-            StudyContent(state, filterState, viewModel, onPractice)
+            StudyContent(state, filterState, viewModel, onPractice, fromSettings, onBack)
         }
     }
 }
@@ -128,7 +131,9 @@ private fun StudyContent(
     state: StudyUiState,
     filterState: StudyFilterState,
     viewModel: StudyViewModel,
-    onPractice: (Int) -> Unit
+    onPractice: (Int) -> Unit,
+    fromSettings: Boolean = false,
+    onBack: (() -> Unit)? = null
 ) {
     val context  = LocalContext.current
     val isBusy   = state.playingTarget != null || state.isRecording || state.groupPlaying
@@ -151,15 +156,17 @@ private fun StudyContent(
     ) {
         // ===== 타이틀 선택 + Prev/Next + 필터아이콘 =====
         TitleSelector(
-            state        = state,
-            filterState  = filterState,
-            viewModel    = viewModel,
-            showFilter   = showFilter,
-            onToggleFilter = { showFilter = !showFilter }
+            state          = state,
+            filterState    = filterState,
+            viewModel      = viewModel,
+            showFilter     = showFilter,
+            onToggleFilter = { showFilter = !showFilter },
+            fromSettings   = fromSettings,
+            onBack         = onBack
         )
 
-        // ===== 필터 패널 (타이틀 아래로 슬라이드 다운) =====
-        AnimatedVisibility(
+        // ===== 필터 패널 (fromSettings 모드에서는 숨김) =====
+        if (!fromSettings) AnimatedVisibility(
             visible = showFilter,
             enter   = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
             exit    = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
@@ -414,7 +421,9 @@ private fun TitleSelector(
     filterState: StudyFilterState,
     viewModel: StudyViewModel,
     showFilter: Boolean,
-    onToggleFilter: () -> Unit
+    onToggleFilter: () -> Unit,
+    fromSettings: Boolean = false,
+    onBack: (() -> Unit)? = null
 ) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = { viewModel.onPrevTitle() }, modifier = Modifier.size(36.dp)) {
@@ -441,12 +450,22 @@ private fun TitleSelector(
             modifier = Modifier.padding(start = 4.dp)
         )
 
-        IconButton(onClick = onToggleFilter, modifier = Modifier.size(32.dp)) {
-            Icon(
-                Icons.Filled.FilterList,
-                contentDescription = "Filter",
-                tint = if (showFilter) OPicColors.Primary else Color.Gray
-            )
+        if (fromSettings && onBack != null) {
+            IconButton(onClick = onBack, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "돌아가기",
+                    tint = OPicColors.Primary
+                )
+            }
+        } else {
+            IconButton(onClick = onToggleFilter, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    Icons.Filled.FilterList,
+                    contentDescription = "Filter",
+                    tint = if (showFilter) OPicColors.Primary else Color.Gray
+                )
+            }
         }
     }
 }
