@@ -25,6 +25,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -87,7 +90,7 @@ fun ReportScreen(
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
-    // CSV 저장 위치 선택 launcher
+    // 학습 현황 CSV 저장 launcher
     val csvLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
@@ -98,7 +101,7 @@ fun ReportScreen(
                     context.contentResolver.openOutputStream(uri)?.use { out ->
                         out.write(content.toByteArray(Charsets.UTF_8))
                     }
-                    Toast.makeText(context, "CSV 저장 완료", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "학습 현황 CSV 저장 완료", Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
                     Toast.makeText(context, "저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
@@ -107,11 +110,54 @@ fun ReportScreen(
         }
     }
 
-    // CSV 데이터 준비 완료 시 파일 선택 다이얼로그 열기
+    // Q&A CSV 저장 launcher
+    val qaCsvLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        if (uri != null) {
+            val content = viewModel.uiState.value.qaCsvContent
+            if (!content.isNullOrBlank()) {
+                try {
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(content.toByteArray(Charsets.UTF_8))
+                    }
+                    Toast.makeText(context, "Q&A CSV 저장 완료", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+            viewModel.clearQaCsvContent()
+        }
+    }
+
+    // Q&A CSV 가져오기 launcher
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) viewModel.importQaCsvFromUri(uri)
+    }
+
+    // 학습 현황 CSV 준비 완료 → 파일 선택 다이얼로그
     LaunchedEffect(state.csvContent) {
         if (!state.csvContent.isNullOrBlank()) {
             val date = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
-            csvLauncher.launch("shadowtalk_$date.csv")
+            csvLauncher.launch("shadowtalk_progress_$date.csv")
+        }
+    }
+
+    // Q&A CSV 준비 완료 → 파일 선택 다이얼로그
+    LaunchedEffect(state.qaCsvContent) {
+        if (!state.qaCsvContent.isNullOrBlank()) {
+            val date = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
+            qaCsvLauncher.launch("shadowtalk_qa_$date.csv")
+        }
+    }
+
+    // 가져오기 결과 Toast
+    LaunchedEffect(state.importResult) {
+        if (!state.importResult.isNullOrBlank()) {
+            Toast.makeText(context, state.importResult, Toast.LENGTH_LONG).show()
+            viewModel.clearImportResult()
         }
     }
 
@@ -121,14 +167,13 @@ fun ReportScreen(
                 CircularProgressIndicator(color = OPicColors.Primary)
             }
         } else {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                     // 헤더: 레벨 아바타 + Level N + 게이지
                     LevelHeaderSection(state)
 
@@ -149,32 +194,14 @@ fun ReportScreen(
 
                     // 섹션 5: Recent Tests (잠금/삭제 메뉴)
                     RecentTestsSection(state, viewModel, onSessionClick)
-                }
 
-                // 우상단 CSV 내보내기 버튼
-                IconButton(
-                    onClick = { viewModel.prepareCsvExport() },
-                    enabled = !state.csvExporting,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(4.dp)
-                        .size(40.dp)
-                ) {
-                    if (state.csvExporting) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = OPicColors.Primary
-                        )
-                    } else {
-                        Icon(
-                            Icons.Filled.Share,
-                            contentDescription = "CSV 내보내기",
-                            tint = OPicColors.Primary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
+                    // 섹션 6: 데이터 관리
+                DataManagementSection(
+                    state            = state,
+                    onExportProgress = { viewModel.prepareCsvExport() },
+                    onExportQa       = { viewModel.prepareQaCsvExport() },
+                    onImportQa       = { importLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "*/*")) }
+                )
             }
         }
     }
@@ -614,6 +641,93 @@ private fun RecentTestsSection(
                 }
             }
         }
+    }
+}
+
+// ==================== 섹션 6: 데이터 관리 ====================
+
+@Composable
+private fun DataManagementSection(
+    state: ReportUiState,
+    onExportProgress: () -> Unit,
+    onExportQa: () -> Unit,
+    onImportQa: () -> Unit
+) {
+    SectionCard(title = "데이터 관리") {
+        Text(
+            text = "학습 현황",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = OPicColors.TextOnLight
+        )
+        Spacer(Modifier.height(6.dp))
+        Button(
+            onClick = onExportProgress,
+            enabled = !state.csvExporting,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = OPicColors.Primary,
+                contentColor = Color.White
+            ),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            if (state.csvExporting) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                Spacer(Modifier.width(8.dp))
+            }
+            Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("학습 현황 내보내기 (CSV)", fontSize = 13.sp)
+        }
+
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = "질문 & 답변 스크립트",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = OPicColors.TextOnLight
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = onExportQa,
+                enabled = !state.qaCsvExporting,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = OPicColors.Primary,
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                if (state.qaCsvExporting) {
+                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White)
+                } else {
+                    Text("내보내기", fontSize = 13.sp)
+                }
+            }
+            OutlinedButton(
+                onClick = onImportQa,
+                enabled = !state.importingCsv,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                if (state.importingCsv) {
+                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = OPicColors.Primary)
+                } else {
+                    Text("가져오기", fontSize = 13.sp, color = OPicColors.Primary)
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "내보내기: question_id, title, question_text, answer_script, user_script, ai_answer\n가져오기: 같은 CSV를 수정 후 불러오면 DB 자동 업데이트",
+            fontSize = 11.sp,
+            color = OPicColors.DisabledBg,
+            lineHeight = 16.sp
+        )
     }
 }
 

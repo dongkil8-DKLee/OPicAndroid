@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import android.net.Uri
 import java.io.File
 import java.time.LocalDate
 import javax.inject.Inject
@@ -48,9 +49,15 @@ data class ReportUiState(
     // Session lock
     val lockedSessions: Set<Int> = emptySet(),
 
-    // CSV 내보내기
+    // 학습 현황 CSV 내보내기
     val csvContent: String? = null,
-    val csvExporting: Boolean = false
+    val csvExporting: Boolean = false,
+
+    // Q&A CSV 내보내기/가져오기
+    val qaCsvContent: String? = null,
+    val qaCsvExporting: Boolean = false,
+    val importingCsv: Boolean = false,
+    val importResult: String? = null
 )
 
 data class TopicAccuracy(
@@ -261,6 +268,124 @@ class ReportViewModel @Inject constructor(
     }
 
     fun clearCsvContent() = _uiState.update { it.copy(csvContent = null) }
+
+    // ===== Q&A 내보내기/가져오기 =====
+
+    fun prepareQaCsvExport() {
+        if (_uiState.value.qaCsvExporting) return
+        _uiState.update { it.copy(qaCsvExporting = true) }
+        viewModelScope.launch {
+            try {
+                val rows = questionDao.getAllQuestionsWithProgressFull(USER_ID)
+                val sb = StringBuilder()
+                sb.append("question_id,title,set,type,question_text,answer_script,user_script,ai_answer\n")
+                for (r in rows) {
+                    sb.append("${r.questionId},")
+                    sb.append("\"${r.title.escapeCsv()}\",")
+                    sb.append("\"${r.set?.escapeCsv() ?: ""}\",")
+                    sb.append("\"${r.type?.escapeCsv() ?: ""}\",")
+                    sb.append("\"${r.questionText?.escapeCsv() ?: ""}\",")
+                    sb.append("\"${r.answerScript?.escapeCsv() ?: ""}\",")
+                    sb.append("\"${r.userScript?.escapeCsv() ?: ""}\",")
+                    sb.append("\"${r.aiAnswer?.escapeCsv() ?: ""}\"")
+                    sb.append("\n")
+                }
+                _uiState.update { it.copy(qaCsvContent = sb.toString(), qaCsvExporting = false) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Q&A CSV 생성 실패", e)
+                _uiState.update { it.copy(qaCsvExporting = false) }
+            }
+        }
+    }
+
+    fun clearQaCsvContent() = _uiState.update { it.copy(qaCsvContent = null) }
+
+    fun importQaCsvFromUri(uri: Uri) {
+        if (_uiState.value.importingCsv) return
+        _uiState.update { it.copy(importingCsv = true, importResult = null) }
+        viewModelScope.launch {
+            try {
+                val content = context.contentResolver.openInputStream(uri)?.use {
+                    it.readBytes().toString(Charsets.UTF_8)
+                } ?: run {
+                    _uiState.update { it.copy(importingCsv = false, importResult = "파일 읽기 실패") }
+                    return@launch
+                }
+
+                val rows = parseCsvContent(content)
+                if (rows.size < 2) {
+                    _uiState.update { it.copy(importingCsv = false, importResult = "유효한 데이터 없음") }
+                    return@launch
+                }
+
+                val headers = rows[0]
+                val idIdx = headers.indexOf("question_id")
+                val qtIdx = headers.indexOf("question_text")
+                val asIdx = headers.indexOf("answer_script")
+                val usIdx = headers.indexOf("user_script")
+                val aiIdx = headers.indexOf("ai_answer")
+
+                if (idIdx < 0) {
+                    _uiState.update { it.copy(importingCsv = false, importResult = "question_id 컬럼이 없습니다") }
+                    return@launch
+                }
+
+                var count = 0
+                for (row in rows.drop(1)) {
+                    val id = row.getOrNull(idIdx)?.toIntOrNull() ?: continue
+                    if (qtIdx >= 0) row.getOrNull(qtIdx)?.let { v -> if (v.isNotBlank()) questionDao.updateQuestionText(id, v) }
+                    if (asIdx >= 0) row.getOrNull(asIdx)?.let { v -> questionDao.updateAnswerScript(id, v) }
+                    if (usIdx >= 0) row.getOrNull(usIdx)?.let { v -> if (v.isNotBlank()) questionDao.updateUserScript(id, v) }
+                    if (aiIdx >= 0) row.getOrNull(aiIdx)?.let { v -> if (v.isNotBlank()) questionDao.updateAiAnswer(id, v) }
+                    count++
+                }
+                _uiState.update { it.copy(importingCsv = false, importResult = "${count}개 문제 업데이트 완료") }
+            } catch (e: Exception) {
+                Log.e(TAG, "Q&A 가져오기 실패", e)
+                _uiState.update { it.copy(importingCsv = false, importResult = "가져오기 실패: ${e.message}") }
+            }
+        }
+    }
+
+    fun clearImportResult() = _uiState.update { it.copy(importResult = null) }
+
+    /** RFC 4180 CSV 파서 — 멀티라인 필드, 이중따옴표 이스케이프 지원 */
+    private fun parseCsvContent(content: String): List<List<String>> {
+        val result = mutableListOf<List<String>>()
+        val currentRow = mutableListOf<String>()
+        val currentField = StringBuilder()
+        var inQuotes = false
+        var i = 0
+
+        while (i < content.length) {
+            val ch = content[i]
+            when {
+                inQuotes && ch == '"' && i + 1 < content.length && content[i + 1] == '"' -> {
+                    currentField.append('"'); i += 2; continue
+                }
+                ch == '"' -> inQuotes = !inQuotes
+                !inQuotes && ch == ',' -> {
+                    currentRow.add(currentField.toString()); currentField.clear()
+                }
+                !inQuotes && ch == '\r' && i + 1 < content.length && content[i + 1] == '\n' -> {
+                    currentRow.add(currentField.toString())
+                    result.add(currentRow.toList()); currentRow.clear(); currentField.clear(); i += 2; continue
+                }
+                !inQuotes && (ch == '\n' || ch == '\r') -> {
+                    currentRow.add(currentField.toString())
+                    result.add(currentRow.toList()); currentRow.clear(); currentField.clear()
+                }
+                else -> currentField.append(ch)
+            }
+            i++
+        }
+        // 마지막 행 처리
+        if (currentField.isNotEmpty() || currentRow.isNotEmpty()) {
+            currentRow.add(currentField.toString())
+            result.add(currentRow.toList())
+        }
+        return result
+    }
 
     private fun String.escapeCsv(): String = replace("\"", "\"\"")
 }
