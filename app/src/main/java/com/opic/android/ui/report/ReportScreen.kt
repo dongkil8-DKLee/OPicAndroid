@@ -10,6 +10,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -85,6 +88,7 @@ fun ReportScreen(
     onVocabClick: () -> Unit = {},
     onTopicClick: (String) -> Unit = {},
     onGradeClick: (String) -> Unit = {},
+    onSettings: () -> Unit = {},
     viewModel: ReportViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -174,6 +178,7 @@ fun ReportScreen(
                 CircularProgressIndicator(color = OPicColors.Primary)
             }
         } else {
+            Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -211,6 +216,22 @@ fun ReportScreen(
                     onRestoreDb  = { dbRestoreLauncher.launch(arrayOf("*/*")) }
                 )
             }
+
+            // ⚙️ 설정 버튼 — 우상단 오버레이
+            IconButton(
+                onClick = onSettings,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 4.dp, end = 4.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Settings,
+                    contentDescription = "Settings",
+                    tint = OPicColors.Primary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            } // Box 닫힘
         }
     }
 }

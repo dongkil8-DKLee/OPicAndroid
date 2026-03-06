@@ -117,9 +117,6 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                     initialGrade = initialGrade,
                     onPractice = { questionId ->
                         navController.navigate(Screen.Practice.createRoute(questionId))
-                    },
-                    onSettings = {
-                        navController.navigate(Screen.Settings.route)
                     }
                 )
             }
@@ -130,7 +127,6 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
             ) {
                 PracticeScreen(
                     onBack = { navController.popBackStack() },
-                    onSettings = { navController.navigate(Screen.Settings.route) },
                     onNavigateToQuestion = { questionId ->
                         navController.navigate(Screen.Practice.createRoute(questionId)) {
                             popUpTo(Screen.Practice.route) { inclusive = true }
@@ -161,6 +157,9 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                             popUpTo(Screen.Report.route) { inclusive = false }
                             launchSingleTop = true
                         }
+                    },
+                    onSettings = {
+                        navController.navigate(Screen.Settings.route)
                     }
                 )
             }

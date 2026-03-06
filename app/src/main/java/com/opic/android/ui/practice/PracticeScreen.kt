@@ -95,7 +95,6 @@ import com.opic.android.ui.theme.OPicColors
 @Composable
 fun PracticeScreen(
     onBack: () -> Unit,
-    onSettings: () -> Unit = {},
     onNavigateToQuestion: (Int) -> Unit = {},
     viewModel: PracticeViewModel = hiltViewModel()
 ) {

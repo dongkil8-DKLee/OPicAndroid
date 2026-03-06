@@ -93,7 +93,6 @@ fun StudyScreen(
     initialTopicSet: String? = null,
     initialGrade: String? = null,
     onPractice: (Int) -> Unit = {},
-    onSettings: () -> Unit = {},
     viewModel: StudyViewModel = hiltViewModel()
 ) {
     val state       by viewModel.uiState.collectAsState()
@@ -119,7 +118,7 @@ fun StudyScreen(
                 }
             }
         } else {
-            StudyContent(state, filterState, viewModel, onPractice, onSettings)
+            StudyContent(state, filterState, viewModel, onPractice)
         }
     }
 }
@@ -129,8 +128,7 @@ private fun StudyContent(
     state: StudyUiState,
     filterState: StudyFilterState,
     viewModel: StudyViewModel,
-    onPractice: (Int) -> Unit,
-    onSettings: () -> Unit
+    onPractice: (Int) -> Unit
 ) {
     val context  = LocalContext.current
     val isBusy   = state.playingTarget != null || state.isRecording || state.groupPlaying
@@ -267,7 +265,7 @@ private fun StudyContent(
         }
 
         Spacer(modifier = Modifier.height(4.dp))
-        SpeedAndControlRow(state = state, viewModel = viewModel, onSettings = onSettings)
+        SpeedAndControlRow(state = state, viewModel = viewModel)
         Spacer(modifier = Modifier.height(4.dp))
         IconButtonRow(
             state     = state,
@@ -367,8 +365,7 @@ private fun IconButtonRow(
 @Composable
 private fun SpeedAndControlRow(
     state: StudyUiState,
-    viewModel: StudyViewModel,
-    onSettings: () -> Unit
+    viewModel: StudyViewModel
 ) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text("속도:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -405,9 +402,6 @@ private fun SpeedAndControlRow(
                 tint     = if (state.isFavorite) OPicColors.TimerOrange else OPicColors.DisabledBg,
                 modifier = Modifier.size(18.dp)
             )
-        }
-        IconButton(onClick = onSettings, modifier = Modifier.size(28.dp)) {
-            Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = OPicColors.Primary, modifier = Modifier.size(18.dp))
         }
     }
 }
