@@ -25,6 +25,10 @@ data class VocabularyEntity(
     @ColumnInfo(name = "isMemorized")
     val isMemorized: Boolean = false,
 
+    // 0=X(모름), 1=△(애매), 2=O(암기완료)
+    @ColumnInfo(name = "memoryLevel")
+    val memoryLevel: Int = 0,
+
     @ColumnInfo(name = "isFavorite")
     val isFavorite: Boolean = false,
 

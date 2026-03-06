@@ -221,9 +221,9 @@ class VocabularyViewModel @Inject constructor(
 
     // ==================== 상태 토글 ====================
 
-    fun toggleMemorized(wordId: Int) {
+    fun cycleMemoryLevel(wordId: Int) {
         viewModelScope.launch {
-            vocabularyDao.toggleMemorized(wordId)
+            vocabularyDao.cycleMemoryLevel(wordId)
         }
     }
 

@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.opic.android.data.local.db.MIGRATION_1_2
 import com.opic.android.data.local.db.MIGRATION_2_3
 import com.opic.android.data.local.db.MIGRATION_3_4
+import com.opic.android.data.local.db.MIGRATION_4_5
 import com.opic.android.data.local.db.OPicDatabase
 import dagger.Module
 import dagger.Provides
@@ -22,7 +23,7 @@ object AppModule {
     fun provideOPicDatabase(@ApplicationContext context: Context): OPicDatabase {
         return Room.databaseBuilder(context, OPicDatabase::class.java, "opic.db")
             .createFromAsset("opic.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
     }
 

@@ -24,6 +24,15 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        // memoryLevel: 0=X, 1=△, 2=O
+        // 기존 isMemorized=1(true) → memoryLevel=2(O)
+        database.execSQL("ALTER TABLE Vocabulary ADD COLUMN memoryLevel INTEGER NOT NULL DEFAULT 0")
+        database.execSQL("UPDATE Vocabulary SET memoryLevel = 2 WHERE isMemorized = 1")
+    }
+}
+
 /**
  * Room Database — Python opic.db 7개 테이블 1:1 매핑.
  * createFromAsset("opic.db")로 Python DB를 그대로 사용.
@@ -39,7 +48,7 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
         ApiKeyEntity::class,
         VocabularyEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class OPicDatabase : RoomDatabase() {

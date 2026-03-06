@@ -15,7 +15,7 @@ interface VocabularyDao {
     @Query("SELECT * FROM Vocabulary ORDER BY createdAt DESC")
     fun getAllWords(): Flow<List<VocabularyEntity>>
 
-    @Query("SELECT * FROM Vocabulary WHERE isMemorized = 0 ORDER BY createdAt DESC")
+    @Query("SELECT * FROM Vocabulary WHERE memoryLevel < 2 ORDER BY createdAt DESC")
     fun getUnmemorizedWords(): Flow<List<VocabularyEntity>>
 
     @Query("SELECT * FROM Vocabulary WHERE word = :word LIMIT 1")
@@ -30,8 +30,8 @@ interface VocabularyDao {
     @Delete
     suspend fun deleteWord(entity: VocabularyEntity)
 
-    @Query("UPDATE Vocabulary SET isMemorized = NOT isMemorized WHERE wordId = :wordId")
-    suspend fun toggleMemorized(wordId: Int)
+    @Query("UPDATE Vocabulary SET memoryLevel = (memoryLevel + 1) % 3 WHERE wordId = :wordId")
+    suspend fun cycleMemoryLevel(wordId: Int)
 
     @Query("UPDATE Vocabulary SET isFavorite = NOT isFavorite WHERE wordId = :wordId")
     suspend fun toggleFavorite(wordId: Int)

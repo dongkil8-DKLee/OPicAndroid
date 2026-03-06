@@ -150,7 +150,7 @@ fun VocabularyScreen(
                             isExpanded = word.wordId in state.expandedWordIds,
                             isAiLoading = state.aiLoadingWordId == word.wordId,
                             onTap = { viewModel.toggleWordExpanded(word.wordId) },
-                            onToggleMemorized = { viewModel.toggleMemorized(word.wordId) },
+                            onToggleMemorized = { viewModel.cycleMemoryLevel(word.wordId) },
                             onToggleFavorite = { viewModel.toggleFavorite(word.wordId) },
                             onAiFill = { viewModel.fillWordWithAi(word) },
                             onEdit = { viewModel.showEditDialog(word) },
@@ -257,19 +257,23 @@ private fun VocabularyCard(
                     modifier = Modifier.weight(1f)
                 )
 
-                // 암기상태 뱃지
+                // 암기상태 뱃지 (탭 → X→△→O 순환)
+                val (badgeLabel, badgeColor) = when (word.memoryLevel) {
+                    2    -> "O"  to Color(0xFF2ECC71)
+                    1    -> "△" to Color(0xFFF39C12)
+                    else -> "X"  to Color(0xFFE74C3C)
+                }
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = if (word.isMemorized) Color(0xFF2ECC71).copy(alpha = 0.2f)
-                    else Color(0xFFE74C3C).copy(alpha = 0.2f),
+                    color = badgeColor.copy(alpha = 0.2f),
                     modifier = Modifier.clickable { onToggleMemorized() }
                 ) {
                     Text(
-                        text = if (word.isMemorized) "쉬워요" else "어려워요",
-                        fontSize = 11.sp,
-                        color = if (word.isMemorized) Color(0xFF2ECC71) else Color(0xFFE74C3C),
+                        text = badgeLabel,
+                        fontSize = 13.sp,
+                        color = badgeColor,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
 
