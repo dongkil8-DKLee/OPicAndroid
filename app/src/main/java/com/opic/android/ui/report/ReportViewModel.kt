@@ -46,7 +46,11 @@ data class ReportUiState(
     val vocabRecentWeekAdded: Int = 0,
 
     // Session lock
-    val lockedSessions: Set<Int> = emptySet()
+    val lockedSessions: Set<Int> = emptySet(),
+
+    // CSV 내보내기
+    val csvContent: String? = null,
+    val csvExporting: Boolean = false
 )
 
 data class TopicAccuracy(
@@ -222,4 +226,41 @@ class ReportViewModel @Inject constructor(
             }
         }
     }
+
+    // ===== CSV 내보내기 =====
+
+    fun prepareCsvExport() {
+        if (_uiState.value.csvExporting) return
+        _uiState.update { it.copy(csvExporting = true) }
+        viewModelScope.launch {
+            try {
+                val rows = questionDao.getAllQuestionsWithProgressFull(USER_ID)
+                val sb = StringBuilder()
+                sb.append("question_id,title,set,type,study_count,is_favorite,last_modified,stt_grade,stt_accuracy_pct,has_ai_answer,user_script\n")
+                for (r in rows) {
+                    val analysis = r.analysisResult?.let { SpeechAnalyzer.fromJson(it) }
+                    sb.append("${r.questionId},")
+                    sb.append("\"${r.title.escapeCsv()}\",")
+                    sb.append("\"${r.set?.escapeCsv() ?: ""}\",")
+                    sb.append("\"${r.type?.escapeCsv() ?: ""}\",")
+                    sb.append("${r.studyCount ?: 0},")
+                    sb.append("${(r.isFavorite ?: 0) == 1},")
+                    sb.append("\"${r.lastModified ?: ""}\",")
+                    sb.append("${analysis?.grade ?: ""},")
+                    sb.append("${analysis?.accuracyPercent?.toInt() ?: ""},")
+                    sb.append("${!r.aiAnswer.isNullOrBlank()},")
+                    sb.append("\"${r.userScript?.escapeCsv() ?: ""}\"")
+                    sb.append("\n")
+                }
+                _uiState.update { it.copy(csvContent = sb.toString(), csvExporting = false) }
+            } catch (e: Exception) {
+                Log.e(TAG, "CSV 생성 실패", e)
+                _uiState.update { it.copy(csvExporting = false) }
+            }
+        }
+    }
+
+    fun clearCsvContent() = _uiState.update { it.copy(csvContent = null) }
+
+    private fun String.escapeCsv(): String = replace("\"", "\"\"")
 }

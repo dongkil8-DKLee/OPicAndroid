@@ -166,4 +166,17 @@ interface QuestionDao {
         WHERE q.title = :title LIMIT 1
     """)
     suspend fun getQuestionWithProgress(title: String, userId: Int): QuestionWithProgress?
+
+    /** CSV 내보내기용: 전체 문제 상세 + 학습 진도 */
+    @Query("""
+        SELECT q.question_id, q.title, q."set" AS q_set, q.type AS q_type, q.combo,
+               q.question_text, q.answer_script, q.question_audio, q.answer_audio, q.user_script, q.ai_answer,
+               IFNULL(usp.study_count, 0) AS study_count,
+               IFNULL(usp.is_favorite, 0) AS is_favorite,
+               usp.last_modified, usp.stt_text, usp.analysis_result
+        FROM Questions q
+        LEFT JOIN User_Study_Progress usp ON q.question_id = usp.question_id AND usp.user_id = :userId
+        ORDER BY q.question_id ASC
+    """)
+    suspend fun getAllQuestionsWithProgressFull(userId: Int): List<QuestionWithProgress>
 }

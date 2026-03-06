@@ -1,6 +1,9 @@
 package com.opic.android.ui.report
 
 import android.graphics.BitmapFactory
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -32,6 +36,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +48,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -51,6 +57,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.opic.android.R
 import com.opic.android.ui.theme.OPicColors
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // Grade colors (SpeechAnalysisPanel.kt 기준)
 private val GradeA = Color(0xFF2ECC71)
@@ -76,6 +85,35 @@ fun ReportScreen(
     viewModel: ReportViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+
+    // CSV 저장 위치 선택 launcher
+    val csvLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        if (uri != null) {
+            val content = viewModel.uiState.value.csvContent
+            if (!content.isNullOrBlank()) {
+                try {
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(content.toByteArray(Charsets.UTF_8))
+                    }
+                    Toast.makeText(context, "CSV 저장 완료", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "저장 실패: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+            viewModel.clearCsvContent()
+        }
+    }
+
+    // CSV 데이터 준비 완료 시 파일 선택 다이얼로그 열기
+    LaunchedEffect(state.csvContent) {
+        if (!state.csvContent.isNullOrBlank()) {
+            val date = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
+            csvLauncher.launch("shadowtalk_$date.csv")
+        }
+    }
 
     Surface(modifier = Modifier.fillMaxSize()) {
         if (state.loading) {
@@ -83,33 +121,60 @@ fun ReportScreen(
                 CircularProgressIndicator(color = OPicColors.Primary)
             }
         } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // 헤더: 레벨 아바타 + Level N + 게이지
-                LevelHeaderSection(state)
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // 헤더: 레벨 아바타 + Level N + 게이지
+                    LevelHeaderSection(state)
 
-                // 섹션 1: Overall Stats
-                OverallStatsSection(state)
+                    // 섹션 1: Overall Stats
+                    OverallStatsSection(state)
 
-                // 단어장 요약 카드 (클릭 → VocabularyScreen)
-                VocabSummarySection(state, onVocabClick)
+                    // 단어장 요약 카드 (클릭 → VocabularyScreen)
+                    VocabSummarySection(state, onVocabClick)
 
-                // 섹션 2: Weekly Activity
-                WeeklyActivitySection(state)
+                    // 섹션 2: Weekly Activity
+                    WeeklyActivitySection(state)
 
-                // 섹션 3: Grade Distribution (클릭 → StudyScreen)
-                GradeDistributionSection(state, onGradeClick)
+                    // 섹션 3: Grade Distribution (클릭 → StudyScreen)
+                    GradeDistributionSection(state, onGradeClick)
 
-                // 섹션 4: Topic Weakness (클릭 → StudyScreen)
-                TopicWeaknessSection(state, onTopicClick)
+                    // 섹션 4: Topic Weakness (클릭 → StudyScreen)
+                    TopicWeaknessSection(state, onTopicClick)
 
-                // 섹션 5: Recent Tests (잠금/삭제 메뉴)
-                RecentTestsSection(state, viewModel, onSessionClick)
+                    // 섹션 5: Recent Tests (잠금/삭제 메뉴)
+                    RecentTestsSection(state, viewModel, onSessionClick)
+                }
+
+                // 우상단 CSV 내보내기 버튼
+                IconButton(
+                    onClick = { viewModel.prepareCsvExport() },
+                    enabled = !state.csvExporting,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .size(40.dp)
+                ) {
+                    if (state.csvExporting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = OPicColors.Primary
+                        )
+                    } else {
+                        Icon(
+                            Icons.Filled.Share,
+                            contentDescription = "CSV 내보내기",
+                            tint = OPicColors.Primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
             }
         }
     }
