@@ -29,6 +29,9 @@ sealed class Screen(val route: String) {
     data object Practice : Screen("PracticeScreen/{questionId}") {
         fun createRoute(questionId: Int) = "PracticeScreen/$questionId"
     }
+    data object PracticeOverlay : Screen("PracticeOverlay/{questionId}") {
+        fun createRoute(questionId: Int) = "PracticeOverlay/$questionId"
+    }
     data object StudyOverlay : Screen("StudyOverlay?set={set}&type={type}") {
         fun createRoute(set: String? = null, type: String? = null): String {
             val params = mutableListOf<String>()

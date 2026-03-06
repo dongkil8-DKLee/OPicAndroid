@@ -89,7 +89,7 @@ private val ColorData       = Color(0xFFE74C3C)   // 레드
 
 @Composable
 fun SettingsScreen(
-    onStudyLink: (set: String) -> Unit = {},
+    onStudyLink: (set: String, type: String) -> Unit = { _, _ -> },
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -397,7 +397,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("문제 편집", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
-                        TextButton(onClick = { onStudyLink(state.selectedSet) }) {
+                        TextButton(onClick = { onStudyLink(state.selectedSet, state.selectedType) }) {
                             Text("Study  ›", fontSize = 12.sp, color = OPicColors.Primary)
                         }
                     }
@@ -411,7 +411,15 @@ fun SettingsScreen(
                             selected = state.selectedSet,
                             options = listOf("전체") + state.allSets,
                             onSelected = { viewModel.onSetFilterChanged(it) },
-                            modifier = Modifier.width(120.dp)
+                            modifier = Modifier.width(110.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        BottomSheetPicker(
+                            label = "유형",
+                            selected = state.selectedType,
+                            options = listOf("전체") + state.allTypes,
+                            onSelected = { viewModel.onTypeFilterChanged(it) },
+                            modifier = Modifier.width(100.dp)
                         )
                         Spacer(Modifier.width(4.dp))
                         IconButton(onClick = { viewModel.onPrevQuestion() }, modifier = Modifier.size(32.dp)) {

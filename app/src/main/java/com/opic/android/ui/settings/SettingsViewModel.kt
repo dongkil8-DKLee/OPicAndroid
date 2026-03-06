@@ -37,7 +37,9 @@ data class SettingsUiState(
 
     // 데이터 편집
     val allSets: List<String> = emptyList(),
+    val allTypes: List<String> = emptyList(),
     val selectedSet: String = "전체",
+    val selectedType: String = "전체",
     val filteredQuestions: List<QuestionEntity> = emptyList(),
     val currentQuestionIndex: Int = 0,
     val editTitle: String = "",
@@ -258,12 +260,13 @@ class SettingsViewModel @Inject constructor(
 
     private suspend fun loadQuestions() {
         allQuestions = questionDao.getAllQuestionsOnce()
-        val sets = allQuestions.mapNotNull { it.set }.distinct().sorted()
-        val filtered = allQuestions
+        val sets  = allQuestions.mapNotNull { it.set  }.distinct().sorted()
+        val types = allQuestions.mapNotNull { it.type }.distinct().sorted()
         _uiState.update { state ->
             state.copy(
                 allSets = sets,
-                filteredQuestions = filtered,
+                allTypes = types,
+                filteredQuestions = allQuestions,
                 currentQuestionIndex = 0
             )
         }
@@ -271,9 +274,19 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun onSetFilterChanged(set: String) {
-        val filtered = if (set == "전체") allQuestions
-                       else allQuestions.filter { it.set == set }
-        _uiState.update { it.copy(selectedSet = set, filteredQuestions = filtered, currentQuestionIndex = 0) }
+        val bySet  = if (set == "전체") allQuestions else allQuestions.filter { it.set == set }
+        val types  = bySet.mapNotNull { it.type }.distinct().sorted()
+        val selType = _uiState.value.selectedType
+        val filtered = if (selType == "전체") bySet else bySet.filter { it.type == selType }
+        _uiState.update { it.copy(selectedSet = set, allTypes = types, filteredQuestions = filtered, currentQuestionIndex = 0) }
+        syncEditFields(0, filtered)
+    }
+
+    fun onTypeFilterChanged(type: String) {
+        val selSet = _uiState.value.selectedSet
+        val bySet  = if (selSet == "전체") allQuestions else allQuestions.filter { it.set == selSet }
+        val filtered = if (type == "전체") bySet else bySet.filter { it.type == type }
+        _uiState.update { it.copy(selectedType = type, filteredQuestions = filtered, currentQuestionIndex = 0) }
         syncEditFields(0, filtered)
     }
 

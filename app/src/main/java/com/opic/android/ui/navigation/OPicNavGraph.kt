@@ -195,14 +195,35 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                     initialTopicSet  = set,
                     initialTopicType = type,
                     fromSettings = true,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onPractice = { questionId ->
+                        navController.navigate(Screen.PracticeOverlay.createRoute(questionId))
+                    }
+                )
+            }
+
+            composable(
+                route = Screen.PracticeOverlay.route,
+                arguments = listOf(navArgument("questionId") { type = NavType.IntType })
+            ) {
+                PracticeScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToQuestion = { questionId ->
+                        navController.navigate(Screen.PracticeOverlay.createRoute(questionId)) {
+                            popUpTo(Screen.PracticeOverlay.route) { inclusive = true }
+                        }
+                    },
+                    fromOverlay = true,
+                    onClose = {
+                        navController.popBackStack(Screen.StudyOverlay.route, inclusive = true)
+                    }
                 )
             }
 
             composable(Screen.Settings.route) {
                 SettingsScreen(
-                    onStudyLink = { set ->
-                        navController.navigate(Screen.StudyOverlay.createRoute(set = set))
+                    onStudyLink = { set, type ->
+                        navController.navigate(Screen.StudyOverlay.createRoute(set = set, type = type))
                     }
                 )
             }

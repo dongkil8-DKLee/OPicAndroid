@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
@@ -70,6 +71,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -96,6 +98,8 @@ import com.opic.android.ui.theme.OPicColors
 fun PracticeScreen(
     onBack: () -> Unit,
     onNavigateToQuestion: (Int) -> Unit = {},
+    fromOverlay: Boolean = false,
+    onClose: (() -> Unit)? = null,
     viewModel: PracticeViewModel = hiltViewModel()
 ) {
     val state       by viewModel.uiState.collectAsState()
@@ -109,27 +113,44 @@ fun PracticeScreen(
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize()) {
-        when {
-            state.loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator()
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("문장 분석 중...")
+    Box(modifier = Modifier.fillMaxSize()) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            when {
+                state.loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("문장 분석 중...")
+                        }
                     }
                 }
-            }
-            state.error != null -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(state.error ?: "Error", color = Color.Red)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = onBack) { Text("Back") }
+                state.error != null -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(state.error ?: "Error", color = Color.Red)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(onClick = onBack) { Text("Back") }
+                        }
                     }
                 }
+                else -> PracticeContent(state, filterState, viewModel, onBack, onNavigateToQuestion)
             }
-            else -> PracticeContent(state, filterState, viewModel, onBack, onNavigateToQuestion)
+        }
+        if (fromOverlay && onClose != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 10.dp, end = 10.dp)
+                    .size(36.dp)
+                    .shadow(elevation = 6.dp, shape = CircleShape)
+                    .clip(CircleShape)
+                    .background(OPicColors.Primary)
+                    .clickable { onClose() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.Close, contentDescription = "닫기", tint = Color.White, modifier = Modifier.size(18.dp))
+            }
         }
     }
 }
