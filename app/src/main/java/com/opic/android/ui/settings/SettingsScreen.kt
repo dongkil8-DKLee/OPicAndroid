@@ -86,7 +86,6 @@ private val ColorStudy      = Color(0xFF3498DB)   // 블루
 private val ColorAi         = Color(0xFF9B59B6)   // 퍼플
 private val ColorEdit       = Color(0xFF27AE60)   // 그린
 private val ColorData       = Color(0xFFE74C3C)   // 레드
-private val ColorFolder     = Color(0xFF7F8C8D)   // 그레이
 
 @Composable
 fun SettingsScreen(
@@ -106,14 +105,6 @@ fun SettingsScreen(
     }
 
     // Launchers — 최상단에 선언
-    val levelImageLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree()
-    ) { uri ->
-        uri?.let {
-            context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            viewModel.onLevelImageDirChanged(it.toString())
-        }
-    }
     val soundDirLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
@@ -264,25 +255,15 @@ fun SettingsScreen(
 
                 HorizontalDivider(color = OPicColors.Border)
 
-                // ─── 2. 학습 설정 ─────────────────────────────────────
+                // ─── 2. 음성 설정 ─────────────────────────────────────
                 CategorySection(
                     icon = Icons.AutoMirrored.Filled.MenuBook,
                     iconTint = ColorStudy,
-                    title = "학습 설정",
-                    subtitle = "목표 등급 · TTS 음성",
+                    title = "음성 설정",
+                    subtitle = "TTS 엔진 · 음성 · 저장 폴더",
                     expanded = expandedCategory == "study",
                     onToggle = { expandedCategory = if (expandedCategory == "study") null else "study" }
                 ) {
-                    // 목표 등급
-                    Text("OPic 목표 등급", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
-                    Spacer(Modifier.height(6.dp))
-                    BottomSheetPicker(
-                        label = "목표 등급",
-                        selected = state.targetGrade,
-                        options = listOf("AL", "IH", "IM3", "IM2", "IM1", "IL", "NH"),
-                        onSelected = { viewModel.onTargetGradeChanged(it) }
-                    )
-                    Spacer(Modifier.height(12.dp))
                     // TTS 엔진
                     if (state.availableEngines.isNotEmpty()) {
                         Text("TTS 엔진", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
@@ -332,6 +313,15 @@ fun SettingsScreen(
                     } else {
                         Text("음성 목록 로딩 중...", fontSize = 12.sp, color = Color.Gray)
                     }
+                    Spacer(Modifier.height(12.dp))
+                    // 음성 저장 폴더
+                    Text("음성 저장 폴더", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
+                    Spacer(Modifier.height(6.dp))
+                    FolderPickerRow(
+                        path = state.soundDir,
+                        placeholder = "폴더를 선택하세요...",
+                        onClick = { soundDirLauncher.launch(null) }
+                    )
                 }
 
                 HorizontalDivider(color = OPicColors.Border)
@@ -376,6 +366,16 @@ fun SettingsScreen(
                     ProfileField("가족 관계", state.profileFamily) { viewModel.onProfileFamilyChanged(it) }
                     ProfileField("국적/거주지", state.profileCountry) { viewModel.onProfileCountryChanged(it) }
                     ProfileField("기타 (자유 서술)", state.profileBackground) { viewModel.onProfileBackgroundChanged(it) }
+                    Spacer(Modifier.height(12.dp))
+                    // OPic 목표 등급
+                    Text("OPic 목표 등급", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
+                    Spacer(Modifier.height(6.dp))
+                    BottomSheetPicker(
+                        label = "목표 등급",
+                        selected = state.targetGrade,
+                        options = listOf("AL", "IH", "IM3", "IM2", "IM1", "IL", "NH"),
+                        onSelected = { viewModel.onTargetGradeChanged(it) }
+                    )
                 }
 
                 HorizontalDivider(color = OPicColors.Border)
@@ -569,34 +569,6 @@ fun SettingsScreen(
                             Text("내보내기", fontSize = 12.sp)
                         }
                     }
-                }
-
-                HorizontalDivider(color = OPicColors.Border)
-
-                // ─── 5. 파일 경로 ─────────────────────────────────────
-                CategorySection(
-                    icon = Icons.Filled.FolderOpen,
-                    iconTint = ColorFolder,
-                    title = "파일 경로",
-                    subtitle = "레벨 이미지 · 음성 저장 폴더",
-                    expanded = expandedCategory == "folder",
-                    onToggle = { expandedCategory = if (expandedCategory == "folder") null else "folder" }
-                ) {
-                    Text("레벨 이미지 폴더", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
-                    Spacer(Modifier.height(6.dp))
-                    FolderPickerRow(
-                        path = state.levelImageDir,
-                        placeholder = "폴더를 선택하세요...",
-                        onClick = { levelImageLauncher.launch(null) }
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Text("음성 저장 폴더", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
-                    Spacer(Modifier.height(6.dp))
-                    FolderPickerRow(
-                        path = state.soundDir,
-                        placeholder = "폴더를 선택하세요...",
-                        onClick = { soundDirLauncher.launch(null) }
-                    )
                 }
 
                 HorizontalDivider(color = OPicColors.Border)

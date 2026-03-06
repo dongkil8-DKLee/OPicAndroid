@@ -1,7 +1,5 @@
 package com.opic.android.ui.report
 
-import android.graphics.BitmapFactory
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -44,16 +42,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.opic.android.R
 import com.opic.android.ui.theme.OPicColors
-import java.io.File
 
 // Grade colors (SpeechAnalysisPanel.kt 기준)
 private val GradeA = Color(0xFF2ECC71)
@@ -144,8 +137,19 @@ private fun LevelHeaderSection(state: ReportUiState) {
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 레벨 아바타
-        LevelAvatar(level = state.level, externalDir = state.levelImageDir)
+        // OPic 목표 등급
+        Text(
+            text = "OPic 목표 등급",
+            fontSize = 12.sp,
+            color = OPicColors.DisabledBg
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = state.targetGrade.ifBlank { "—" },
+            fontSize = 32.sp,
+            fontWeight = FontWeight.Bold,
+            color = OPicColors.Primary
+        )
 
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -158,10 +162,10 @@ private fun LevelHeaderSection(state: ReportUiState) {
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // 게이지 바
+        // 게이지 바 (30% 더 길게: 0.6 → 0.78)
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.6f)
+                .fillMaxWidth(0.78f)
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -181,54 +185,6 @@ private fun LevelHeaderSection(state: ReportUiState) {
                 color = OPicColors.TextOnLight
             )
         }
-    }
-}
-
-/** 외부 폴더 우선 이미지 로드, 없으면 drawable fallback */
-@Composable
-private fun LevelAvatar(level: Int, externalDir: String) {
-    val externalBitmap = remember(level, externalDir) {
-        if (externalDir.isNotBlank()) {
-            val file = File(externalDir, "level_$level.png")
-            if (file.exists()) {
-                try {
-                    BitmapFactory.decodeFile(file.absolutePath)
-                } catch (_: Exception) { null }
-            } else null
-        } else null
-    }
-
-    if (externalBitmap != null) {
-        Image(
-            bitmap = externalBitmap.asImageBitmap(),
-            contentDescription = "Level $level Avatar",
-            modifier = Modifier.size(120.dp),
-            contentScale = ContentScale.Fit
-        )
-    } else {
-        Image(
-            painter = painterResource(id = levelDrawable(level)),
-            contentDescription = "Level $level Avatar",
-            modifier = Modifier.size(120.dp),
-            contentScale = ContentScale.Fit
-        )
-    }
-}
-
-/** level 번호(1~10) → R.drawable.level_N 매핑 */
-private fun levelDrawable(level: Int): Int {
-    return when (level) {
-        1 -> R.drawable.level_1
-        2 -> R.drawable.level_2
-        3 -> R.drawable.level_3
-        4 -> R.drawable.level_4
-        5 -> R.drawable.level_5
-        6 -> R.drawable.level_6
-        7 -> R.drawable.level_7
-        8 -> R.drawable.level_8
-        9 -> R.drawable.level_9
-        10 -> R.drawable.level_10
-        else -> R.drawable.level_1
     }
 }
 

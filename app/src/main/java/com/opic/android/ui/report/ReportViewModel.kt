@@ -37,7 +37,7 @@ data class ReportUiState(
     // Level info (from StartScreen)
     val level: Int = 1,
     val gaugePercent: Int = 0,
-    val levelImageDir: String = "",
+    val targetGrade: String = "",
 
     // Vocabulary summary
     val vocabTotal: Int = 0,
@@ -209,7 +209,7 @@ class ReportViewModel @Inject constructor(
                         recentTests = recentTests,
                         level = levelInfo.level,
                         gaugePercent = levelInfo.gaugePercent,
-                        levelImageDir = appPrefs.levelImageDir,
+                        targetGrade = appPrefs.targetGrade,
                         vocabTotal = vocabTotal,
                         vocabMemorized = vocabMemorized,
                         vocabFavorites = vocabFavorites,

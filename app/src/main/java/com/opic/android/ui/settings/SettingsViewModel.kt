@@ -32,7 +32,6 @@ import javax.inject.Inject
 data class SettingsUiState(
     // 기존 필드
     val textSize: Int = 18,
-    val levelImageDir: String = "",
     val soundDir: String = "",
     val targetGrade: String = "IM2",
 
@@ -103,7 +102,6 @@ class SettingsViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 textSize = appPrefs.textSize,
-                levelImageDir = appPrefs.levelImageDir,
                 soundDir = appPrefs.soundDir,
                 targetGrade = appPrefs.targetGrade,
                 selectedVoice = appPrefs.selectedVoice,
@@ -213,12 +211,6 @@ class SettingsViewModel @Inject constructor(
     fun onTextSizeChanged(size: Int) {
         appPrefs.textSize = size
         _uiState.update { it.copy(textSize = size) }
-    }
-
-    fun onLevelImageDirChanged(dir: String) {
-        val realPath = convertTreeUriToFilePath(dir)
-        appPrefs.levelImageDir = realPath
-        _uiState.update { it.copy(levelImageDir = realPath) }
     }
 
     fun onSoundDirChanged(dir: String) {
