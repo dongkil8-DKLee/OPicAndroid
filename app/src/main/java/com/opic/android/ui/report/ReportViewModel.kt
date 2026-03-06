@@ -307,7 +307,7 @@ class ReportViewModel @Inject constructor(
                 for (row in rows.drop(1)) {
                     val id = row.getOrNull(idIdx)?.toIntOrNull() ?: continue
                     if (qtIdx >= 0) row.getOrNull(qtIdx)?.let { v -> if (v.isNotBlank()) questionDao.updateQuestionText(id, v) }
-                    if (asIdx >= 0) row.getOrNull(asIdx)?.let { v -> questionDao.updateAnswerScript(id, v) }
+                    if (asIdx >= 0) row.getOrNull(asIdx)?.let { v -> if (v.isNotBlank()) questionDao.updateAnswerScript(id, v) }
                     if (usIdx >= 0) row.getOrNull(usIdx)?.let { v -> if (v.isNotBlank()) questionDao.updateUserScript(id, v) }
                     if (aiIdx >= 0) row.getOrNull(aiIdx)?.let { v -> if (v.isNotBlank()) questionDao.updateAiAnswer(id, v) }
                     count++
