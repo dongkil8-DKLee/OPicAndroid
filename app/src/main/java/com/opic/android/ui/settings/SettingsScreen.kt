@@ -124,14 +124,6 @@ fun SettingsScreen(
             viewModel.onSoundDirChanged(it.toString())
         }
     }
-    val csvExportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/csv")
-    ) { uri -> uri?.let { viewModel.exportCsv(it) } }
-
-    val csvImportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri -> uri?.let { viewModel.importCsv(it) } }
-
     val vocabCsvExportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv")
     ) { uri -> uri?.let { viewModel.exportVocabCsv(it) } }
@@ -516,7 +508,7 @@ fun SettingsScreen(
                     Spacer(Modifier.height(16.dp))
 
                     // ── Q&A 스크립트 CSV ───────────────────────────────
-                    SectionTitle("Q&A 스크립트 (question_text · answer_script · user_script · ai_answer)")
+                    SectionTitle("Q&A 스크립트\n(question_text · answer_script · user_script · ai_answer)")
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
@@ -547,34 +539,6 @@ fun SettingsScreen(
                                 Spacer(Modifier.width(4.dp))
                                 Text("가져오기", fontSize = 12.sp, color = OPicColors.Primary)
                             }
-                        }
-                    }
-
-                    Spacer(Modifier.height(16.dp))
-
-                    // ── 문제 전체 CSV (원시 데이터) ────────────────────
-                    SectionTitle("문제 전체 CSV (원시 데이터)")
-                    Spacer(Modifier.height(6.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = { csvImportLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "*/*")) },
-                            colors = ButtonDefaults.buttonColors(containerColor = OPicColors.Primary),
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("가져오기", fontSize = 12.sp)
-                        }
-                        Button(
-                            onClick = { csvExportLauncher.launch("opic_questions.csv") },
-                            colors = ButtonDefaults.buttonColors(containerColor = OPicColors.Primary),
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Filled.Upload, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("내보내기", fontSize = 12.sp)
                         }
                     }
 

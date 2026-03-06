@@ -48,9 +48,6 @@ data class SettingsUiState(
     val editQAudio: String = "",
     val editAAudio: String = "",
 
-    // CSV
-    val csvPath: String = "",
-
     // TTS Engine & Voice
     val availableEngines: List<EngineOption> = emptyList(),
     val selectedEnginePackage: String = "",
@@ -346,92 +343,6 @@ class SettingsViewModel @Inject constructor(
 
     fun clearSnackbar() {
         _uiState.update { it.copy(snackbarMessage = null) }
-    }
-
-    // ==================== CSV (Questions) ====================
-
-    fun onCsvPathChanged(path: String) {
-        _uiState.update { it.copy(csvPath = path) }
-    }
-
-    fun exportCsv(uri: Uri) = viewModelScope.launch(Dispatchers.IO) {
-        try {
-            val questions = questionDao.getAllQuestionsOnce()
-            context.contentResolver.openOutputStream(uri)?.use { out ->
-                out.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
-                val writer = out.bufferedWriter()
-                writer.write("question_id,title,set,type,combo,question_text,answer_script,question_audio,answer_audio,user_script\n")
-                questions.forEach { q ->
-                    val row = listOf(
-                        q.questionId.toString(),
-                        q.title.csvEscape(),
-                        (q.set ?: "").csvEscape(),
-                        (q.type ?: "").csvEscape(),
-                        (q.combo ?: "").csvEscape(),
-                        (q.questionText ?: "").csvEscape(),
-                        (q.answerScript ?: "").csvEscape(),
-                        (q.questionAudio ?: "").csvEscape(),
-                        (q.answerAudio ?: "").csvEscape(),
-                        (q.userScript ?: "").csvEscape()
-                    ).joinToString(",")
-                    writer.write("$row\n")
-                }
-                writer.flush()
-            }
-            withContext(Dispatchers.Main) {
-                _uiState.update { it.copy(snackbarMessage = "CSV 내보내기 완료") }
-            }
-        } catch (e: Exception) {
-            withContext(Dispatchers.Main) {
-                _uiState.update { it.copy(snackbarMessage = "내보내기 실패: ${e.message}") }
-            }
-        }
-    }
-
-    fun importCsv(uri: Uri) = viewModelScope.launch(Dispatchers.IO) {
-        try {
-            context.contentResolver.openInputStream(uri)?.use { ins ->
-                val lines = ins.bufferedReader().readLines()
-                if (lines.isEmpty()) return@use
-                val header = lines.first().split(",")
-                val idxId    = header.indexOf("question_id")
-                val idxTitle = header.indexOf("title")
-                val idxSet   = header.indexOf("set")
-                val idxType  = header.indexOf("type")
-                val idxCombo = header.indexOf("combo")
-                val idxQText = header.indexOf("question_text")
-                val idxAScript = header.indexOf("answer_script")
-                val idxQAudio  = header.indexOf("question_audio")
-                val idxAAudio  = header.indexOf("answer_audio")
-                val idxUScript = header.indexOf("user_script")
-
-                lines.drop(1).forEach { line ->
-                    val cols = parseCsvLine(line)
-                    val id = cols.getOrNull(idxId)?.toIntOrNull() ?: return@forEach
-                    val entity = QuestionEntity(
-                        questionId  = id,
-                        title       = cols.getOrElse(idxTitle) { "" },
-                        set         = cols.getOrNull(idxSet)?.ifBlank { null },
-                        type        = cols.getOrNull(idxType)?.ifBlank { null },
-                        combo       = cols.getOrNull(idxCombo)?.ifBlank { null },
-                        questionText  = cols.getOrNull(idxQText)?.ifBlank { null },
-                        answerScript  = cols.getOrNull(idxAScript)?.ifBlank { null },
-                        questionAudio = cols.getOrNull(idxQAudio)?.ifBlank { null },
-                        answerAudio   = cols.getOrNull(idxAAudio)?.ifBlank { null },
-                        userScript    = cols.getOrNull(idxUScript)?.ifBlank { null }
-                    )
-                    questionDao.upsert(entity)
-                }
-            }
-            withContext(Dispatchers.Main) {
-                _uiState.update { it.copy(snackbarMessage = "CSV 가져오기 완료") }
-                loadQuestions()
-            }
-        } catch (e: Exception) {
-            withContext(Dispatchers.Main) {
-                _uiState.update { it.copy(snackbarMessage = "가져오기 실패: ${e.message}") }
-            }
-        }
     }
 
     // ==================== Vocabulary CSV ====================
