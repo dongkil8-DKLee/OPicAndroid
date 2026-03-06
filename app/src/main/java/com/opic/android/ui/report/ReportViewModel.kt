@@ -9,8 +9,10 @@ import com.opic.android.data.local.dao.SessionSummary
 import com.opic.android.data.local.dao.StudyProgressDao
 import com.opic.android.data.local.dao.TestDao
 import com.opic.android.data.local.dao.VocabularyDao
+import com.opic.android.data.local.db.OPicDatabase
 import com.opic.android.data.prefs.AppPreferences
 import com.opic.android.domain.LevelCalculator
+import com.opic.android.util.CsvUtil
 import com.opic.android.util.SpeechAnalyzer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -49,15 +51,16 @@ data class ReportUiState(
     // Session lock
     val lockedSessions: Set<Int> = emptySet(),
 
-    // 학습 현황 CSV 내보내기
+    // 통합 Q&A CSV 내보내기/가져오기
     val csvContent: String? = null,
     val csvExporting: Boolean = false,
-
-    // Q&A CSV 내보내기/가져오기
-    val qaCsvContent: String? = null,
-    val qaCsvExporting: Boolean = false,
     val importingCsv: Boolean = false,
-    val importResult: String? = null
+    val importResult: String? = null,
+
+    // DB 백업/복원
+    val isBackingUp: Boolean = false,
+    val isRestoring: Boolean = false,
+    val dbBackupBytes: ByteArray? = null
 )
 
 data class TopicAccuracy(
@@ -74,7 +77,8 @@ class ReportViewModel @Inject constructor(
     private val testDao: TestDao,
     private val levelCalculator: LevelCalculator,
     private val appPrefs: AppPreferences,
-    private val vocabularyDao: VocabularyDao
+    private val vocabularyDao: VocabularyDao,
+    private val database: OPicDatabase
 ) : ViewModel() {
 
     companion object {
@@ -234,7 +238,7 @@ class ReportViewModel @Inject constructor(
         }
     }
 
-    // ===== CSV 내보내기 =====
+    // ===== 통합 Q&A CSV 내보내기/가져오기 =====
 
     fun prepareCsvExport() {
         if (_uiState.value.csvExporting) return
@@ -243,20 +247,20 @@ class ReportViewModel @Inject constructor(
             try {
                 val rows = questionDao.getAllQuestionsWithProgressFull(USER_ID)
                 val sb = StringBuilder()
-                sb.append("question_id,title,set,type,study_count,is_favorite,last_modified,stt_grade,stt_accuracy_pct,has_ai_answer,user_script\n")
+                sb.append("question_id,title,set,type,question_text,answer_script,user_script,ai_answer,study_count,is_favorite,stt_grade\n")
                 for (r in rows) {
                     val analysis = r.analysisResult?.let { SpeechAnalyzer.fromJson(it) }
                     sb.append("${r.questionId},")
-                    sb.append("\"${r.title.escapeCsv()}\",")
-                    sb.append("\"${r.set?.escapeCsv() ?: ""}\",")
-                    sb.append("\"${r.type?.escapeCsv() ?: ""}\",")
+                    sb.append("\"${CsvUtil.escape(r.title)}\",")
+                    sb.append("\"${CsvUtil.escape(r.set ?: "")}\",")
+                    sb.append("\"${CsvUtil.escape(r.type ?: "")}\",")
+                    sb.append("\"${CsvUtil.escape(r.questionText ?: "")}\",")
+                    sb.append("\"${CsvUtil.escape(r.answerScript ?: "")}\",")
+                    sb.append("\"${CsvUtil.escape(r.userScript ?: "")}\",")
+                    sb.append("\"${CsvUtil.escape(r.aiAnswer ?: "")}\",")
                     sb.append("${r.studyCount ?: 0},")
                     sb.append("${(r.isFavorite ?: 0) == 1},")
-                    sb.append("\"${r.lastModified ?: ""}\",")
-                    sb.append("${analysis?.grade ?: ""},")
-                    sb.append("${analysis?.accuracyPercent?.toInt() ?: ""},")
-                    sb.append("${!r.aiAnswer.isNullOrBlank()},")
-                    sb.append("\"${r.userScript?.escapeCsv() ?: ""}\"")
+                    sb.append("${analysis?.grade ?: ""}")
                     sb.append("\n")
                 }
                 _uiState.update { it.copy(csvContent = sb.toString(), csvExporting = false) }
@@ -268,37 +272,6 @@ class ReportViewModel @Inject constructor(
     }
 
     fun clearCsvContent() = _uiState.update { it.copy(csvContent = null) }
-
-    // ===== Q&A 내보내기/가져오기 =====
-
-    fun prepareQaCsvExport() {
-        if (_uiState.value.qaCsvExporting) return
-        _uiState.update { it.copy(qaCsvExporting = true) }
-        viewModelScope.launch {
-            try {
-                val rows = questionDao.getAllQuestionsWithProgressFull(USER_ID)
-                val sb = StringBuilder()
-                sb.append("question_id,title,set,type,question_text,answer_script,user_script,ai_answer\n")
-                for (r in rows) {
-                    sb.append("${r.questionId},")
-                    sb.append("\"${r.title.escapeCsv()}\",")
-                    sb.append("\"${r.set?.escapeCsv() ?: ""}\",")
-                    sb.append("\"${r.type?.escapeCsv() ?: ""}\",")
-                    sb.append("\"${r.questionText?.escapeCsv() ?: ""}\",")
-                    sb.append("\"${r.answerScript?.escapeCsv() ?: ""}\",")
-                    sb.append("\"${r.userScript?.escapeCsv() ?: ""}\",")
-                    sb.append("\"${r.aiAnswer?.escapeCsv() ?: ""}\"")
-                    sb.append("\n")
-                }
-                _uiState.update { it.copy(qaCsvContent = sb.toString(), qaCsvExporting = false) }
-            } catch (e: Exception) {
-                Log.e(TAG, "Q&A CSV 생성 실패", e)
-                _uiState.update { it.copy(qaCsvExporting = false) }
-            }
-        }
-    }
-
-    fun clearQaCsvContent() = _uiState.update { it.copy(qaCsvContent = null) }
 
     fun importQaCsvFromUri(uri: Uri) {
         if (_uiState.value.importingCsv) return
@@ -312,7 +285,7 @@ class ReportViewModel @Inject constructor(
                     return@launch
                 }
 
-                val rows = parseCsvContent(content)
+                val rows = CsvUtil.parse(content)
                 if (rows.size < 2) {
                     _uiState.update { it.copy(importingCsv = false, importResult = "유효한 데이터 없음") }
                     return@launch
@@ -349,43 +322,42 @@ class ReportViewModel @Inject constructor(
 
     fun clearImportResult() = _uiState.update { it.copy(importResult = null) }
 
-    /** RFC 4180 CSV 파서 — 멀티라인 필드, 이중따옴표 이스케이프 지원 */
-    private fun parseCsvContent(content: String): List<List<String>> {
-        val result = mutableListOf<List<String>>()
-        val currentRow = mutableListOf<String>()
-        val currentField = StringBuilder()
-        var inQuotes = false
-        var i = 0
+    // ===== DB 백업/복원 =====
 
-        while (i < content.length) {
-            val ch = content[i]
-            when {
-                inQuotes && ch == '"' && i + 1 < content.length && content[i + 1] == '"' -> {
-                    currentField.append('"'); i += 2; continue
-                }
-                ch == '"' -> inQuotes = !inQuotes
-                !inQuotes && ch == ',' -> {
-                    currentRow.add(currentField.toString()); currentField.clear()
-                }
-                !inQuotes && ch == '\r' && i + 1 < content.length && content[i + 1] == '\n' -> {
-                    currentRow.add(currentField.toString())
-                    result.add(currentRow.toList()); currentRow.clear(); currentField.clear(); i += 2; continue
-                }
-                !inQuotes && (ch == '\n' || ch == '\r') -> {
-                    currentRow.add(currentField.toString())
-                    result.add(currentRow.toList()); currentRow.clear(); currentField.clear()
-                }
-                else -> currentField.append(ch)
+    fun backupDatabase() {
+        if (_uiState.value.isBackingUp) return
+        _uiState.update { it.copy(isBackingUp = true) }
+        viewModelScope.launch {
+            try {
+                val src = context.getDatabasePath("opic.db")
+                val bytes = src.readBytes()
+                _uiState.update { it.copy(isBackingUp = false, dbBackupBytes = bytes) }
+            } catch (e: Exception) {
+                Log.e(TAG, "DB 백업 실패", e)
+                _uiState.update { it.copy(isBackingUp = false, importResult = "백업 실패: ${e.message}") }
             }
-            i++
         }
-        // 마지막 행 처리
-        if (currentField.isNotEmpty() || currentRow.isNotEmpty()) {
-            currentRow.add(currentField.toString())
-            result.add(currentRow.toList())
-        }
-        return result
     }
 
-    private fun String.escapeCsv(): String = replace("\"", "\"\"")
+    fun clearDbBackupBytes() = _uiState.update { it.copy(dbBackupBytes = null) }
+
+    fun restoreDatabaseFromUri(uri: Uri) {
+        if (_uiState.value.isRestoring) return
+        _uiState.update { it.copy(isRestoring = true, importResult = null) }
+        viewModelScope.launch {
+            try {
+                val bytes = context.contentResolver.openInputStream(uri)?.readBytes()
+                    ?: run {
+                        _uiState.update { it.copy(isRestoring = false, importResult = "파일 읽기 실패") }
+                        return@launch
+                    }
+                database.close()
+                context.getDatabasePath("opic.db").writeBytes(bytes)
+                _uiState.update { it.copy(isRestoring = false, importResult = "복원 완료 — 앱을 재시작해주세요") }
+            } catch (e: Exception) {
+                Log.e(TAG, "DB 복원 실패", e)
+                _uiState.update { it.copy(isRestoring = false, importResult = "복원 실패: ${e.message}") }
+            }
+        }
+    }
 }
