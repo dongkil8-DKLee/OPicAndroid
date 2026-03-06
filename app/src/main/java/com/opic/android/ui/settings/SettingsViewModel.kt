@@ -74,6 +74,9 @@ data class SettingsUiState(
     val qaCsvExporting: Boolean = false,
     val importingCsv: Boolean = false,
 
+    // UI 상태 보존
+    val expandedCategory: String? = null,
+
     // 피드백
     val snackbarMessage: String? = null
 )
@@ -335,6 +338,10 @@ class SettingsViewModel @Inject constructor(
 
     fun clearSnackbar() {
         _uiState.update { it.copy(snackbarMessage = null) }
+    }
+
+    fun onCategoryToggle(key: String) {
+        _uiState.update { it.copy(expandedCategory = if (it.expandedCategory == key) null else key) }
     }
 
     // ==================== Vocabulary CSV ====================

@@ -83,7 +83,7 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                 ReviewScreen(
                     onNavigateToStudy = { type, set ->
                         // popUpTo 없음 → Back 시 Review로 복귀
-                        navController.navigate(Screen.Study.createRoute(type = type, set = set)) {
+                        navController.navigate(Screen.StudyOverlay.createRoute(set = set, type = type)) {
                             launchSingleTop = true
                         }
                     }
@@ -171,9 +171,14 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
             }
 
             composable(
-                route = Screen.StudyFromSettings.route,
+                route = Screen.StudyOverlay.route,
                 arguments = listOf(
                     navArgument("set") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument("type") {
                         type = NavType.StringType
                         nullable = true
                         defaultValue = null
@@ -184,9 +189,11 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                 popEnterTransition  = { slideInHorizontally(initialOffsetX = { -it }) },
                 popExitTransition   = { slideOutHorizontally(targetOffsetX = { -it }) }
             ) { backStackEntry ->
-                val set = backStackEntry.arguments?.getString("set")
+                val set  = backStackEntry.arguments?.getString("set")
+                val type = backStackEntry.arguments?.getString("type")
                 StudyScreen(
-                    initialTopicSet = set,
+                    initialTopicSet  = set,
+                    initialTopicType = type,
                     fromSettings = true,
                     onBack = { navController.popBackStack() }
                 )
@@ -195,7 +202,7 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onStudyLink = { set ->
-                        navController.navigate(Screen.StudyFromSettings.createRoute(set))
+                        navController.navigate(Screen.StudyOverlay.createRoute(set = set))
                     }
                 )
             }

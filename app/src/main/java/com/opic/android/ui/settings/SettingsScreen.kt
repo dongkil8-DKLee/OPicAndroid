@@ -95,7 +95,7 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
-    var expandedCategory by remember { mutableStateOf<String?>(null) }
+    val expandedCategory = state.expandedCategory
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.snackbarMessage) {
@@ -222,7 +222,7 @@ fun SettingsScreen(
                     title = "앱 외관",
                     subtitle = "테마 · 글자 크기",
                     expanded = expandedCategory == "appearance",
-                    onToggle = { expandedCategory = if (expandedCategory == "appearance") null else "appearance" }
+                    onToggle = { viewModel.onCategoryToggle("appearance") }
                 ) {
                     // 테마
                     Text("테마", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
@@ -263,7 +263,7 @@ fun SettingsScreen(
                     title = "음성 설정",
                     subtitle = "TTS 엔진 · 음성 · 저장 폴더",
                     expanded = expandedCategory == "study",
-                    onToggle = { expandedCategory = if (expandedCategory == "study") null else "study" }
+                    onToggle = { viewModel.onCategoryToggle("study") }
                 ) {
                     // 음성 저장 폴더
                     Text("음성 저장 폴더", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
@@ -334,7 +334,7 @@ fun SettingsScreen(
                     title = "AI 설정",
                     subtitle = "OPic 목표 등급 · API Key · 개인 프로필",
                     expanded = expandedCategory == "ai",
-                    onToggle = { expandedCategory = if (expandedCategory == "ai") null else "ai" }
+                    onToggle = { viewModel.onCategoryToggle("ai") }
                 ) {
                     // OPic 목표 등급
                     Text("OPic 목표 등급", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
@@ -388,7 +388,7 @@ fun SettingsScreen(
                     title = "데이터 관리",
                     subtitle = "문제 편집 · CSV · DB 백업/복원",
                     expanded = expandedCategory == "data",
-                    onToggle = { expandedCategory = if (expandedCategory == "data") null else "data" }
+                    onToggle = { viewModel.onCategoryToggle("data") }
                 ) {
                     // ── 문제 편집 ──────────────────────────────────────
                     Row(

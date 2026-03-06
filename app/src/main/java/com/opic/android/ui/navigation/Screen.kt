@@ -29,10 +29,13 @@ sealed class Screen(val route: String) {
     data object Practice : Screen("PracticeScreen/{questionId}") {
         fun createRoute(questionId: Int) = "PracticeScreen/$questionId"
     }
-    data object StudyFromSettings : Screen("StudyFromSettings?set={set}") {
-        fun createRoute(set: String? = null): String =
-            if (set.isNullOrBlank() || set == "전체") "StudyFromSettings"
-            else "StudyFromSettings?set=$set"
+    data object StudyOverlay : Screen("StudyOverlay?set={set}&type={type}") {
+        fun createRoute(set: String? = null, type: String? = null): String {
+            val params = mutableListOf<String>()
+            if (!set.isNullOrBlank() && set != "전체") params.add("set=$set")
+            if (!type.isNullOrBlank()) params.add("type=$type")
+            return if (params.isEmpty()) "StudyOverlay" else "StudyOverlay?${params.joinToString("&")}"
+        }
     }
     data object Settings : Screen("SettingsScreen")
     data object Report : Screen("ReportScreen")
