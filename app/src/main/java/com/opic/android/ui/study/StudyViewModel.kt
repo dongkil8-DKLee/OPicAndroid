@@ -1,6 +1,8 @@
 package com.opic.android.ui.study
 
 import android.content.Context
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -294,12 +296,8 @@ class StudyViewModel @Inject constructor(
     }
 
     private fun findUserRecording(questionId: Int): String? {
-        if (!recordingDir.exists()) return null
-        val pattern = "UserRec_${questionId}_"
-        return recordingDir.listFiles()
-            ?.filter { it.name.startsWith(pattern) && it.name.endsWith(".wav") }
-            ?.maxByOrNull { it.name }
-            ?.absolutePath
+        val file = File(recordingDir, "Study_${questionId}.wav")
+        return if (file.exists()) file.absolutePath else null
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -520,14 +518,15 @@ class StudyViewModel @Inject constructor(
         val q = _uiState.value.currentQuestion ?: return
         if (_uiState.value.playingTarget != null || _uiState.value.groupPlaying) return
 
-        val timestamp  = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val outputFile = File(recordingDir, "UserRec_${q.questionId}_$timestamp.wav")
+        val outputFile = File(recordingDir, "Study_${q.questionId}.wav")
         _uiState.update { it.copy(isRecording = true, micLevel = 0f) }
+        ToneGenerator(AudioManager.STREAM_MUSIC, 80).startTone(ToneGenerator.TONE_PROP_BEEP, 150)
 
         recordingJob = viewModelScope.launch {
             audioRecorder.record(outputFile) { rmsLevel ->
                 _uiState.update { it.copy(micLevel = rmsLevel) }
             }
+            ToneGenerator(AudioManager.STREAM_MUSIC, 80).startTone(ToneGenerator.TONE_PROP_BEEP2, 150)
             _uiState.update {
                 it.copy(
                     isRecording  = false,

@@ -35,8 +35,6 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
@@ -137,7 +135,6 @@ private fun StudyContent(
     val context  = LocalContext.current
     val isBusy   = state.playingTarget != null || state.isRecording || state.groupPlaying
     var showFilter    by remember { mutableStateOf(false) }
-    var expandedScript by remember { mutableStateOf<String?>(null) }
     var splitFraction  by remember { mutableFloatStateOf(0.44f) }
     val questionScrollState = rememberScrollState()
     val answerScrollState   = rememberScrollState()
@@ -227,83 +224,46 @@ private fun StudyContent(
         }
 
         // ===== 스크립트 영역 =====
-        if (expandedScript == null) {
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                val totalHeightPx = with(LocalDensity.current) { maxHeight.toPx() }
-                Column(modifier = Modifier.fillMaxSize()) {
-                    ScriptSection(
-                        modifier             = Modifier.fillMaxWidth().weight(splitFraction),
-                        label                = "Question",
-                        scriptText           = state.currentQuestion?.questionText,
-                        highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.QUESTION) state.highlightedWordIndex else -1,
-                        isEditing            = state.editingQuestion,
-                        draft                = state.questionDraft,
-                        onToggleEdit         = { viewModel.toggleEditQuestion() },
-                        onCancelEdit         = { viewModel.cancelEditQuestion() },
-                        onDraftChange        = { viewModel.updateQuestionDraft(it) },
-                        onSave               = { viewModel.saveQuestionScript() },
-                        fontSize             = state.fontSize,
-                        isPlaying            = state.playingTarget == StudyPlayTarget.QUESTION,
-                        canPlay              = !isBusy && state.currentQuestion != null,
-                        onPlay               = { viewModel.playQuestionAudio() },
-                        onStop               = { viewModel.stopAudio() },
-                        isExpanded           = false,
-                        onExpandToggle       = { expandedScript = "question" },
-                        scrollState          = questionScrollState
-                    )
-                    Box(
-                        modifier = Modifier.fillMaxWidth().height(12.dp).draggable(
-                            state       = rememberDraggableState { delta ->
-                                splitFraction = (splitFraction + delta / totalHeightPx).coerceIn(0.15f, 0.85f)
-                            },
-                            orientation = Orientation.Vertical
-                        ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(modifier = Modifier.size(width = 40.dp, height = 4.dp).background(Color.Gray.copy(alpha = 0.4f), RoundedCornerShape(2.dp)))
-                    }
-                    AnswerTabSection(
-                        modifier       = Modifier.fillMaxWidth().weight(1f - splitFraction),
-                        state          = state,
-                        viewModel      = viewModel,
-                        isBusy         = isBusy,
-                        isExpanded     = false,
-                        onExpandToggle = { expandedScript = "answer" },
-                        scrollState    = answerScrollState
-                    )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            val totalHeightPx = with(LocalDensity.current) { maxHeight.toPx() }
+            Column(modifier = Modifier.fillMaxSize()) {
+                ScriptSection(
+                    modifier             = Modifier.fillMaxWidth().weight(splitFraction),
+                    label                = "Question",
+                    scriptText           = state.currentQuestion?.questionText,
+                    highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.QUESTION) state.highlightedWordIndex else -1,
+                    isEditing            = state.editingQuestion,
+                    draft                = state.questionDraft,
+                    onToggleEdit         = { viewModel.toggleEditQuestion() },
+                    onCancelEdit         = { viewModel.cancelEditQuestion() },
+                    onDraftChange        = { viewModel.updateQuestionDraft(it) },
+                    onSave               = { viewModel.saveQuestionScript() },
+                    fontSize             = state.fontSize,
+                    isPlaying            = state.playingTarget == StudyPlayTarget.QUESTION,
+                    canPlay              = !isBusy && state.currentQuestion != null,
+                    onPlay               = { viewModel.playQuestionAudio() },
+                    onStop               = { viewModel.stopAudio() },
+                    scrollState          = questionScrollState
+                )
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(12.dp).draggable(
+                        state       = rememberDraggableState { delta ->
+                            splitFraction = (splitFraction + delta / totalHeightPx).coerceIn(0.15f, 0.85f)
+                        },
+                        orientation = Orientation.Vertical
+                    ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(modifier = Modifier.size(width = 40.dp, height = 4.dp).background(Color.Gray.copy(alpha = 0.4f), RoundedCornerShape(2.dp)))
                 }
+                AnswerTabSection(
+                    modifier    = Modifier.fillMaxWidth().weight(1f - splitFraction),
+                    state       = state,
+                    viewModel   = viewModel,
+                    isBusy      = isBusy,
+                    scrollState = answerScrollState
+                )
             }
-        } else if (expandedScript == "question") {
-            ScriptSection(
-                modifier             = Modifier.weight(1f),
-                label                = "Question",
-                scriptText           = state.currentQuestion?.questionText,
-                highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.QUESTION) state.highlightedWordIndex else -1,
-                isEditing            = state.editingQuestion,
-                draft                = state.questionDraft,
-                onToggleEdit         = { viewModel.toggleEditQuestion() },
-                onCancelEdit         = { viewModel.cancelEditQuestion() },
-                onDraftChange        = { viewModel.updateQuestionDraft(it) },
-                onSave               = { viewModel.saveQuestionScript() },
-                fontSize             = state.fontSize,
-                isPlaying            = state.playingTarget == StudyPlayTarget.QUESTION,
-                canPlay              = !isBusy && state.currentQuestion != null,
-                onPlay               = { viewModel.playQuestionAudio() },
-                onStop               = { viewModel.stopAudio() },
-                isExpanded           = true,
-                onExpandToggle       = { expandedScript = null },
-                scrollState          = questionScrollState
-            )
-        } else {
-            AnswerTabSection(
-                modifier       = Modifier.weight(1f),
-                state          = state,
-                viewModel      = viewModel,
-                isBusy         = isBusy,
-                isExpanded     = true,
-                onExpandToggle = { expandedScript = null },
-                scrollState    = answerScrollState
-            )
         }
 
         Spacer(modifier = Modifier.height(4.dp))
@@ -557,8 +517,6 @@ private fun AnswerTabSection(
     state: StudyUiState,
     viewModel: StudyViewModel,
     isBusy: Boolean,
-    isExpanded: Boolean,
-    onExpandToggle: () -> Unit,
     scrollState: ScrollState
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -591,8 +549,6 @@ private fun AnswerTabSection(
                 canPlay              = !isBusy && state.currentQuestion != null,
                 onPlay               = { viewModel.playAnswerAudio() },
                 onStop               = { viewModel.stopAudio() },
-                isExpanded           = isExpanded,
-                onExpandToggle       = onExpandToggle,
                 scrollState          = scrollState
             )
             else -> AiAnswerSection(
@@ -717,8 +673,6 @@ private fun ScriptSection(
     canPlay: Boolean,
     onPlay: () -> Unit,
     onStop: () -> Unit,
-    isExpanded: Boolean,
-    onExpandToggle: () -> Unit,
     scrollState: ScrollState = rememberScrollState()
 ) {
     Column(
@@ -753,14 +707,6 @@ private fun ScriptSection(
                 TextButton(onClick = onToggleEdit) { Text("Edit", fontSize = 12.sp) }
             }
             Spacer(modifier = Modifier.weight(1f))
-            IconButton(onClick = onExpandToggle, modifier = Modifier.size(28.dp)) {
-                Icon(
-                    if (isExpanded) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
-                    contentDescription = if (isExpanded) "축소" else "확대",
-                    tint     = Color.Gray,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
         }
 
         if (isEditing) {

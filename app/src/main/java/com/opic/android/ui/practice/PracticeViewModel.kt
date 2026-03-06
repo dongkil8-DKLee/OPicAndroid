@@ -1,7 +1,9 @@
 package com.opic.android.ui.practice
 
 import android.content.Context
+import android.media.AudioManager
 import android.media.MediaPlayer
+import android.media.ToneGenerator
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -179,7 +181,7 @@ class PracticeViewModel @Inject constructor(
 
     /** 문장별 UserScript 녹음 파일 경로 (고정 파일명, 재녹음 = 덮어쓰기) */
     private fun userRecordingPath(sentenceIndex: Int): String =
-        File(recordingDir, "UserRec_${_uiState.value.questionId}_S${sentenceIndex}.wav").absolutePath
+        File(recordingDir, "Study_${_uiState.value.questionId}_S${sentenceIndex.toString().padStart(2, '0')}.wav").absolutePath
 
     private fun loadQuestion(questionId: Int) {
         viewModelScope.launch {
@@ -209,7 +211,7 @@ class PracticeViewModel @Inject constructor(
 
                 // 문장별 UserScript 녹음 파일 존재 여부 스캔
                 val hasRecording = sentenceStates.indices.associate { i ->
-                    i to File(recordingDir, "UserRec_${questionId}_S${i}.wav").exists()
+                    i to File(recordingDir, "Study_${questionId}_S${i.toString().padStart(2, '0')}.wav").exists()
                 }
 
                 // 저장된 문장별 경계 오프셋 복원 (0인 경우 맵에서 제외하여 깔끔하게 유지)
@@ -474,11 +476,13 @@ class PracticeViewModel @Inject constructor(
 
         _uiState.update { it.copy(isRecording = true, micLevel = 0f) }
         markInProgressIfNeeded()
+        ToneGenerator(AudioManager.STREAM_MUSIC, 80).startTone(ToneGenerator.TONE_PROP_BEEP, 150)
 
         recordingJob = viewModelScope.launch {
             audioRecorder.record(outputFile) { rmsLevel ->
                 _uiState.update { it.copy(micLevel = rmsLevel) }
             }
+            ToneGenerator(AudioManager.STREAM_MUSIC, 80).startTone(ToneGenerator.TONE_PROP_BEEP2, 150)
             val valid = outputFile.exists() && outputFile.length() > 44
             _uiState.update { s ->
                 val updated = s.sentences.toMutableList()
@@ -550,11 +554,13 @@ class PracticeViewModel @Inject constructor(
 
         _uiState.update { it.copy(isRecording = true, isCombinedRecording = true, micLevel = 0f) }
         markInProgressIfNeeded()
+        ToneGenerator(AudioManager.STREAM_MUSIC, 80).startTone(ToneGenerator.TONE_PROP_BEEP, 150)
 
         recordingJob = viewModelScope.launch {
             audioRecorder.record(outputFile) { rmsLevel ->
                 _uiState.update { it.copy(micLevel = rmsLevel) }
             }
+            ToneGenerator(AudioManager.STREAM_MUSIC, 80).startTone(ToneGenerator.TONE_PROP_BEEP2, 150)
             val valid = outputFile.exists() && outputFile.length() > 44
             _uiState.update { s ->
                 val updated = s.sentences.toMutableList()
@@ -642,15 +648,17 @@ class PracticeViewModel @Inject constructor(
         if (qId <= 0) return
 
         // 문장별 고정 파일명: 재녹음 시 덮어쓰기
-        val filename = "UserRec_${qId}_S${idx}.wav"
+        val filename = "Study_${qId}_S${idx.toString().padStart(2, '0')}.wav"
         val outputFile = File(recordingDir, filename)
 
         _uiState.update { it.copy(isRecordingUserScript = true, userScriptMicLevel = 0f) }
+        ToneGenerator(AudioManager.STREAM_MUSIC, 80).startTone(ToneGenerator.TONE_PROP_BEEP, 150)
 
         userScriptRecordingJob = viewModelScope.launch {
             audioRecorder.record(outputFile) { rmsLevel ->
                 _uiState.update { it.copy(userScriptMicLevel = rmsLevel) }
             }
+            ToneGenerator(AudioManager.STREAM_MUSIC, 80).startTone(ToneGenerator.TONE_PROP_BEEP2, 150)
             val exists = outputFile.exists() && outputFile.length() > 44
             _uiState.update {
                 it.copy(
@@ -992,7 +1000,7 @@ class PracticeViewModel @Inject constructor(
             }
 
             // 사용자 녹음: 문장별 고정 파일명으로 로드
-            val userPath = File(recordingDir, "UserRec_${state.questionId}_S${state.currentIndex}.wav")
+            val userPath = File(recordingDir, "Study_${state.questionId}_S${state.currentIndex.toString().padStart(2, '0')}.wav")
                 .takeIf { it.exists() }?.absolutePath
             val silenceTrimMs = if (userPath != null) WavSampleReader.detectLeadingSilenceMs(userPath) else 0L
             // 파형을 0부터 전체 로드 — fraction 좌표계를 totalDuration 기준으로 일치시킴.
