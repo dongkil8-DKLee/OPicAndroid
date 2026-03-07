@@ -5,14 +5,12 @@
     android:viewportWidth="256"
     android:viewportHeight="256">
 
-    <!-- 원 (회색) — 동일 구조 -->
     <path
-        android:pathData="M92,117 A36,36 0 1 0 164,117 A36,36 0 1 0 92,117 Z"
+        android:pathData="M74,117 A54,54 0 1 0 182,117 A54,54 0 1 0 74,117 Z"
         android:fillColor="#00000000"
         android:strokeColor="#9E9E9E"
         android:strokeWidth="8"/>
 
-    <!-- 파형+재생 아이콘 (회색, 1.2x) -->
     <group
         android:pivotX="128"
         android:pivotY="118"

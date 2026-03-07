@@ -5,12 +5,14 @@
     android:viewportWidth="256"
     android:viewportHeight="256">
 
-    <!-- 마이크 아이콘 (회색, 1.7x) -->
+    <!-- 마이크 아이콘 (회색, 1.36x, 뷰포트 중앙) -->
     <group
-        android:pivotX="130"
-        android:pivotY="116"
-        android:scaleX="1.7"
-        android:scaleY="1.7">
+        android:pivotX="118"
+        android:pivotY="117"
+        android:scaleX="1.36"
+        android:scaleY="1.36"
+        android:translateX="10"
+        android:translateY="11">
         <path
             android:fillColor="#9E9E9E"
             android:pathData="m117.7 80.7c-8.05 0-12.64 6.87-12.64 13.21v19.88c0 7.8 6.17 12.29 12.57 12.29h0.07c7.3 0 12.09-6.24 12.09-12.29v-19.88c0-7-5.01-13.21-12.09-13.21z"/>
@@ -21,7 +23,7 @@
 
     <!-- 빈 삼각형 (회색) -->
     <path
-        android:pathData="M102.25,43.52 L206.5,114 L102.25,184.34 Z"
+        android:pathData="M93.25,57.57 L197.5,128 L93.25,198.39 Z"
         android:fillColor="#00000000"
         android:strokeColor="#9E9E9E"
         android:strokeWidth="12"

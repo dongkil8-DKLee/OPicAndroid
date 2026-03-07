@@ -6,19 +6,17 @@
     android:viewportHeight="256">
 
     <!--
-        원 설계:
-        - 플레이 삼각형 꼭짓점(tip) 위치(1.2x 스케일 후): (128, 87)
-        - 아이콘 시각 중심: (128, 117)
-        - 중심→tip 거리: 30  → 원 반지름 = 1.2×30 = 36
-        - 원 중심 = 아이콘 시각 중심 (128, 117)
+        원: 반지름 36 × 1.5 = 54 → 아이콘 전체가 원 안에 들어옴
+        중심: (128, 117) — 아이콘 시각 중심
+        색상: #E07000 (FF8000보다 약간 진한 주황)
     -->
     <path
-        android:pathData="M92,117 A36,36 0 1 0 164,117 A36,36 0 1 0 92,117 Z"
+        android:pathData="M74,117 A54,54 0 1 0 182,117 A54,54 0 1 0 74,117 Z"
         android:fillColor="#00000000"
-        android:strokeColor="#FF8000"
+        android:strokeColor="#E07000"
         android:strokeWidth="8"/>
 
-    <!-- 파형+재생 아이콘 (주황색, 1.2x 확대) -->
+    <!-- 파형+재생 아이콘 (주황 #FF8000, 1.2x) -->
     <group
         android:pivotX="128"
         android:pivotY="118"
