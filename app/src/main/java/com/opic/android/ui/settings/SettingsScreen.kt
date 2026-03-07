@@ -89,7 +89,7 @@ private val ColorData       = Color(0xFFE74C3C)   // 레드
 
 @Composable
 fun SettingsScreen(
-    onStudyLink: (set: String, type: String) -> Unit = { _, _ -> },
+    onStudyLink: (set: String, type: String, title: String) -> Unit = { _, _, _ -> },
     onSurveyLink: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -423,7 +423,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("문제 편집", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
-                        TextButton(onClick = { onStudyLink(state.selectedSet, state.selectedType) }) {
+                        TextButton(onClick = { onStudyLink(state.selectedSet, state.selectedType, state.editTitle) }) {
                             Text("Study  ›", fontSize = 12.sp, color = OPicColors.Primary)
                         }
                     }

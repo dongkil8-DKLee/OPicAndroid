@@ -94,6 +94,7 @@ fun StudyScreen(
     initialTopicType: String? = null,
     initialTopicSet: String? = null,
     initialGrade: String? = null,
+    initialTitle: String? = null,
     fromSettings: Boolean = false,
     onBack: (() -> Unit)? = null,
     onPractice: (Int) -> Unit = {},
@@ -110,6 +111,15 @@ fun StudyScreen(
 
     LaunchedEffect(initialGrade) {
         viewModel.setGradeFilter(initialGrade)
+    }
+
+    // 제목 필터: titles 목록이 갱신되면 initialTitle 자동 선택 (1회)
+    var titleApplied by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    LaunchedEffect(filterState.titles) {
+        if (!titleApplied && !initialTitle.isNullOrBlank() && initialTitle in filterState.titles) {
+            viewModel.onTitleSelected(initialTitle)
+            titleApplied = true
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

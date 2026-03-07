@@ -81,9 +81,9 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                 arguments = listOf(navArgument("sessionId") { type = NavType.IntType })
             ) {
                 ReviewScreen(
-                    onNavigateToStudy = { type, set ->
+                    onNavigateToStudy = { type, set, title ->
                         // popUpTo 없음 → Back 시 Review로 복귀
-                        navController.navigate(Screen.StudyOverlay.createRoute(set = set, type = type)) {
+                        navController.navigate(Screen.StudyOverlay.createRoute(set = set, type = type, title = title)) {
                             launchSingleTop = true
                         }
                     }
@@ -182,6 +182,11 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                         type = NavType.StringType
                         nullable = true
                         defaultValue = null
+                    },
+                    navArgument("title") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
                     }
                 ),
                 enterTransition = { slideInHorizontally(initialOffsetX = { -it }) },
@@ -189,11 +194,14 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                 popEnterTransition  = { slideInHorizontally(initialOffsetX = { -it }) },
                 popExitTransition   = { slideOutHorizontally(targetOffsetX = { -it }) }
             ) { backStackEntry ->
-                val set  = backStackEntry.arguments?.getString("set")
-                val type = backStackEntry.arguments?.getString("type")
+                val set   = backStackEntry.arguments?.getString("set")
+                val type  = backStackEntry.arguments?.getString("type")
+                val title = backStackEntry.arguments?.getString("title")
+                    ?.let { java.net.URLDecoder.decode(it, "UTF-8") }
                 StudyScreen(
                     initialTopicSet  = set,
                     initialTopicType = type,
+                    initialTitle     = title,
                     fromSettings = true,
                     onBack = { navController.popBackStack() },
                     onPractice = { questionId ->
@@ -237,8 +245,8 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
 
             composable(Screen.Settings.route) {
                 SettingsScreen(
-                    onStudyLink = { set, type ->
-                        navController.navigate(Screen.StudyOverlay.createRoute(set = set, type = type))
+                    onStudyLink = { set, type, title ->
+                        navController.navigate(Screen.StudyOverlay.createRoute(set = set, type = type, title = title))
                     },
                     onSurveyLink = {
                         navController.navigate(Screen.SurveyOverlay.route)

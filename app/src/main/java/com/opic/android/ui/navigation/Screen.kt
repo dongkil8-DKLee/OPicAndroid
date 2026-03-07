@@ -32,13 +32,15 @@ sealed class Screen(val route: String) {
     data object PracticeOverlay : Screen("PracticeOverlay/{questionId}") {
         fun createRoute(questionId: Int) = "PracticeOverlay/$questionId"
     }
-    data object StudyOverlay : Screen("StudyOverlay?set={set}&type={type}") {
-        fun createRoute(set: String? = null, type: String? = null): String {
+    data object StudyOverlay : Screen("StudyOverlay?set={set}&type={type}&title={title}") {
+        fun createRoute(set: String? = null, type: String? = null, title: String? = null): String {
             val params = mutableListOf<String>()
-            if (!set.isNullOrBlank() && set != "전체") params.add("set=$set")
-            if (!type.isNullOrBlank()) params.add("type=$type")
+            if (!set.isNullOrBlank() && set != "전체") params.add("set=${set.encode()}")
+            if (!type.isNullOrBlank() && type != "전체") params.add("type=${type.encode()}")
+            if (!title.isNullOrBlank()) params.add("title=${title.encode()}")
             return if (params.isEmpty()) "StudyOverlay" else "StudyOverlay?${params.joinToString("&")}"
         }
+        private fun String.encode() = java.net.URLEncoder.encode(this, "UTF-8")
     }
     data object SurveyOverlay : Screen("SurveyOverlay")
     data object Settings : Screen("SettingsScreen")
