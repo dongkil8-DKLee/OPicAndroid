@@ -1,7 +1,6 @@
 package com.opic.android.ui.common
 
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
@@ -436,32 +434,31 @@ fun WaveformComparisonPanel(
                 }
             }
 
-            // ⭕/⏹ 녹음재생 — 원형 outline (2x: 원 48dp, 아이콘 40dp)
-            // ★ CIRCLE_SIZE  = 48.dp  : 원 전체 크기 (원래 24dp → 2배)
-            // ★ BORDER_WIDTH = 2.dp   : 테두리 두께
-            // ★ ICON_SIZE    = 40.dp  : 삼각형/정지 아이콘 크기
+            // 녹음재생 — ic_rec_play 아이콘
             if (onPlayUser != null) {
                 val isUserPlayEnabled = hasUserAudio && !isRecordingUser && !isPlaying && !isPlayingOriginal && !isLoopPlaying
-                val circleColor = when {
-                    isPlayingUser     -> OPicColors.RecordActive
-                    isUserPlayEnabled -> OPicColors.PlayButton
-                    else              -> Color.Gray
-                }
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)                                       // ★ CIRCLE_SIZE
-                        .border(2.dp, circleColor, CircleShape)            // ★ BORDER_WIDTH
-                        .clickable(enabled = isPlayingUser || isUserPlayEnabled) {
-                            if (isPlayingUser) onStopUser?.invoke() else onPlayUser.invoke()
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (isPlayingUser) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                        contentDescription = if (isPlayingUser) "녹음 정지" else "녹음 재생",
-                        tint     = circleColor,
-                        modifier = Modifier.size(40.dp)                    // ★ ICON_SIZE
-                    )
+                if (isPlayingUser) {
+                    IconButton(
+                        onClick  = { onStopUser?.invoke() },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(Icons.Filled.Stop, contentDescription = "녹음 정지",
+                            tint     = OPicColors.RecordActive,
+                            modifier = Modifier.size(28.dp))
+                    }
+                } else {
+                    IconButton(
+                        onClick  = { onPlayUser.invoke() },
+                        enabled  = isUserPlayEnabled,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_rec_play),
+                            contentDescription = "녹음 재생",
+                            tint               = Color.Unspecified,
+                            modifier           = Modifier.size(28.dp)
+                        )
+                    }
                 }
             }
 

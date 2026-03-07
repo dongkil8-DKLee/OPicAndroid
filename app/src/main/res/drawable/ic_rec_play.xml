@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="256dp"
+    android:height="256dp"
+    android:viewportWidth="256"
+    android:viewportHeight="256">
+
+    <!-- 말풍선 (80% 축소, 중앙 기준) -->
+    <group
+        android:pivotX="128"
+        android:pivotY="128"
+        android:scaleX="0.8"
+        android:scaleY="0.8">
+        <path
+            android:fillColor="#F95721"
+            android:strokeColor="#FFD5C7"
+            android:strokeWidth="1.271"
+            android:pathData="m127.4 24.84c-63.68 0-117.8 43.97-117.8 93.23 0 24.74 12.43 46.87 35.32 64.56 6.42 4.88-2.85 20.28-11.07 36.31-4.1 7.87 1.8 12.75 9.85 9.29 17.03-7.6 30.32-13.4 45.98-22.89 2.08-1.28 2.69-0.73 4.57-0.35 10.02 2.22 20.43 3.17 32.37 3.17 62.15 0 119.7-42.38 119.7-90.09s-49.9-93.23-119-93.23z"/>
+    </group>
+
+    <!-- 마이크 아이콘 -->
+    <path
+        android:fillColor="#FEFFFE"
+        android:strokeColor="#F95721"
+        android:strokeWidth="0.6356"
+        android:pathData="m117.7 80.7c-8.05 0-12.64 6.87-12.64 13.21v19.88c0 7.8 6.17 12.29 12.57 12.29h0.07c7.3 0 12.09-6.24 12.09-12.29v-19.88c0-7-5.01-13.21-12.09-13.21z"/>
+    <path
+        android:fillColor="#FEFFFE"
+        android:strokeColor="#F95721"
+        android:strokeWidth="0.6356"
+        android:pathData="m138.8 109.8c-2.39 0-3.47 1.04-3.47 3.43 0 9.86-8.21 17.53-17.52 17.53h-0.09c-10.23 0-17.61-8.17-17.61-17.53 0-2.39-1.08-3.43-3.47-3.43-2.38 0-3.23 1.04-3.23 3.43 0 12.73 9.77 22.97 20.78 24.19v8.84h-8.05c-2.06 0-3.25 1.46-3.25 3.29s1.19 3.14 3.25 3.14h23.18c2.06 0 2.86-1.31 2.86-3.14s-1.16-3.29-2.86-3.29h-9.11v-8.8c11.51-1.39 22.05-11.77 22.05-24.23 0-2.39-1.08-3.43-3.46-3.43z"/>
+
+    <!-- 재생 삼각형 -->
+    <path
+        android:fillColor="#FEFFFE"
+        android:strokeColor="#FEFFFE"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="4.886"
+        android:pathData="m175 114.8l-20.15-13.81v27.61l20.15-13.8z"/>
+</vector>

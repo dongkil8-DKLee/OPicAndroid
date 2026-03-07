@@ -40,23 +40,25 @@ import androidx.compose.ui.unit.sp
 import com.opic.android.ui.theme.OPicColors
 
 /**
- * 공통 필터 패널 — Study/Practice 재사용.
+ * 공통 필터 패널 — Study/Practice 재사용. 1줄 레이아웃.
  *
  * showSort=true (Study 기본):
- *   Row 1: 주제 | 유형 | 정렬
- *   Row 2: (extraRow2Content?) | 학습
+ *   Row: 주제 | 유형 | 정렬 | [모드] | 학습
  *
  * showSort=false (Practice):
- *   Row 1: 주제 | 유형 | 학습
- *   Row 2: extraRow2Content (없으면 생략)
+ *   Row: 주제 | 유형 | 학습
  *
  * @param state          현재 필터 상태
  * @param onSetChanged   주제 변경 콜백
  * @param onTypeChanged  유형 변경 콜백
  * @param onSortChanged  정렬 변경 콜백
  * @param onStudyFilterChanged 학습 필터 변경 콜백
- * @param showSort       false이면 정렬 Picker 제거 + 학습을 Row1 3번째로 이동
- * @param extraRow2Content Row 2 에 추가할 Study 전용 컨텐츠 (Group Play 버튼 등). null이면 생략.
+ * @param showSort       false이면 정렬 Picker 제거
+ * @param pillHeight     각 Picker 버튼 높이 (기본 36dp)
+ * @param showModeFilter true이면 모드 Picker 추가 (정렬 우측)
+ * @param modeSelected   모드 현재 선택값
+ * @param modeOptions    모드 선택 목록
+ * @param onModeSelected 모드 변경 콜백
  */
 @Composable
 fun FilterPanel(
@@ -67,76 +69,61 @@ fun FilterPanel(
     onStudyFilterChanged: (String) -> Unit,
     modifier: Modifier = Modifier,
     showSort: Boolean = true,
-    extraRow2Content: (@Composable () -> Unit)? = null
+    pillHeight: Dp = 36.dp,
+    showModeFilter: Boolean = false,
+    modeSelected: String = "",
+    modeOptions: List<String> = emptyList(),
+    onModeSelected: (String) -> Unit = {}
 ) {
-    Column(
+    Row(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        // Row 1: 주제 | 유형 | 정렬(or 학습)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            BottomSheetPicker(
-                label    = "주제",
-                selected = state.selectedSet,
-                options  = listOf("전체") + state.sets,
-                onSelected = onSetChanged,
-                modifier = Modifier.weight(1f)
-            )
-            BottomSheetPicker(
-                label    = "유형",
-                selected = state.selectedType,
-                options  = listOf("전체") + state.types,
-                onSelected = onTypeChanged,
-                modifier = Modifier.weight(1f)
-            )
-            if (showSort) {
-                BottomSheetPicker(
-                    label    = "정렬",
-                    selected = state.selectedSort,
-                    options  = listOf("주제 순서", "오래된 순"),
-                    onSelected = onSortChanged,
-                    modifier = Modifier.weight(1f)
-                )
-            } else {
-                BottomSheetPicker(
-                    label    = "학습",
-                    selected = state.selectedStudyFilter,
-                    options  = listOf("전체", "📌", "저득점", "최근오답", "0", "1", "2", "3", "4", "5", "6", "7"),
-                    onSelected = onStudyFilterChanged,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        // Row 2: showSort=true → (extraRow2Content?) | 학습
-        //        showSort=false → extraRow2Content만 (없으면 생략)
+        BottomSheetPicker(
+            label      = "주제",
+            selected   = state.selectedSet,
+            options    = listOf("전체") + state.sets,
+            onSelected = onSetChanged,
+            modifier   = Modifier.weight(1f),
+            pillHeight = pillHeight
+        )
+        BottomSheetPicker(
+            label      = "유형",
+            selected   = state.selectedType,
+            options    = listOf("전체") + state.types,
+            onSelected = onTypeChanged,
+            modifier   = Modifier.weight(1f),
+            pillHeight = pillHeight
+        )
         if (showSort) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                extraRow2Content?.invoke()
-                BottomSheetPicker(
-                    label    = "학습",
-                    selected = state.selectedStudyFilter,
-                    options  = listOf("전체", "📌", "저득점", "최근오답", "0", "1", "2", "3", "4", "5", "6", "7"),
-                    onSelected = onStudyFilterChanged,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        } else if (extraRow2Content != null) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                extraRow2Content.invoke()
-            }
+            BottomSheetPicker(
+                label      = "정렬",
+                selected   = state.selectedSort,
+                options    = listOf("주제 순서", "오래된 순"),
+                onSelected = onSortChanged,
+                modifier   = Modifier.weight(1f),
+                pillHeight = pillHeight
+            )
         }
+        if (showModeFilter && modeOptions.isNotEmpty()) {
+            BottomSheetPicker(
+                label      = "모드",
+                selected   = modeSelected,
+                options    = modeOptions,
+                onSelected = onModeSelected,
+                modifier   = Modifier.weight(1f),
+                pillHeight = pillHeight
+            )
+        }
+        BottomSheetPicker(
+            label      = "학습",
+            selected   = state.selectedStudyFilter,
+            options    = listOf("전체", "📌", "저득점", "최근오답", "0", "1", "2", "3", "4", "5", "6", "7"),
+            onSelected = onStudyFilterChanged,
+            modifier   = Modifier.weight(1f),
+            pillHeight = pillHeight
+        )
     }
 }
 

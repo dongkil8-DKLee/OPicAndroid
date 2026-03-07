@@ -205,42 +205,15 @@ private fun StudyContent(
             Column {
                 Spacer(modifier = Modifier.height(4.dp))
                 FilterPanel(
-                    state               = filterState,
-                    onSetChanged        = { viewModel.onSetChanged(it) },
-                    onTypeChanged       = { viewModel.onTypeChanged(it) },
-                    onSortChanged       = { viewModel.onSortChanged(it) },
+                    state                = filterState,
+                    onSetChanged         = { viewModel.onSetChanged(it) },
+                    onTypeChanged        = { viewModel.onTypeChanged(it) },
+                    onSortChanged        = { viewModel.onSortChanged(it) },
                     onStudyFilterChanged = { viewModel.onStudyFilterChanged(it) },
-                    extraRow2Content = {
-                        Button(
-                            onClick  = { viewModel.toggleGroupPlay() },
-                            enabled  = !state.isRecording,
-                            colors   = ButtonDefaults.buttonColors(
-                                containerColor = if (state.groupPlaying) OPicColors.RecordActive else OPicColors.PlayButton,
-                                contentColor   = Color.White
-                            ),
-                            shape    = RoundedCornerShape(10.dp),
-                            modifier = Modifier.height(44.dp).weight(1f)
-                        ) {
-                            Icon(
-                                if (state.groupPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text(
-                                if (state.groupPlaying) "Stop" else "Group Play",
-                                fontSize   = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        BottomSheetPicker(
-                            label      = "모드",
-                            selected   = state.groupPlayMode,
-                            options    = listOf("목록 재생", "질문 재생", "답변 재생"),
-                            onSelected = { viewModel.onGroupPlayModeChanged(it) },
-                            modifier   = Modifier.weight(1f)
-                        )
-                    }
+                    showModeFilter       = true,
+                    modeSelected         = state.groupPlayMode,
+                    modeOptions          = listOf("목록 재생", "질문 재생", "답변 재생"),
+                    onModeSelected       = { viewModel.onGroupPlayModeChanged(it) }
                 )
                 Spacer(modifier = Modifier.height(4.dp))
             }
@@ -342,6 +315,32 @@ private fun IconButtonRow(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment     = Alignment.CenterVertically
     ) {
+        // 그룹 플레이 버튼 (Mic 좌측)
+        if (state.groupPlaying) {
+            IconButton(
+                onClick  = { viewModel.toggleGroupPlay() },
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(Icons.Filled.Stop, contentDescription = "그룹 재생 중지",
+                    tint     = OPicColors.RecordActive,
+                    modifier = Modifier.size(28.dp))
+            }
+        } else {
+            IconButton(
+                onClick  = { viewModel.toggleGroupPlay() },
+                enabled  = !state.isRecording && hasQuestion,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_group_play),
+                    contentDescription = "그룹 재생",
+                    tint               = Color.Unspecified,
+                    modifier           = Modifier.size(28.dp)
+                )
+            }
+        }
+
+        // 녹음 버튼
         if (state.isRecording) {
             IconButton(onClick = { viewModel.stopRecording() }, modifier = Modifier.size(48.dp)) {
                 Icon(Icons.Filled.Stop, contentDescription = "녹음 중지", tint = OPicColors.RecordActive, modifier = Modifier.size(28.dp))
@@ -358,36 +357,28 @@ private fun IconButtonRow(
             }
         }
 
-        // 녹음 재생 버튼 — 원형 outline 스타일
-        // ★ 미세 튜닝 포인트:
-        // ★ CIRCLE_SIZE  = 40.dp  : 원 전체 크기
-        // ★ BORDER_WIDTH = 1.5.dp : 테두리 두께
-        // ★ ICON_SIZE    = 20.dp  : 삼각형/정지 아이콘 크기
-        // ★ IDLE_COLOR   = OPicColors.PlayButton   : 대기 상태 색상
-        // ★ ACTIVE_COLOR = OPicColors.RecordActive : 재생 중 색상
-        // ★ DISABLED_COLOR = Color.Gray            : 비활성화 색상
-        val isUserPlaying  = state.playingTarget == StudyPlayTarget.USER
+        // 녹음 재생 버튼 — ic_rec_play 아이콘
+        val isUserPlaying   = state.playingTarget == StudyPlayTarget.USER
         val userPlayEnabled = state.hasUserAudio && !isBusy
-        val userCircleColor = when {
-            isUserPlaying   -> OPicColors.RecordActive  // ★ ACTIVE_COLOR
-            userPlayEnabled -> OPicColors.PlayButton    // ★ IDLE_COLOR
-            else            -> Color.Gray               // ★ DISABLED_COLOR
-        }
-        Box(
-            modifier = Modifier
-                .size(24.dp)                                          // ★ CIRCLE_SIZE
-                .border(1.5.dp, userCircleColor, CircleShape)         // ★ BORDER_WIDTH
-                .clickable(enabled = isUserPlaying || userPlayEnabled) {
-                    if (isUserPlaying) viewModel.stopAudio() else viewModel.playUserAudio()
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = if (isUserPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                contentDescription = if (isUserPlaying) "재생 중지" else "녹음 재생",
-                tint     = userCircleColor,
-                modifier = Modifier.size(20.dp)                       // ★ ICON_SIZE
-            )
+        if (isUserPlaying) {
+            IconButton(onClick = { viewModel.stopAudio() }, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.Filled.Stop, contentDescription = "재생 중지",
+                    tint     = OPicColors.RecordActive,
+                    modifier = Modifier.size(28.dp))
+            }
+        } else {
+            IconButton(
+                onClick  = { viewModel.playUserAudio() },
+                enabled  = userPlayEnabled,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_rec_play),
+                    contentDescription = "녹음 재생",
+                    tint               = Color.Unspecified,
+                    modifier           = Modifier.size(28.dp)
+                )
+            }
         }
 
         IconButton(onClick = onPractice, enabled = hasQuestion, modifier = Modifier.size(48.dp)) {

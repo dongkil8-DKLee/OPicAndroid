@@ -119,9 +119,10 @@ private fun ReviewContent(
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
-                        Icons.Filled.PlayArrow,
+                        painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_group_play),
                         contentDescription = "Play All",
-                        tint = if (!isPlaying) OPicColors.PlayButton else Color.Gray
+                        tint               = Color.Unspecified,
+                        modifier           = Modifier.size(28.dp)
                     )
                 }
             }
@@ -276,7 +277,12 @@ private fun UserAudioRow(
             }
         } else {
             TextButton(onClick = onPlay, enabled = hasAudio && canPlay) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(
+                    painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_rec_play),
+                    contentDescription = null,
+                    tint               = Color.Unspecified,
+                    modifier           = Modifier.size(20.dp)
+                )
                 Text(" Play", fontSize = 12.sp)
             }
         }
