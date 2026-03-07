@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -300,6 +301,7 @@ private fun PracticeContent(
                             WaveformComparisonPanel(
                                 modifier = Modifier.fillMaxWidth(),
                                 showButtonRow = false,
+                                showSpeedControl = false,
                                 originalWaveform = state.originalWaveform,
                                 userWaveform = state.userWaveform,
                                 isPlaying = state.isComparisonPlaying,
@@ -360,6 +362,31 @@ private fun PracticeContent(
         }
 
         Spacer(modifier = Modifier.height(4.dp))
+
+        // ===== 속도 조절 행 (Study와 동일 위치) =====
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("속도:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(2.dp))
+            TextButton(
+                onClick = { viewModel.setComparisonSpeed((state.comparisonSpeed - 0.1f).coerceAtLeast(0.5f)) },
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                modifier = Modifier.height(28.dp)
+            ) { Text("−", fontSize = 14.sp, color = OPicColors.TimerRed) }
+            Text(
+                text     = String.format("%.1f", state.comparisonSpeed) + "x",
+                fontSize = 11.sp,
+                color    = OPicColors.Primary,
+                modifier = Modifier.width(36.dp)
+            )
+            TextButton(
+                onClick = { viewModel.setComparisonSpeed((state.comparisonSpeed + 0.1f).coerceAtMost(1.5f)) },
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                modifier = Modifier.height(28.dp)
+            ) { Text("+", fontSize = 14.sp, color = OPicColors.TimerGreen) }
+        }
 
         // ===== 공유 하단 버튼 행 =====
         PracticeSharedButtonRow(
@@ -555,7 +582,7 @@ private fun PracticeSharedButtonRow(
                     Icon(
                         painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_rec_play),
                         contentDescription = "녹음 재생",
-                        tint               = Color.Unspecified,
+                        tint               = if (isUserPlayEnabled) Color.Unspecified else Color.Gray.copy(alpha = 0.4f),
                         modifier           = Modifier.size(BUTTON_SLOT)
                     )
                 }

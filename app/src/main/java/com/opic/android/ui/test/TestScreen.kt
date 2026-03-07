@@ -275,18 +275,6 @@ private fun TestContent(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // 마이크 레벨 바
-                LinearProgressIndicator(
-                    progress = { state.micLevel },
-                    modifier = Modifier
-                        .fillMaxWidth(0.9f)
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                    color = OPicColors.TimerGreen,
-                    trackColor = OPicColors.Border,
-                )
             }
 
             // 우측 열: 번호 그리드 (3열)

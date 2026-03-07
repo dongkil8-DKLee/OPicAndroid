@@ -95,6 +95,8 @@ fun WaveformComparisonPanel(
     onExpandAfterChange: ((Long) -> Unit)? = null,
     // false이면 하단 5개 버튼 Row를 숨김 (외부 공유 버튼 행으로 이동 시)
     showButtonRow: Boolean = true,
+    // false이면 속도 조절 Row를 숨김 (Practice에서 외부로 이동 시)
+    showSpeedControl: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var markerMode by remember { mutableStateOf(MarkerMode.None) }
@@ -336,7 +338,7 @@ fun WaveformComparisonPanel(
         }
 
         // ── 속도 조절 (버튼 위 우측) ──
-        Row(
+        if (showSpeedControl) Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -455,7 +457,7 @@ fun WaveformComparisonPanel(
                         Icon(
                             painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_rec_play),
                             contentDescription = "녹음 재생",
-                            tint               = Color.Unspecified,
+                            tint               = if (isUserPlayEnabled) Color.Unspecified else Color.Gray.copy(alpha = 0.4f),
                             modifier           = Modifier.size(28.dp)
                         )
                     }

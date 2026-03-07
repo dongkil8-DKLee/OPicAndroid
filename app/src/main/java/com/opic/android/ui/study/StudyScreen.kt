@@ -324,7 +324,7 @@ private fun IconButtonRow(
                 Icon(
                     painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_group_play),
                     contentDescription = "그룹 재생",
-                    tint               = Color.Unspecified,
+                    tint               = if (!state.isRecording && hasQuestion) Color.Unspecified else Color.Gray.copy(alpha = 0.4f),
                     modifier           = Modifier.size(48.dp)
                 )
             }
@@ -365,7 +365,7 @@ private fun IconButtonRow(
                 Icon(
                     painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_rec_play),
                     contentDescription = "녹음 재생",
-                    tint               = Color.Unspecified,
+                    tint               = if (userPlayEnabled) Color.Unspecified else Color.Gray.copy(alpha = 0.4f),
                     modifier           = Modifier.size(48.dp)
                 )
             }

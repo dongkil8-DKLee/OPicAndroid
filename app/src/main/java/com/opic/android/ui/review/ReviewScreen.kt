@@ -121,7 +121,7 @@ private fun ReviewContent(
                     Icon(
                         painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_group_play),
                         contentDescription = "Play All",
-                        tint               = Color.Unspecified,
+                        tint               = if (!isPlaying) Color.Unspecified else Color.Gray.copy(alpha = 0.4f),
                         modifier           = Modifier.size(28.dp)
                     )
                 }
@@ -280,7 +280,7 @@ private fun UserAudioRow(
                 Icon(
                     painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_rec_play),
                     contentDescription = null,
-                    tint               = Color.Unspecified,
+                    tint               = if (hasAudio && canPlay) Color.Unspecified else Color.Gray.copy(alpha = 0.4f),
                     modifier           = Modifier.size(20.dp)
                 )
                 Text(" Play", fontSize = 12.sp)
