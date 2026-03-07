@@ -67,8 +67,9 @@ class MainActivity : ComponentActivity() {
             if (!view.isInEditMode) {
                 SideEffect {
                     val window = (view.context as Activity).window
-                    WindowCompat.getInsetsController(window, view)
-                        .isAppearanceLightStatusBars = !isDark
+                    val controller = WindowCompat.getInsetsController(window, view)
+                    controller.isAppearanceLightStatusBars = !isDark       // 상단 상태바 아이콘
+                    controller.isAppearanceLightNavigationBars = !isDark   // 하단 네비게이션바 아이콘
                 }
             }
 
