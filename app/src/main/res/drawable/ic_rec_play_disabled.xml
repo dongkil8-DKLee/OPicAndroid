@@ -5,7 +5,7 @@
     android:viewportWidth="256"
     android:viewportHeight="256">
 
-    <!-- 마이크 + 재생 삼각형 (회색, 1.7x 확대) -->
+    <!-- 마이크 아이콘 (회색, 1.7x) -->
     <group
         android:pivotX="130"
         android:pivotY="116"
@@ -17,13 +17,15 @@
         <path
             android:fillColor="#9E9E9E"
             android:pathData="m138.8 109.8c-2.39 0-3.47 1.04-3.47 3.43 0 9.86-8.21 17.53-17.52 17.53h-0.09c-10.23 0-17.61-8.17-17.61-17.53 0-2.39-1.08-3.43-3.47-3.43-2.38 0-3.23 1.04-3.23 3.43 0 12.73 9.77 22.97 20.78 24.19v8.84h-8.05c-2.06 0-3.25 1.46-3.25 3.29s1.19 3.14 3.25 3.14h23.18c2.06 0 2.86-1.31 2.86-3.14s-1.16-3.29-2.86-3.29h-9.11v-8.8c11.51-1.39 22.05-11.77 22.05-24.23 0-2.39-1.08-3.43-3.46-3.43z"/>
-        <path
-            android:fillColor="#9E9E9E"
-            android:strokeColor="#9E9E9E"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round"
-            android:strokeWidth="4.886"
-            android:pathData="m175 114.8l-20.15-13.81v27.61l20.15-13.8z"/>
     </group>
+
+    <!-- 빈 삼각형 (회색) -->
+    <path
+        android:pathData="M102.25,43.52 L206.5,114 L102.25,184.34 Z"
+        android:fillColor="#00000000"
+        android:strokeColor="#9E9E9E"
+        android:strokeWidth="12"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"/>
 
 </vector>
