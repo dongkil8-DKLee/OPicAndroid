@@ -14,6 +14,12 @@ import java.net.URL
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class GeneratedQuestion(
+    val title: String,
+    val questionText: String,
+    val answerScript: String
+)
+
 data class VocabInfo(
     val meaning: String,       // "n. 어휘, 단어; syn: term, expression"
     val pronunciation: String, // "/vəˈkæbjʊləri/ (보캐뷸러리)"
@@ -128,6 +134,61 @@ OPIC_EN: [OPic 스피킹에서 직접 쓸 수 있는 영어 예문 1문장]
         }
     }
 
+    /** API Key 설정 여부 */
+    fun hasApiKey(): Boolean = appPrefs.claudeApiKey.isNotBlank()
+
+    /**
+     * OPic 테스트 문제 자동 생성 (서베이 선택 주제에 DB 문제 없을 때).
+     * topic + type + grade → Claude → count개 GeneratedQuestion
+     */
+    suspend fun generateTestQuestions(
+        topic: String,
+        type: String,
+        targetGrade: String,
+        count: Int = 3
+    ): Result<List<GeneratedQuestion>> = withContext(Dispatchers.IO) {
+        val apiKey = appPrefs.claudeApiKey
+        if (apiKey.isBlank()) {
+            return@withContext Result.failure(Exception("API 키 미설정"))
+        }
+
+        val prompt = buildString {
+            appendLine("OPic 토픽: $topic")
+            appendLine("유형: $type")
+            appendLine("목표 등급: $targetGrade")
+            appendLine()
+            appendLine("다음 형식으로 정확히 ${count}개의 OPic 문제를 생성하세요.")
+            appendLine("각 항목은 반드시 한 줄로 작성하세요. 라벨 외 다른 내용은 쓰지 마세요.")
+            appendLine()
+            for (i in 1..count) {
+                appendLine("Q${i}_TITLE: [한국어 제목 5~10자]")
+                appendLine("Q${i}_TEXT: [영어 OPic 질문 1문장, Tell me about / Describe / Have you ever 형식]")
+                appendLine("Q${i}_ANSWER: [${targetGrade} 수준 영어 모범 답변, 5~7문장을 이어서 한 줄로]")
+                if (i < count) appendLine()
+            }
+        }
+
+        val raw = callClaudeApi(
+            apiKey = apiKey,
+            systemPrompt = "You are an OPic test question designer. Generate OPic questions and model answers strictly in the requested format. Each field must be on a single line.",
+            userMessage = prompt,
+            maxTokens = 2048
+        )
+        raw.map { text ->
+            val lines = text.lines()
+            fun extractLine(label: String) = lines
+                .firstOrNull { it.trimStart().startsWith("$label:") }
+                ?.substringAfter(":")?.trim() ?: ""
+            (1..count).map { i ->
+                GeneratedQuestion(
+                    title = extractLine("Q${i}_TITLE"),
+                    questionText = extractLine("Q${i}_TEXT"),
+                    answerScript = extractLine("Q${i}_ANSWER")
+                )
+            }.filter { it.title.isNotBlank() && it.questionText.isNotBlank() }
+        }
+    }
+
     /**
      * STT 결과 피드백 생성.
      * questionText + sttResult + targetGrade → Claude → 한국어 피드백
@@ -167,7 +228,8 @@ OPIC_EN: [OPic 스피킹에서 직접 쓸 수 있는 영어 예문 1문장]
     private fun callClaudeApi(
         apiKey: String,
         systemPrompt: String,
-        userMessage: String
+        userMessage: String,
+        maxTokens: Int = MAX_TOKENS
     ): Result<String> {
         return try {
             val conn = URL(API_URL).openConnection() as HttpURLConnection
@@ -183,7 +245,7 @@ OPIC_EN: [OPic 스피킹에서 직접 쓸 수 있는 영어 예문 1문장]
 
             val body = JSONObject().apply {
                 put("model", MODEL)
-                put("max_tokens", MAX_TOKENS)
+                put("max_tokens", maxTokens)
                 put("system", systemPrompt)
                 put("messages", JSONArray().put(
                     JSONObject().apply {

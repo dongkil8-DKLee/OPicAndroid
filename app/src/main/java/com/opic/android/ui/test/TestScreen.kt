@@ -124,19 +124,41 @@ fun TestScreen(
 
     Surface(modifier = Modifier.fillMaxSize()) {
         when (state.phase) {
-            TestPhase.LOADING -> LoadingScreen()
+            TestPhase.LOADING -> LoadingScreen(
+                aiTopic = state.aiGeneratingTopic,
+                aiProgress = state.aiGeneratingProgress,
+                aiTotal = state.aiGeneratingTotal
+            )
             else -> TestContent(state, viewModel)
         }
     }
 }
 
 @Composable
-private fun LoadingScreen() {
+private fun LoadingScreen(
+    aiTopic: String = "",
+    aiProgress: Int = 0,
+    aiTotal: Int = 0
+) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(16.dp))
-            Text("문제 생성 중...")
+            if (aiTotal > 0 && aiTopic.isNotBlank()) {
+                Text("AI가 문제를 생성하고 있습니다...", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("「$aiTopic」", fontSize = 14.sp, color = OPicColors.Primary)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("${aiProgress + 1} / $aiTotal 주제", fontSize = 12.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(12.dp))
+                LinearProgressIndicator(
+                    progress = { (aiProgress + 1).toFloat() / aiTotal },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = OPicColors.Primary
+                )
+            } else {
+                Text("문제 생성 중...")
+            }
         }
     }
 }

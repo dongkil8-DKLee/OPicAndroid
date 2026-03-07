@@ -116,6 +116,14 @@ interface QuestionDao {
     @Query("DELETE FROM Questions WHERE question_id = :questionId")
     suspend fun deleteById(questionId: Int)
 
+    /** AI 문제 생성용: set+type 보유 여부 확인 */
+    @Query("SELECT COUNT(*) FROM Questions WHERE \"set\" = :set AND type = :type")
+    suspend fun getCountBySetAndType(set: String, type: String): Int
+
+    /** AI 문제 생성용: 동일 set+type 최대 콤보 번호 */
+    @Query("SELECT MAX(CAST(combo AS INTEGER)) FROM Questions WHERE \"set\" = :set AND type = :type AND combo IS NOT NULL")
+    suspend fun getMaxComboForSetType(set: String, type: String): Int?
+
     @Upsert
     suspend fun upsert(question: QuestionEntity)
 

@@ -7,15 +7,19 @@ import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.opic.android.ai.ClaudeApiService
 import com.opic.android.audio.AudioFileResolver
 import com.opic.android.audio.AudioPlayer
 import com.opic.android.audio.AudioRecorder
 import com.opic.android.audio.SttManager
 import com.opic.android.audio.TtsManager
+import com.opic.android.data.local.dao.QuestionDao
 import com.opic.android.data.local.dao.TestDao
+import com.opic.android.data.local.entity.QuestionEntity
 import com.opic.android.data.local.entity.TestResultEntity
 import com.opic.android.data.local.entity.TestSessionEntity
 import com.opic.android.data.prefs.AppPreferences
+import com.opic.android.data.prefs.SurveyPreferences
 import com.opic.android.domain.LevelCalculator
 import com.opic.android.domain.QuestionGenerator
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -54,7 +58,11 @@ data class TestUiState(
     val sttListening: Boolean = false,
     val audioPaths: Map<Int, String> = emptyMap(), // questionId → 녹음 파일 경로
     val level: Int = 1,
-    val levelImageDir: String = ""
+    val levelImageDir: String = "",
+    // AI 문제 자동 생성 진행 상태
+    val aiGeneratingTopic: String = "",
+    val aiGeneratingProgress: Int = 0,
+    val aiGeneratingTotal: Int = 0
 )
 
 /**
@@ -67,6 +75,7 @@ class TestViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     @ApplicationContext private val context: Context,
     private val questionGenerator: QuestionGenerator,
+    private val questionDao: QuestionDao,
     private val testDao: TestDao,
     private val audioPlayer: AudioPlayer,
     private val audioRecorder: AudioRecorder,
@@ -74,7 +83,9 @@ class TestViewModel @Inject constructor(
     private val ttsManager: TtsManager,
     private val sttManager: SttManager,
     private val levelCalculator: LevelCalculator,
-    private val appPrefs: AppPreferences
+    private val appPrefs: AppPreferences,
+    private val surveyPrefs: SurveyPreferences,
+    private val claudeApiService: ClaudeApiService
 ) : ViewModel() {
 
     companion object {
@@ -116,6 +127,42 @@ class TestViewModel @Inject constructor(
     private fun generateTest() {
         viewModelScope.launch {
             _uiState.update { it.copy(phase = TestPhase.LOADING) }
+
+            // Step 0: 서베이 선택 주제 중 DB 문제 없는 것 → AI 자동 생성
+            if (claudeApiService.hasApiKey()) {
+                val missingTopics = surveyPrefs.selectedTopics.filter { topic ->
+                    questionDao.getCountBySetAndType(topic, "선택") == 0
+                }
+                if (missingTopics.isNotEmpty()) {
+                    _uiState.update { it.copy(aiGeneratingTotal = missingTopics.size, aiGeneratingProgress = 0) }
+                    missingTopics.forEachIndexed { idx, topic ->
+                        _uiState.update { it.copy(aiGeneratingTopic = topic, aiGeneratingProgress = idx) }
+                        claudeApiService.generateTestQuestions(topic, "선택", appPrefs.targetGrade, 3)
+                            .onSuccess { generated ->
+                                val currentMaxId = questionDao.getMaxQuestionId() ?: 0
+                                val nextCombo = ((questionDao.getMaxComboForSetType(topic, "선택") ?: 0) + 1).toString()
+                                generated.forEachIndexed { qIdx, q ->
+                                    questionDao.upsert(QuestionEntity(
+                                        questionId = currentMaxId + qIdx + 1,
+                                        title = q.title,
+                                        set = topic,
+                                        type = "선택",
+                                        combo = nextCombo,
+                                        questionText = q.questionText,
+                                        answerScript = q.answerScript,
+                                        questionAudio = null,
+                                        answerAudio = null,
+                                        userScript = null
+                                    ))
+                                }
+                                Log.d(TAG, "AI 문제 생성 완료: $topic (${generated.size}개, combo=$nextCombo)")
+                            }
+                            .onFailure { Log.w(TAG, "AI 문제 생성 실패: $topic", it) }
+                    }
+                    _uiState.update { it.copy(aiGeneratingTopic = "", aiGeneratingTotal = 0) }
+                }
+            }
+
             val questions = questionGenerator.generate(difficulty)
             if (questions.isEmpty()) {
                 Log.e(TAG, "문제 생성 실패")
