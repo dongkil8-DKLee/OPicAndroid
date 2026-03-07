@@ -1,6 +1,7 @@
 package com.opic.android.ui.settings
 
 import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -25,6 +26,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
@@ -71,7 +74,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -381,7 +390,21 @@ fun SettingsScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Text("API 키는 기기 내에만 저장됩니다.", fontSize = 11.sp, color = Color.Gray)
+                    val apiKeyGuideText = buildAnnotatedString {
+                        append("클로드(Claude) API 키는 앤트로픽 콘솔(")
+                        withLink(
+                            LinkAnnotation.Url(
+                                url = "https://console.anthropic.com",
+                                styles = TextLinkStyles(
+                                    style = SpanStyle(color = OPicColors.Primary, textDecoration = TextDecoration.Underline)
+                                )
+                            )
+                        ) {
+                            append("console.anthropic.com")
+                        }
+                        append(")에서 회원가입 및 결제 수단 등록 후 'API Keys' 메뉴에서 발급받을 수 있습니다")
+                    }
+                    Text(text = apiKeyGuideText, fontSize = 11.sp, color = Color.Gray)
                     Spacer(Modifier.height(12.dp))
                     // 나만의 추가 정보
                     Text("나만의 추가 정보", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
