@@ -42,5 +42,8 @@ data class QuestionEntity(
     val userScript: String?,
 
     @ColumnInfo(name = "ai_answer")
-    val aiAnswer: String? = null
+    val aiAnswer: String? = null,
+
+    @ColumnInfo(name = "is_ai_generated")
+    val isAiGenerated: Int = 0
 )

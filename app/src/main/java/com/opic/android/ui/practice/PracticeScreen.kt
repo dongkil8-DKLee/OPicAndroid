@@ -556,7 +556,7 @@ private fun PracticeSharedButtonRow(
                         painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_rec_play),
                         contentDescription = "녹음 재생",
                         tint               = Color.Unspecified,
-                        modifier           = Modifier.size(ICON_SIZE)
+                        modifier           = Modifier.size(BUTTON_SLOT)
                     )
                 }
             }

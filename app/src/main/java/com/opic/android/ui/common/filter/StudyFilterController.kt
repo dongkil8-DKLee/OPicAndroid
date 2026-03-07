@@ -245,6 +245,7 @@ class StudyFilterController @Inject constructor(
                     }
                 }
             }
+            "신규" -> filtered = filtered.filter { it.isAiGenerated == 1 }
             else -> {
                 val count = s.selectedStudyFilter.toIntOrNull()
                 if (count != null) filtered = filtered.filter { (it.studyCount ?: 0) == count }

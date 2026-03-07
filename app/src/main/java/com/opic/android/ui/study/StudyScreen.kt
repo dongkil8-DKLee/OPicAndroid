@@ -48,7 +48,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -288,15 +287,6 @@ private fun StudyContent(
             }
         )
 
-        if (state.isRecording) {
-            Spacer(modifier = Modifier.height(4.dp))
-            LinearProgressIndicator(
-                progress    = { state.micLevel },
-                modifier    = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                color       = OPicColors.TimerGreen,
-                trackColor  = OPicColors.Border,
-            )
-        }
     }
 }
 
@@ -402,34 +392,32 @@ private fun SpeedAndControlRow(
         TextButton(
             onClick         = { viewModel.onPlaybackSpeedChanged((state.playbackSpeed - 0.1f).coerceAtLeast(0.5f)) },
             contentPadding  = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-            modifier        = Modifier.height(28.dp)
+            modifier        = Modifier.height(36.dp)
         ) { Text("−", fontSize = 14.sp, color = OPicColors.TimerRed) }
         Text(
             text     = String.format("%.1f", state.playbackSpeed) + "x",
             fontSize = 11.sp,
             color    = OPicColors.Primary,
-            modifier = Modifier.width(36.dp)
+            modifier = Modifier.width(30.dp)
         )
         TextButton(
             onClick         = { viewModel.onPlaybackSpeedChanged((state.playbackSpeed + 0.1f).coerceAtMost(1.5f)) },
             contentPadding  = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-            modifier        = Modifier.height(28.dp)
+            modifier        = Modifier.height(36.dp)
         ) { Text("+", fontSize = 14.sp, color = OPicColors.TimerGreen) }
 
         Spacer(modifier = Modifier.weight(1f))
 
         Text(
-            text     = "${state.studyCount}/7",
-            fontWeight = FontWeight.Bold,
-            fontSize = 11.sp,
-            modifier = Modifier.border(1.dp, OPicColors.Border, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp)
+            text     = "학습 ${state.studyCount}/7 회     ",
+            fontSize = 11.sp
         )
         IconButton(onClick = { viewModel.toggleFavorite() }, modifier = Modifier.size(28.dp)) {
             Icon(
                 imageVector = if (state.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
                 contentDescription = "Favorite",
                 tint     = if (state.isFavorite) OPicColors.TimerOrange else OPicColors.DisabledBg,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
     }

@@ -96,6 +96,14 @@ fun FilterPanel(
             modifier   = Modifier.weight(1f),
             pillHeight = pillHeight
         )
+        BottomSheetPicker(
+            label      = "학습",
+            selected   = state.selectedStudyFilter,
+            options    = listOf("전체", "📌", "저득점", "최근오답", "신규", "0", "1", "2", "3", "4", "5", "6", "7"),
+            onSelected = onStudyFilterChanged,
+            modifier   = Modifier.weight(1f),
+            pillHeight = pillHeight
+        )
         if (showSort) {
             BottomSheetPicker(
                 label      = "정렬",
@@ -116,14 +124,6 @@ fun FilterPanel(
                 pillHeight = pillHeight
             )
         }
-        BottomSheetPicker(
-            label      = "학습",
-            selected   = state.selectedStudyFilter,
-            options    = listOf("전체", "📌", "저득점", "최근오답", "0", "1", "2", "3", "4", "5", "6", "7"),
-            onSelected = onStudyFilterChanged,
-            modifier   = Modifier.weight(1f),
-            pillHeight = pillHeight
-        )
     }
 }
 

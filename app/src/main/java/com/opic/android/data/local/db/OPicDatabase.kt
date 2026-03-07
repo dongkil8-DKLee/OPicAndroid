@@ -33,6 +33,12 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE Questions ADD COLUMN is_ai_generated INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
 /**
  * Room Database — Python opic.db 7개 테이블 1:1 매핑.
  * createFromAsset("opic.db")로 Python DB를 그대로 사용.
@@ -48,7 +54,7 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         ApiKeyEntity::class,
         VocabularyEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class OPicDatabase : RoomDatabase() {

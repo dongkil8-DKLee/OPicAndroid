@@ -18,7 +18,8 @@ data class QuestionSummary(
     @ColumnInfo(name = "q_type") val type: String?,
     @ColumnInfo(name = "study_count") val studyCount: Int?,
     @ColumnInfo(name = "is_favorite") val isFavorite: Int?,
-    @ColumnInfo(name = "last_modified") val lastModified: String?
+    @ColumnInfo(name = "last_modified") val lastModified: String?,
+    @ColumnInfo(name = "is_ai_generated") val isAiGenerated: Int = 0
 )
 
 /** StudyScreen: 문제 상세 + 학습 진도 JOIN */
@@ -142,7 +143,8 @@ interface QuestionDao {
         SELECT q.question_id, q.title, q."set" AS q_set, q.type AS q_type,
                IFNULL(usp.study_count, 0) AS study_count,
                IFNULL(usp.is_favorite, 0) AS is_favorite,
-               usp.last_modified
+               usp.last_modified,
+               IFNULL(q.is_ai_generated, 0) AS is_ai_generated
         FROM Questions q
         LEFT JOIN User_Study_Progress usp ON q.question_id = usp.question_id AND usp.user_id = :userId
         WHERE q.title IS NOT NULL AND q."set" IS NOT NULL AND q.type IS NOT NULL
@@ -155,7 +157,8 @@ interface QuestionDao {
         SELECT q.question_id, q.title, q."set" AS q_set, q.type AS q_type,
                IFNULL(usp.study_count, 0) AS study_count,
                IFNULL(usp.is_favorite, 0) AS is_favorite,
-               usp.last_modified
+               usp.last_modified,
+               IFNULL(q.is_ai_generated, 0) AS is_ai_generated
         FROM Questions q
         LEFT JOIN User_Study_Progress usp ON q.question_id = usp.question_id AND usp.user_id = :userId
         WHERE q.question_id = :questionId LIMIT 1

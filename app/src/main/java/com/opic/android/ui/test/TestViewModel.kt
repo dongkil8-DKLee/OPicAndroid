@@ -143,16 +143,17 @@ class TestViewModel @Inject constructor(
                                 val nextCombo = ((questionDao.getMaxComboForSetType(topic, "선택") ?: 0) + 1).toString()
                                 generated.forEachIndexed { qIdx, q ->
                                     questionDao.upsert(QuestionEntity(
-                                        questionId = currentMaxId + qIdx + 1,
-                                        title = q.title,
-                                        set = topic,
-                                        type = "선택",
-                                        combo = nextCombo,
-                                        questionText = q.questionText,
-                                        answerScript = q.answerScript,
+                                        questionId    = currentMaxId + qIdx + 1,
+                                        title         = q.title,
+                                        set           = topic,
+                                        type          = "선택",
+                                        combo         = nextCombo,
+                                        questionText  = q.questionText,
+                                        answerScript  = q.answerScript,
                                         questionAudio = null,
-                                        answerAudio = null,
-                                        userScript = null
+                                        answerAudio   = null,
+                                        userScript    = null,
+                                        isAiGenerated = 1
                                     ))
                                 }
                                 Log.d(TAG, "AI 문제 생성 완료: $topic (${generated.size}개, combo=$nextCombo)")
