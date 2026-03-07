@@ -259,13 +259,13 @@ private fun VocabularyCard(
 
                 // 암기상태 뱃지 (탭 → X→△→O 순환)
                 val (badgeLabel, badgeColor) = when (word.memoryLevel) {
-                    2    -> "O"  to Color(0xFF2ECC71)
-                    1    -> "△" to Color(0xFFF39C12)
-                    else -> "X"  to Color(0xFFE74C3C)
+                    2    -> "암기:(O)"   to Color(0xFF2ECC71)
+                    1    -> "암기:(세모)" to Color(0xFFF39C12)
+                    else -> "암기:(X)"   to Color(0xFFE74C3C)
                 }
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = badgeColor.copy(alpha = 0.2f),
+                    color = Color.Transparent,
                     modifier = Modifier.clickable { onToggleMemorized() }
                 ) {
                     Text(

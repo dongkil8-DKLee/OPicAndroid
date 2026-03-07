@@ -98,15 +98,16 @@ class ClaudeApiService @Inject constructor(
             )
         }
 
+        val grade = appPrefs.targetGrade
+
         val prompt = """
 단어: $word
 
 다음 형식으로 정확히 답하세요. 라벨 외 다른 내용은 쓰지 마세요:
 MEANING: [품사약어]. [한국어 뜻]; syn: [영어 동의어1], [영어 동의어2]
-PRONUNCIATION: /[IPA]/ ([한글 발음])
-EXAMPLE_EN: [자연스러운 영어 예문 1문장]
-EXAMPLE_KO: [위 예문의 한국어 번역]
-OPIC_EN: [OPic 스피킹에서 직접 쓸 수 있는 영어 예문 1문장]
+PRONUNCIATION: /[IPA]/
+OPIC_EN: [OPic $grade 수준에서 직접 쓸 수 있는 영어 예문 1문장]
+OPIC_KO: [위 OPIC_EN의 한국어 번역]
         """.trimIndent()
 
         val raw = callClaudeApi(
@@ -118,13 +119,11 @@ OPIC_EN: [OPic 스피킹에서 직접 쓸 수 있는 영어 예문 1문장]
             fun extract(label: String) = text.lines()
                 .firstOrNull { it.startsWith("$label:") }
                 ?.removePrefix("$label:")?.trim() ?: ""
-            val exampleEn = extract("EXAMPLE_EN")
-            val exampleKo = extract("EXAMPLE_KO")
-            val opicEn    = extract("OPIC_EN")
+            val opicEn = extract("OPIC_EN")
+            val opicKo = extract("OPIC_KO")
             val memo = buildString {
-                if (exampleEn.isNotBlank()) appendLine("[예문] $exampleEn")
-                if (exampleKo.isNotBlank()) appendLine("[한글] $exampleKo")
-                if (opicEn.isNotBlank())    append("[OPic] $opicEn")
+                if (opicEn.isNotBlank()) appendLine("[예문 Opic $grade] $opicEn")
+                if (opicKo.isNotBlank()) append("[한글] $opicKo")
             }.trim()
             VocabInfo(
                 meaning       = extract("MEANING"),

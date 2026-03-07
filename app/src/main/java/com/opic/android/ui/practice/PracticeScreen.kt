@@ -374,18 +374,18 @@ private fun PracticeContent(
                 onClick = { viewModel.setComparisonSpeed((state.comparisonSpeed - 0.1f).coerceAtLeast(0.5f)) },
                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                 modifier = Modifier.height(28.dp)
-            ) { Text("−", fontSize = 14.sp, color = OPicColors.TimerRed) }
+            ) { Text("▼", fontSize = 18.sp, color = OPicColors.TimerRed) }
             Text(
                 text     = String.format("%.1f", state.comparisonSpeed) + "x",
                 fontSize = 11.sp,
                 color    = OPicColors.Primary,
-                modifier = Modifier.width(36.dp)
+                modifier = Modifier.width(30.dp)
             )
             TextButton(
                 onClick = { viewModel.setComparisonSpeed((state.comparisonSpeed + 0.1f).coerceAtMost(1.5f)) },
                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                 modifier = Modifier.height(28.dp)
-            ) { Text("+", fontSize = 14.sp, color = OPicColors.TimerGreen) }
+            ) { Text("▲", fontSize = 18.sp, color = OPicColors.TimerGreen) }
         }
 
         // ===== 공유 하단 버튼 행 =====
@@ -1042,6 +1042,40 @@ private fun UserScriptSection(
 ) {
     val currentSentence = state.sentences.getOrNull(state.currentIndex)
 
+    // 현재 문장의 전체 단어 목록 (음절 분리)
+    val sentenceWords = remember(currentSentence?.segment?.text) {
+        currentSentence?.segment?.text
+            ?.lowercase()
+            ?.replace(Regex("[^a-z'\\s]"), "")
+            ?.split("\\s+".toRegex())
+            ?.filter { it.isNotBlank() }
+            ?.distinct()
+            ?: emptyList()
+    }
+    var addWordTarget by remember { mutableStateOf<String?>(null) }
+    val hasApiKey = remember { viewModel.hasApiKey() }
+
+    // AI/기본 선택 다이얼로그
+    addWordTarget?.let { word ->
+        AlertDialog(
+            onDismissRequest = { addWordTarget = null },
+            title = { Text("'$word' 단어장 추가", fontWeight = FontWeight.Bold) },
+            text = { Text("저장 방식을 선택하세요.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.addWordToVocabulary(word, true)
+                    addWordTarget = null
+                }) { Text("AI 자동완성", color = OPicColors.Primary, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    viewModel.addWordToVocabulary(word, false)
+                    addWordTarget = null
+                }) { Text("기본 저장") }
+            }
+        )
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -1086,37 +1120,43 @@ private fun UserScriptSection(
                     expectedText = currentSentence?.segment?.text ?: "",
                     actualText = state.userScriptSttText ?: ""
                 )
+            }
 
-                // 누락 단어 클릭 → 단어장 추가
-                if (state.userScriptAnalysisResult.missingWords.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "누락 단어 (탭하여 단어장 추가):",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFE74C3C)
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        state.userScriptAnalysisResult.missingWords.forEach { word ->
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color(0xFFE74C3C).copy(alpha = 0.12f),
-                                modifier = Modifier.clickable {
-                                    viewModel.addMissingWordToVocabulary(word)
-                                }
-                            ) {
-                                Text(
-                                    text = word,
-                                    fontSize = 12.sp,
-                                    color = Color(0xFFE74C3C),
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
+            // 전체 단어 → 단어장 추가 (누락 단어는 빨간색으로 강조)
+            if (sentenceWords.isNotEmpty()) {
+                val missingWordSet = state.userScriptAnalysisResult?.missingWords
+                    ?.map { it.lowercase() }?.toSet() ?: emptySet()
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "단어 추가 (탭하여 단어장 추가):",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = OPicColors.TextOnLight.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    sentenceWords.forEach { word ->
+                        val isMissing = word in missingWordSet
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isMissing) Color(0xFFE74C3C).copy(alpha = 0.12f)
+                                    else OPicColors.LightBg,
+                            modifier = Modifier.clickable {
+                                if (hasApiKey) addWordTarget = word
+                                else viewModel.addWordToVocabulary(word, false)
                             }
+                        ) {
+                            Text(
+                                text = word,
+                                fontSize = 12.sp,
+                                color = if (isMissing) Color(0xFFE74C3C)
+                                        else OPicColors.TextOnLight.copy(alpha = 0.7f),
+                                fontWeight = if (isMissing) FontWeight.Medium else FontWeight.Normal,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
                         }
                     }
                 }

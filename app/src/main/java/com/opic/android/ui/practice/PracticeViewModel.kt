@@ -769,7 +769,9 @@ class PracticeViewModel @Inject constructor(
 
     // ==================== 누락 단어 → 단어장 추가 ====================
 
-    fun addMissingWordToVocabulary(word: String) {
+    fun hasApiKey(): Boolean = claudeApiService.hasApiKey()
+
+    fun addWordToVocabulary(word: String, useAi: Boolean) {
         viewModelScope.launch {
             try {
                 val existing = vocabularyDao.getWordByText(word.lowercase())
@@ -777,24 +779,53 @@ class PracticeViewModel @Inject constructor(
                     _uiState.update { it.copy(wordAddedMessage = "'$word' 이미 단어장에 있습니다.") }
                     return@launch
                 }
-
                 val now = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
-                val pronunciation = DictionaryApi.fetchPronunciation(word)
-                val entity = VocabularyEntity(
-                    word = word.lowercase(),
-                    pronunciation = pronunciation,
-                    sourceQuestionId = _uiState.value.questionId,
-                    createdAt = now
-                )
-                vocabularyDao.insertWord(entity)
-                _uiState.update { it.copy(wordAddedMessage = "'$word' 단어장에 추가됨!") }
-                Log.d(TAG, "Word added to vocabulary: $word")
+                if (useAi) {
+                    val result = claudeApiService.generateVocabInfo(word)
+                    result.onSuccess { info ->
+                        val entity = VocabularyEntity(
+                            word = word.lowercase(),
+                            meaning = info.meaning.ifBlank { null },
+                            pronunciation = info.pronunciation.ifBlank { null },
+                            memo = info.memo.ifBlank { null },
+                            sourceQuestionId = _uiState.value.questionId,
+                            createdAt = now
+                        )
+                        vocabularyDao.insertWord(entity)
+                        _uiState.update { it.copy(wordAddedMessage = "'$word' 단어장에 추가됨! (AI)") }
+                        Log.d(TAG, "Word added with AI: $word")
+                    }.onFailure { e ->
+                        Log.e(TAG, "AI vocab error for $word", e)
+                        _uiState.update { it.copy(wordAddedMessage = "AI 조회 실패, 기본 저장 중...") }
+                        val pronunciation = DictionaryApi.fetchPronunciation(word)
+                        val entity = VocabularyEntity(
+                            word = word.lowercase(),
+                            pronunciation = pronunciation,
+                            sourceQuestionId = _uiState.value.questionId,
+                            createdAt = now
+                        )
+                        vocabularyDao.insertWord(entity)
+                    }
+                } else {
+                    val pronunciation = DictionaryApi.fetchPronunciation(word)
+                    val entity = VocabularyEntity(
+                        word = word.lowercase(),
+                        pronunciation = pronunciation,
+                        sourceQuestionId = _uiState.value.questionId,
+                        createdAt = now
+                    )
+                    vocabularyDao.insertWord(entity)
+                    _uiState.update { it.copy(wordAddedMessage = "'$word' 단어장에 추가됨!") }
+                    Log.d(TAG, "Word added to vocabulary: $word")
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to add word: $word", e)
                 _uiState.update { it.copy(wordAddedMessage = "단어 추가 실패") }
             }
         }
     }
+
+    fun addMissingWordToVocabulary(word: String) = addWordToVocabulary(word, false)
 
     fun clearWordAddedMessage() {
         _uiState.update { it.copy(wordAddedMessage = null) }
