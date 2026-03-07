@@ -423,7 +423,7 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("문제 편집", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
-                        TextButton(onClick = { onStudyLink(state.selectedSet, state.selectedType, state.editTitle) }) {
+                        TextButton(onClick = { onStudyLink(state.editSet, state.editType, state.editTitle) }) {
                             Text("Study  ›", fontSize = 12.sp, color = OPicColors.Primary)
                         }
                     }
