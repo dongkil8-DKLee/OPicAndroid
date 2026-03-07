@@ -60,10 +60,6 @@ data class SettingsUiState(
 
     // AI 설정
     val claudeApiKey: String = "",
-    val profileJob: String = "",
-    val profileHobbies: String = "",
-    val profileFamily: String = "",
-    val profileCountry: String = "",
     val profileBackground: String = "",
 
     // DB 백업/복원
@@ -113,10 +109,6 @@ class SettingsViewModel @Inject constructor(
                 selectedEnginePackage = appPrefs.ttsEnginePackage,
                 themeMode = appPrefs.themeMode,
                 claudeApiKey = appPrefs.claudeApiKey,
-                profileJob = appPrefs.userProfile.job,
-                profileHobbies = appPrefs.userProfile.hobbies,
-                profileFamily = appPrefs.userProfile.family,
-                profileCountry = appPrefs.userProfile.country,
                 profileBackground = appPrefs.userProfile.background
             )
         }
@@ -187,21 +179,10 @@ class SettingsViewModel @Inject constructor(
         _uiState.update { it.copy(claudeApiKey = key) }
     }
 
-    fun onProfileJobChanged(v: String)        { _uiState.update { it.copy(profileJob = v) };        saveProfile() }
-    fun onProfileHobbiesChanged(v: String)    { _uiState.update { it.copy(profileHobbies = v) };    saveProfile() }
-    fun onProfileFamilyChanged(v: String)     { _uiState.update { it.copy(profileFamily = v) };     saveProfile() }
-    fun onProfileCountryChanged(v: String)    { _uiState.update { it.copy(profileCountry = v) };    saveProfile() }
     fun onProfileBackgroundChanged(v: String) { _uiState.update { it.copy(profileBackground = v) }; saveProfile() }
 
     private fun saveProfile() {
-        val s = _uiState.value
-        appPrefs.userProfile = UserProfile(
-            job        = s.profileJob,
-            hobbies    = s.profileHobbies,
-            family     = s.profileFamily,
-            country    = s.profileCountry,
-            background = s.profileBackground
-        )
+        appPrefs.userProfile = UserProfile(background = _uiState.value.profileBackground)
     }
 
     // ==================== Theme ====================

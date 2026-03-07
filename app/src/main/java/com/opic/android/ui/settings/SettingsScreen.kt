@@ -333,7 +333,7 @@ fun SettingsScreen(
                     icon = Icons.Filled.Psychology,
                     iconTint = ColorAi,
                     title = "AI 설정",
-                    subtitle = "서베이 · OPic 목표 등급 · API Key · 개인 프로필",
+                    subtitle = "서베이 · OPic 목표 등급 · API Key · 추가 정보",
                     expanded = expandedCategory == "ai",
                     onToggle = { viewModel.onCategoryToggle("ai") }
                 ) {
@@ -383,14 +383,26 @@ fun SettingsScreen(
                     )
                     Text("API 키는 기기 내에만 저장됩니다.", fontSize = 11.sp, color = Color.Gray)
                     Spacer(Modifier.height(12.dp))
-                    // 개인 프로필
-                    Text("개인 프로필 (AI 모범 답안 개인화)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
+                    // 나만의 추가 정보
+                    Text("나만의 추가 정보", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
+                    Text("AI 답변 작성 활용 내용", fontSize = 11.sp, color = Color.Gray)
                     Spacer(Modifier.height(6.dp))
-                    ProfileField("직업", state.profileJob) { viewModel.onProfileJobChanged(it) }
-                    ProfileField("취미", state.profileHobbies) { viewModel.onProfileHobbiesChanged(it) }
-                    ProfileField("가족 관계", state.profileFamily) { viewModel.onProfileFamilyChanged(it) }
-                    ProfileField("국적/거주지", state.profileCountry) { viewModel.onProfileCountryChanged(it) }
-                    ProfileField("기타 (자유 서술)", state.profileBackground) { viewModel.onProfileBackgroundChanged(it) }
+                    OutlinedTextField(
+                        value = state.profileBackground,
+                        onValueChange = { viewModel.onProfileBackgroundChanged(it) },
+                        placeholder = {
+                            Text(
+                                text = "예) 저는 10년 경력의 IT 개발자입니다.\n" +
+                                       "주말에는 등산과 독서를 즐기며, 최근 마라톤을 시작했습니다.\n" +
+                                       "AI 답변 작성 시 이 내용을 참고해 자연스러운 답변을 만들어 주세요.",
+                                fontSize = 12.sp,
+                                color = Color.Gray,
+                                lineHeight = 18.sp
+                            )
+                        },
+                        minLines = 4,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
 
                 HorizontalDivider(color = OPicColors.Border)
@@ -691,17 +703,6 @@ private fun DataField(label: String, value: String, onValueChange: (String) -> U
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
         textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp)
-    )
-}
-
-@Composable
-private fun ProfileField(label: String, value: String, onValueChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label, fontSize = 12.sp) },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth()
     )
 }
 
