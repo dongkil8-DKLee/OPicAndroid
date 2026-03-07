@@ -494,9 +494,10 @@ private fun PracticeSharedButtonRow(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     Icon(
-                        painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_table_play),
+                        painter            = androidx.compose.ui.res.painterResource(
+                            if (playEnabled) com.opic.android.R.drawable.ic_table_play else com.opic.android.R.drawable.ic_table_play_disabled),
                         contentDescription = "원본 재생",
-                        tint               = if (playEnabled) Color.Unspecified else Color.Gray.copy(alpha = 0.4f),
+                        tint               = Color.Unspecified,
                         modifier           = Modifier.size(BUTTON_SLOT)
                     )
                 }
@@ -585,9 +586,10 @@ private fun PracticeSharedButtonRow(
                     modifier = Modifier.size(BUTTON_SLOT)
                 ) {
                     Icon(
-                        painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_rec_play),
+                        painter            = androidx.compose.ui.res.painterResource(
+                            if (isUserPlayEnabled) com.opic.android.R.drawable.ic_rec_play else com.opic.android.R.drawable.ic_rec_play_disabled),
                         contentDescription = "녹음 재생",
-                        tint               = if (isUserPlayEnabled) Color.Unspecified else Color.Gray.copy(alpha = 0.4f),
+                        tint               = Color.Unspecified,
                         modifier           = Modifier.size(BUTTON_SLOT)
                     )
                 }

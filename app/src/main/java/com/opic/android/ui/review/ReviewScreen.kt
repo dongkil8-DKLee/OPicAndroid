@@ -119,9 +119,10 @@ private fun ReviewContent(
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
-                        painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_group_play),
+                        painter            = androidx.compose.ui.res.painterResource(
+                            if (!isPlaying) com.opic.android.R.drawable.ic_group_play else com.opic.android.R.drawable.ic_group_play_disabled),
                         contentDescription = "Play All",
-                        tint               = if (!isPlaying) Color.Unspecified else Color.Gray.copy(alpha = 0.4f),
+                        tint               = Color.Unspecified,
                         modifier           = Modifier.size(28.dp)
                     )
                 }
@@ -277,10 +278,12 @@ private fun UserAudioRow(
             }
         } else {
             TextButton(onClick = onPlay, enabled = hasAudio && canPlay) {
+                val recPlayEnabled = hasAudio && canPlay
                 Icon(
-                    painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_rec_play),
+                    painter            = androidx.compose.ui.res.painterResource(
+                        if (recPlayEnabled) com.opic.android.R.drawable.ic_rec_play else com.opic.android.R.drawable.ic_rec_play_disabled),
                     contentDescription = null,
-                    tint               = if (hasAudio && canPlay) Color.Unspecified else Color.Gray.copy(alpha = 0.4f),
+                    tint               = Color.Unspecified,
                     modifier           = Modifier.size(20.dp)
                 )
                 Text(" Play", fontSize = 12.sp)

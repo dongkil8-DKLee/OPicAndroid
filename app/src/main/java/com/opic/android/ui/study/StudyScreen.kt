@@ -321,10 +321,12 @@ private fun IconButtonRow(
                 enabled  = !state.isRecording && hasQuestion,
                 modifier = Modifier.size(48.dp)
             ) {
+                val groupPlayEnabled = !state.isRecording && hasQuestion
                 Icon(
-                    painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_group_play),
+                    painter            = androidx.compose.ui.res.painterResource(
+                        if (groupPlayEnabled) com.opic.android.R.drawable.ic_group_play else com.opic.android.R.drawable.ic_group_play_disabled),
                     contentDescription = "그룹 재생",
-                    tint               = if (!state.isRecording && hasQuestion) Color.Unspecified else Color.Gray.copy(alpha = 0.4f),
+                    tint               = Color.Unspecified,
                     modifier           = Modifier.size(48.dp)
                 )
             }
@@ -363,9 +365,10 @@ private fun IconButtonRow(
                 modifier = Modifier.size(48.dp)
             ) {
                 Icon(
-                    painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_rec_play),
+                    painter            = androidx.compose.ui.res.painterResource(
+                        if (userPlayEnabled) com.opic.android.R.drawable.ic_rec_play else com.opic.android.R.drawable.ic_rec_play_disabled),
                     contentDescription = "녹음 재생",
-                    tint               = if (userPlayEnabled) Color.Unspecified else Color.Gray.copy(alpha = 0.4f),
+                    tint               = Color.Unspecified,
                     modifier           = Modifier.size(48.dp)
                 )
             }
