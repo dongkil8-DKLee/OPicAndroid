@@ -335,7 +335,7 @@ private fun IconButtonRow(
                     painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_group_play),
                     contentDescription = "그룹 재생",
                     tint               = Color.Unspecified,
-                    modifier           = Modifier.size(28.dp)
+                    modifier           = Modifier.size(48.dp)
                 )
             }
         }
@@ -376,7 +376,7 @@ private fun IconButtonRow(
                     painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_rec_play),
                     contentDescription = "녹음 재생",
                     tint               = Color.Unspecified,
-                    modifier           = Modifier.size(28.dp)
+                    modifier           = Modifier.size(48.dp)
                 )
             }
         }
