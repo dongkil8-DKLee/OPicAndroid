@@ -533,31 +533,32 @@ private fun PracticeSharedButtonRow(
             }
         }
 
-        // ── ⭕/⏹ 녹음재생 (원형 outline 스타일) ──────────────────────
+        // ── 녹음재생 — ic_rec_play 아이콘 ──────────────────────────────
         Box(modifier = Modifier.size(BUTTON_SLOT), contentAlignment = Alignment.Center) {
             val isUserPlayEnabled = state.hasUserAudio && !state.isRecordingUserScript &&
                     !state.isComparisonPlaying && !state.isPlayingOriginal && !state.isLoopPlaying
-            val circleColor = when {
-                state.isPlayingUserAudio -> OPicColors.RecordActive
-                isUserPlayEnabled        -> OPicColors.PlayButton
-                else                     -> Color.Gray
-            }
-            Box(
-                modifier = Modifier
-                    .size(ICON_SIZE + 4.dp)   // ← 원 크기: ICON_SIZE보다 약간 크게
-                    .border(2.dp, circleColor, CircleShape)
-                    .clickable(enabled = state.isPlayingUserAudio || isUserPlayEnabled) {
-                        if (state.isPlayingUserAudio) viewModel.stopUserScriptAudio()
-                        else viewModel.playUserScriptAudio()
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (state.isPlayingUserAudio) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                    contentDescription = if (state.isPlayingUserAudio) "녹음 정지" else "녹음 재생",
-                    tint = circleColor,
-                    modifier = Modifier.size(ICON_SIZE)
-                )
+            if (state.isPlayingUserAudio) {
+                IconButton(
+                    onClick  = { viewModel.stopUserScriptAudio() },
+                    modifier = Modifier.size(BUTTON_SLOT)
+                ) {
+                    Icon(Icons.Filled.Stop, contentDescription = "녹음 정지",
+                        tint     = OPicColors.RecordActive,
+                        modifier = Modifier.size(ICON_SIZE))
+                }
+            } else {
+                IconButton(
+                    onClick  = { viewModel.playUserScriptAudio() },
+                    enabled  = isUserPlayEnabled,
+                    modifier = Modifier.size(BUTTON_SLOT)
+                ) {
+                    Icon(
+                        painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_rec_play),
+                        contentDescription = "녹음 재생",
+                        tint               = Color.Unspecified,
+                        modifier           = Modifier.size(ICON_SIZE)
+                    )
+                }
             }
         }
 
