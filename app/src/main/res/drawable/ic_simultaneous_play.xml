@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="256"
+    android:viewportHeight="256">
+
+    <!-- 뒤쪽 삼각형 (연한 주황 #FFB366) -->
+    <path
+        android:pathData="M110,90 L110,166 L186,128 Z"
+        android:fillColor="#FFB366"/>
+
+    <!-- 앞쪽 삼각형 (진한 주황 #FF8000) -->
+    <path
+        android:pathData="M98,66 L98,142 L174,104 Z"
+        android:fillColor="#FF8000"/>
+
+</vector>

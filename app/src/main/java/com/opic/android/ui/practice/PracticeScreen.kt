@@ -623,9 +623,12 @@ private fun PracticeSharedButtonRow(
                         enabled = compareEnabled,
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = "동시 재생",
-                            tint = if (compareEnabled) OPicColors.TextOnLight else Color.Gray,
-                            modifier = Modifier.size(28.dp))
+                        Icon(
+                            painter = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_simultaneous_play),
+                            contentDescription = "동시 재생",
+                            tint = if (compareEnabled) Color.Unspecified else Color.Gray.copy(alpha = 0.4f),
+                            modifier = Modifier.size(BUTTON_SLOT)
+                        )
                     }
                 }
             } else {
