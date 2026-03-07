@@ -487,13 +487,18 @@ private fun PracticeSharedButtonRow(
                         modifier = Modifier.size(ICON_SIZE))
                 }
             } else {
+                val playEnabled = !state.isComparisonPlaying && !state.isLoopPlaying && !state.isRecordingUserScript
                 IconButton(
-                    onClick = { viewModel.playOriginal() },
-                    enabled = !state.isComparisonPlaying && !state.isLoopPlaying && !state.isRecordingUserScript,
+                    onClick  = { viewModel.playOriginal() },
+                    enabled  = playEnabled,
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = "원본 재생",
-                        modifier = Modifier.size(ICON_SIZE))
+                    Icon(
+                        painter            = androidx.compose.ui.res.painterResource(com.opic.android.R.drawable.ic_table_play),
+                        contentDescription = "원본 재생",
+                        tint               = if (playEnabled) Color.Unspecified else Color.Gray.copy(alpha = 0.4f),
+                        modifier           = Modifier.size(BUTTON_SLOT)
+                    )
                 }
             }
         }
