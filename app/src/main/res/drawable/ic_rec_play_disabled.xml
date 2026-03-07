@@ -5,26 +5,30 @@
     android:viewportWidth="256"
     android:viewportHeight="256">
 
-    <!-- 원형 배경 (회색) -->
+    <!-- 라운드 사각형 배경 (회색) -->
     <path
-        android:pathData="M18,128 A110,110 0 1 0 238,128 A110,110 0 1 0 18,128 Z"
+        android:pathData="M40,28 L216,28 A25,25 0 0 1 241,53 L241,183 A25,25 0 0 1 216,208 L40,208 A25,25 0 0 1 15,183 L15,53 A25,25 0 0 1 40,28 Z"
         android:fillColor="#9E9E9E"/>
 
-    <!-- 마이크 아이콘 (비활성이어도 흰색 유지) -->
-    <path
-        android:fillColor="#FEFFFE"
-        android:pathData="m117.7 80.7c-8.05 0-12.64 6.87-12.64 13.21v19.88c0 7.8 6.17 12.29 12.57 12.29h0.07c7.3 0 12.09-6.24 12.09-12.29v-19.88c0-7-5.01-13.21-12.09-13.21z"/>
-    <path
-        android:fillColor="#FEFFFE"
-        android:pathData="m138.8 109.8c-2.39 0-3.47 1.04-3.47 3.43 0 9.86-8.21 17.53-17.52 17.53h-0.09c-10.23 0-17.61-8.17-17.61-17.53 0-2.39-1.08-3.43-3.47-3.43-2.38 0-3.23 1.04-3.23 3.43 0 12.73 9.77 22.97 20.78 24.19v8.84h-8.05c-2.06 0-3.25 1.46-3.25 3.29s1.19 3.14 3.25 3.14h23.18c2.06 0 2.86-1.31 2.86-3.14s-1.16-3.29-2.86-3.29h-9.11v-8.8c11.51-1.39 22.05-11.77 22.05-24.23 0-2.39-1.08-3.43-3.46-3.43z"/>
-
-    <!-- 재생 삼각형 (비활성이어도 흰색 유지) -->
-    <path
-        android:fillColor="#FEFFFE"
-        android:strokeColor="#FEFFFE"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:strokeWidth="4.886"
-        android:pathData="m175 114.8l-20.15-13.81v27.61l20.15-13.8z"/>
+    <!-- 마이크 + 재생 삼각형 (비활성이어도 흰색 유지, 1.7x 확대) -->
+    <group
+        android:pivotX="130"
+        android:pivotY="116"
+        android:scaleX="1.7"
+        android:scaleY="1.7">
+        <path
+            android:fillColor="#FEFFFE"
+            android:pathData="m117.7 80.7c-8.05 0-12.64 6.87-12.64 13.21v19.88c0 7.8 6.17 12.29 12.57 12.29h0.07c7.3 0 12.09-6.24 12.09-12.29v-19.88c0-7-5.01-13.21-12.09-13.21z"/>
+        <path
+            android:fillColor="#FEFFFE"
+            android:pathData="m138.8 109.8c-2.39 0-3.47 1.04-3.47 3.43 0 9.86-8.21 17.53-17.52 17.53h-0.09c-10.23 0-17.61-8.17-17.61-17.53 0-2.39-1.08-3.43-3.47-3.43-2.38 0-3.23 1.04-3.23 3.43 0 12.73 9.77 22.97 20.78 24.19v8.84h-8.05c-2.06 0-3.25 1.46-3.25 3.29s1.19 3.14 3.25 3.14h23.18c2.06 0 2.86-1.31 2.86-3.14s-1.16-3.29-2.86-3.29h-9.11v-8.8c11.51-1.39 22.05-11.77 22.05-24.23 0-2.39-1.08-3.43-3.46-3.43z"/>
+        <path
+            android:fillColor="#FEFFFE"
+            android:strokeColor="#FEFFFE"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:strokeWidth="4.886"
+            android:pathData="m175 114.8l-20.15-13.81v27.61l20.15-13.8z"/>
+    </group>
 
 </vector>
