@@ -90,6 +90,7 @@ private val ColorData       = Color(0xFFE74C3C)   // 레드
 @Composable
 fun SettingsScreen(
     onStudyLink: (set: String, type: String) -> Unit = { _, _ -> },
+    onSurveyLink: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -332,10 +333,23 @@ fun SettingsScreen(
                     icon = Icons.Filled.Psychology,
                     iconTint = ColorAi,
                     title = "AI 설정",
-                    subtitle = "OPic 목표 등급 · API Key · 개인 프로필",
+                    subtitle = "서베이 · OPic 목표 등급 · API Key · 개인 프로필",
                     expanded = expandedCategory == "ai",
                     onToggle = { viewModel.onCategoryToggle("ai") }
                 ) {
+                    // 서베이 설정
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Background Survey", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
+                        TextButton(onClick = onSurveyLink) {
+                            Text("설정 ›", fontSize = 12.sp, color = OPicColors.Primary)
+                        }
+                    }
+                    HorizontalDivider(color = OPicColors.Border)
+                    Spacer(Modifier.height(10.dp))
                     // OPic 목표 등급
                     Text("OPic 목표 등급", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OPicColors.TextOnLight)
                     Spacer(Modifier.height(6.dp))

@@ -17,6 +17,26 @@ class SurveyPreferences @Inject constructor(
     private val prefs: SharedPreferences =
         context.getSharedPreferences("opic_survey", Context.MODE_PRIVATE)
 
+    var part1Main: Int
+        get() = prefs.getInt("part1_main", -1)
+        set(v) = prefs.edit().putInt("part1_main", v).apply()
+
+    var part1Sub: Int
+        get() = prefs.getInt("part1_sub", -1)
+        set(v) = prefs.edit().putInt("part1_sub", v).apply()
+
+    var part2Main: Int
+        get() = prefs.getInt("part2_main", -1)
+        set(v) = prefs.edit().putInt("part2_main", v).apply()
+
+    var part2Sub: Int
+        get() = prefs.getInt("part2_sub", -1)
+        set(v) = prefs.edit().putInt("part2_sub", v).apply()
+
+    var part3Selection: Int
+        get() = prefs.getInt("part3_selection", -1)
+        set(v) = prefs.edit().putInt("part3_selection", v).apply()
+
     var selectedTopics: Set<String>
         get() = prefs.getStringSet("selected_topics", emptySet()) ?: emptySet()
         set(v) = prefs.edit().putStringSet("selected_topics", v).apply()

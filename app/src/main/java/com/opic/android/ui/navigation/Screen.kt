@@ -40,6 +40,7 @@ sealed class Screen(val route: String) {
             return if (params.isEmpty()) "StudyOverlay" else "StudyOverlay?${params.joinToString("&")}"
         }
     }
+    data object SurveyOverlay : Screen("SurveyOverlay")
     data object Settings : Screen("SettingsScreen")
     data object Report : Screen("ReportScreen")
     data object Vocabulary : Screen("VocabularyScreen")

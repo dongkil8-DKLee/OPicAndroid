@@ -220,10 +220,28 @@ fun OPicNavGraph(navController: NavHostController, modifier: Modifier = Modifier
                 )
             }
 
+            composable(
+                route = Screen.SurveyOverlay.route,
+                enterTransition = { slideInHorizontally(initialOffsetX = { -it }) },
+                exitTransition  = { slideOutHorizontally(targetOffsetX = { -it }) },
+                popEnterTransition  = { slideInHorizontally(initialOffsetX = { -it }) },
+                popExitTransition   = { slideOutHorizontally(targetOffsetX = { -it }) }
+            ) {
+                SurveyScreen(
+                    onBack = {},
+                    onNext = { navController.popBackStack() },
+                    fromSettings = true,
+                    onClose = { navController.popBackStack() }
+                )
+            }
+
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onStudyLink = { set, type ->
                         navController.navigate(Screen.StudyOverlay.createRoute(set = set, type = type))
+                    },
+                    onSurveyLink = {
+                        navController.navigate(Screen.SurveyOverlay.route)
                     }
                 )
             }

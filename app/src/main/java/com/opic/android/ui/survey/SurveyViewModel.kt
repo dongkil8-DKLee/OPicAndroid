@@ -106,22 +106,45 @@ class SurveyViewModel @Inject constructor(
     val uiState: StateFlow<SurveyUiState> = _uiState
 
     init {
-        // 저장된 Part 4 선택 복원
+        // 저장된 모든 파트 복원
         val savedTopics = surveyPrefs.selectedTopics
-        if (savedTopics.isNotEmpty()) {
-            _uiState.update { it.copy(part4Selections = savedTopics) }
+        _uiState.update {
+            it.copy(
+                part1Main      = surveyPrefs.part1Main,
+                part1Sub       = surveyPrefs.part1Sub,
+                part2Main      = surveyPrefs.part2Main,
+                part2Sub       = surveyPrefs.part2Sub,
+                part3Selection = surveyPrefs.part3Selection,
+                part4Selections = if (savedTopics.isNotEmpty()) savedTopics else DEFAULT_SELECTIONS.toSet()
+            )
         }
     }
 
-    fun setPart1Main(index: Int) = _uiState.update { it.copy(part1Main = index, part1Sub = -1) }
-    fun setPart1Sub(index: Int) = _uiState.update { it.copy(part1Sub = index) }
-    fun setPart2Main(index: Int) = _uiState.update { it.copy(part2Main = index, part2Sub = -1) }
-    fun setPart2Sub(index: Int) = _uiState.update { it.copy(part2Sub = index) }
-    fun setPart3(index: Int) = _uiState.update { it.copy(part3Selection = index) }
+    fun setPart1Main(index: Int) {
+        surveyPrefs.part1Main = index; surveyPrefs.part1Sub = -1
+        _uiState.update { it.copy(part1Main = index, part1Sub = -1) }
+    }
+    fun setPart1Sub(index: Int) {
+        surveyPrefs.part1Sub = index
+        _uiState.update { it.copy(part1Sub = index) }
+    }
+    fun setPart2Main(index: Int) {
+        surveyPrefs.part2Main = index; surveyPrefs.part2Sub = -1
+        _uiState.update { it.copy(part2Main = index, part2Sub = -1) }
+    }
+    fun setPart2Sub(index: Int) {
+        surveyPrefs.part2Sub = index
+        _uiState.update { it.copy(part2Sub = index) }
+    }
+    fun setPart3(index: Int) {
+        surveyPrefs.part3Selection = index
+        _uiState.update { it.copy(part3Selection = index) }
+    }
 
     fun togglePart4(item: String) = _uiState.update { state ->
         val newSet = state.part4Selections.toMutableSet()
         if (newSet.contains(item)) newSet.remove(item) else newSet.add(item)
+        surveyPrefs.selectedTopics = newSet
         state.copy(part4Selections = newSet)
     }
 

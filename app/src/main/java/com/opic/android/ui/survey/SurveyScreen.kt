@@ -1,6 +1,9 @@
 package com.opic.android.ui.survey
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -10,12 +13,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,12 +37,17 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.opic.android.ui.navigation.LocalBottomNavState
 import com.opic.android.ui.navigation.Screen
+import com.opic.android.ui.theme.OPicColors
 
 /**
  * Python SurveyPage 1:1 이식.
@@ -42,46 +59,95 @@ fun SurveyScreen(
     onBack: () -> Unit,
     onHome: () -> Unit = {},
     onNext: () -> Unit,
+    fromSettings: Boolean = false,
+    onClose: (() -> Unit)? = null,
     viewModel: SurveyViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
     val bottomNavState = LocalBottomNavState.current
 
-    // 하단바에 Back/Home/Next 액션 설정 (ownerRoute 기반으로 stale 액션 방지)
-    DisposableEffect(Unit) {
-        bottomNavState.setOwnerActions(
-            ownerRoute = Screen.Survey.route,
-            back = { if (viewModel.goBack()) onBack() },
-            home = onHome,
-            next = { if (viewModel.goNext()) onNext() },
-            nextEnabled = true
-        )
-        onDispose { bottomNavState.clearOwnerActions(Screen.Survey.route) }
+    // Settings 오버레이가 아닐 때만 하단바에 액션 등록
+    if (!fromSettings) {
+        DisposableEffect(Unit) {
+            bottomNavState.setOwnerActions(
+                ownerRoute = Screen.Survey.route,
+                back = { if (viewModel.goBack()) onBack() },
+                home = onHome,
+                next = { if (viewModel.goNext()) onNext() },
+                nextEnabled = true
+            )
+            onDispose { bottomNavState.clearOwnerActions(Screen.Survey.route) }
+        }
     }
 
-    Surface(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // --- 상단: Part 표시 ---
-            Text(
-                text = "Background Survey - Part ${state.currentPart + 1} of 4",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(16.dp)
-            )
+    Box(modifier = Modifier.fillMaxSize()) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // --- 상단: Part 표시 ---
+                Text(
+                    text = "Background Survey - Part ${state.currentPart + 1} of 4",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(16.dp)
+                )
 
-            // --- 콘텐츠 (스크롤) ---
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp)
-            ) {
-                when (state.currentPart) {
-                    0 -> Part1Content(state, viewModel)
-                    1 -> Part2Content(state, viewModel)
-                    2 -> Part3Content(state, viewModel)
-                    3 -> Part4Content(state, viewModel)
+                // --- 콘텐츠 (스크롤) ---
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp)
+                ) {
+                    when (state.currentPart) {
+                        0 -> Part1Content(state, viewModel)
+                        1 -> Part2Content(state, viewModel)
+                        2 -> Part3Content(state, viewModel)
+                        3 -> Part4Content(state, viewModel)
+                    }
                 }
+
+                // Settings 오버레이일 때 하단 Back/Next 버튼
+                if (fromSettings) {
+                    HorizontalDivider()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        OutlinedButton(
+                            onClick = { viewModel.goBack() },
+                            enabled = state.currentPart > 0
+                        ) { Text("← 이전", fontSize = 13.sp) }
+
+                        Button(
+                            onClick = { if (viewModel.goNext()) onNext() },
+                            colors = ButtonDefaults.buttonColors(containerColor = OPicColors.Primary)
+                        ) {
+                            Text(
+                                if (state.currentPart < 3) "다음 →" else "저장 ✓",
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ✕ 닫기 버튼 (fromSettings일 때만)
+        if (fromSettings && onClose != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 10.dp, end = 10.dp)
+                    .size(36.dp)
+                    .shadow(elevation = 6.dp, shape = CircleShape)
+                    .clip(CircleShape)
+                    .background(OPicColors.Primary)
+                    .clickable { onClose() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.Close, contentDescription = "닫기", tint = Color.White, modifier = Modifier.size(18.dp))
             }
         }
     }
