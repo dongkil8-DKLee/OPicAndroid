@@ -158,6 +158,22 @@ class PracticeViewModel @Inject constructor(
         File(context.getExternalFilesDir(null), "Recording").also { it.mkdirs() }
     }
 
+    private fun beepStart() {
+        viewModelScope.launch {
+            val tg = ToneGenerator(AudioManager.STREAM_MUSIC, 40)
+            try { tg.startTone(ToneGenerator.TONE_PROP_BEEP, 150); kotlinx.coroutines.delay(180) }
+            finally { tg.release() }
+        }
+    }
+
+    private fun beepStop() {
+        viewModelScope.launch {
+            val tg = ToneGenerator(AudioManager.STREAM_MUSIC, 40)
+            try { tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 150); kotlinx.coroutines.delay(180) }
+            finally { tg.release() }
+        }
+    }
+
     private val prefs by lazy {
         context.getSharedPreferences("practice_settings", android.content.Context.MODE_PRIVATE)
     }
@@ -476,13 +492,13 @@ class PracticeViewModel @Inject constructor(
 
         _uiState.update { it.copy(isRecording = true, micLevel = 0f) }
         markInProgressIfNeeded()
-        ToneGenerator(AudioManager.STREAM_MUSIC, 80).startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+        beepStart()
 
         recordingJob = viewModelScope.launch {
             audioRecorder.record(outputFile) { rmsLevel ->
                 _uiState.update { it.copy(micLevel = rmsLevel) }
             }
-            ToneGenerator(AudioManager.STREAM_MUSIC, 80).startTone(ToneGenerator.TONE_PROP_BEEP2, 150)
+            beepStop()
             val valid = outputFile.exists() && outputFile.length() > 44
             _uiState.update { s ->
                 val updated = s.sentences.toMutableList()
@@ -554,13 +570,13 @@ class PracticeViewModel @Inject constructor(
 
         _uiState.update { it.copy(isRecording = true, isCombinedRecording = true, micLevel = 0f) }
         markInProgressIfNeeded()
-        ToneGenerator(AudioManager.STREAM_MUSIC, 80).startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+        beepStart()
 
         recordingJob = viewModelScope.launch {
             audioRecorder.record(outputFile) { rmsLevel ->
                 _uiState.update { it.copy(micLevel = rmsLevel) }
             }
-            ToneGenerator(AudioManager.STREAM_MUSIC, 80).startTone(ToneGenerator.TONE_PROP_BEEP2, 150)
+            beepStop()
             val valid = outputFile.exists() && outputFile.length() > 44
             _uiState.update { s ->
                 val updated = s.sentences.toMutableList()
@@ -652,13 +668,13 @@ class PracticeViewModel @Inject constructor(
         val outputFile = File(recordingDir, filename)
 
         _uiState.update { it.copy(isRecordingUserScript = true, userScriptMicLevel = 0f) }
-        ToneGenerator(AudioManager.STREAM_MUSIC, 80).startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+        beepStart()
 
         userScriptRecordingJob = viewModelScope.launch {
             audioRecorder.record(outputFile) { rmsLevel ->
                 _uiState.update { it.copy(userScriptMicLevel = rmsLevel) }
             }
-            ToneGenerator(AudioManager.STREAM_MUSIC, 80).startTone(ToneGenerator.TONE_PROP_BEEP2, 150)
+            beepStop()
             val exists = outputFile.exists() && outputFile.length() > 44
             _uiState.update {
                 it.copy(

@@ -144,6 +144,22 @@ class StudyViewModel @Inject constructor(
         File(context.getExternalFilesDir(null), "Recording").also { it.mkdirs() }
     }
 
+    private fun beepStart() {
+        viewModelScope.launch {
+            val tg = ToneGenerator(AudioManager.STREAM_MUSIC, 40)
+            try { tg.startTone(ToneGenerator.TONE_PROP_BEEP, 150); kotlinx.coroutines.delay(180) }
+            finally { tg.release() }
+        }
+    }
+
+    private fun beepStop() {
+        viewModelScope.launch {
+            val tg = ToneGenerator(AudioManager.STREAM_MUSIC, 40)
+            try { tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 150); kotlinx.coroutines.delay(180) }
+            finally { tg.release() }
+        }
+    }
+
     private var recordingJob: Job? = null
     private var groupPlayJob: Job? = null
     private var positionPollingJob: Job? = null
@@ -520,13 +536,13 @@ class StudyViewModel @Inject constructor(
 
         val outputFile = File(recordingDir, "Study_${q.questionId}.wav")
         _uiState.update { it.copy(isRecording = true, micLevel = 0f) }
-        ToneGenerator(AudioManager.STREAM_MUSIC, 80).startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+        beepStart()
 
         recordingJob = viewModelScope.launch {
             audioRecorder.record(outputFile) { rmsLevel ->
                 _uiState.update { it.copy(micLevel = rmsLevel) }
             }
-            ToneGenerator(AudioManager.STREAM_MUSIC, 80).startTone(ToneGenerator.TONE_PROP_BEEP2, 150)
+            beepStop()
             _uiState.update {
                 it.copy(
                     isRecording  = false,

@@ -239,7 +239,7 @@ class TestViewModel @Inject constructor(
         // 시스템 알림음(ToneGenerator) → 250ms 대기 → 자동 녹음 시작
         viewModelScope.launch {
             try {
-                val toneGen = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
+                val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 40)
                 try {
                     toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 200)
                     delay(250)
