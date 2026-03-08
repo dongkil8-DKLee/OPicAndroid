@@ -3,6 +3,13 @@ package com.opic.android.ui.vocabulary
 import android.content.Intent
 import android.net.Uri
 import android.speech.tts.TextToSpeech
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -112,51 +119,59 @@ fun VocabularyScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ===== 단어 목록 =====
-            val words = if (state.selectedTab == 0) state.allWords else state.unmemorizedWords
-
-            if (words.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (state.selectedTab == 0) "단어장이 비어있습니다.\n+ 버튼으로 단어를 추가하세요."
-                        else "암기하지 못한 단어가 없습니다.",
-                        color = OPicColors.DisabledBg,
-                        fontSize = 14.sp
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(words, key = { it.wordId }) { word ->
-                        VocabularyCard(
-                            word = word,
-                            isExpanded = word.wordId in state.expandedWordIds,
-                            isAiLoading = state.aiLoadingWordId == word.wordId,
-                            onTap = { viewModel.toggleWordExpanded(word.wordId) },
-                            onToggleMemorized = { viewModel.cycleMemoryLevel(word.wordId) },
-                            onToggleFavorite = { viewModel.toggleFavorite(word.wordId) },
-                            onAiFill = { viewModel.fillWordWithAi(word) },
-                            onEdit = { viewModel.showEditDialog(word) },
-                            onDelete = { viewModel.deleteWord(word) },
-                            onYouglish = {
-                                val url = "https://youglish.com/pronounce/${word.word}/english"
-                                runCatching {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                                }
-                            },
-                            onTts = {
-                                runCatching {
-                                    tts?.speak(word.word, TextToSpeech.QUEUE_FLUSH, null, "vocab_${word.wordId}")
-                                }
-                            }
+            // ===== 단어 목록 (탭 전환 슬라이드 애니메이션) =====
+            AnimatedContent(
+                targetState = state.selectedTab,
+                transitionSpec = {
+                    val dir = if (targetState > initialState) 1 else -1
+                    (slideInHorizontally(tween(280)) { it * dir } + fadeIn(tween(200))) togetherWith
+                    (slideOutHorizontally(tween(280)) { -it * dir } + fadeOut(tween(200)))
+                },
+                modifier = Modifier.weight(1f),
+                label    = "vocab_tab_content"
+            ) { tab ->
+                val words = if (tab == 0) state.allWords else state.unmemorizedWords
+                if (words.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (tab == 0) "단어장이 비어있습니다.\n+ 버튼으로 단어를 추가하세요."
+                            else "암기하지 못한 단어가 없습니다.",
+                            color = OPicColors.DisabledBg,
+                            fontSize = 14.sp
                         )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(words, key = { it.wordId }) { word ->
+                            VocabularyCard(
+                                word = word,
+                                isExpanded = word.wordId in state.expandedWordIds,
+                                isAiLoading = state.aiLoadingWordId == word.wordId,
+                                onTap = { viewModel.toggleWordExpanded(word.wordId) },
+                                onToggleMemorized = { viewModel.cycleMemoryLevel(word.wordId) },
+                                onToggleFavorite = { viewModel.toggleFavorite(word.wordId) },
+                                onAiFill = { viewModel.fillWordWithAi(word) },
+                                onEdit = { viewModel.showEditDialog(word) },
+                                onDelete = { viewModel.deleteWord(word) },
+                                onYouglish = {
+                                    val url = "https://youglish.com/pronounce/${word.word}/english"
+                                    runCatching {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                    }
+                                },
+                                onTts = {
+                                    runCatching {
+                                        tts?.speak(word.word, TextToSpeech.QUEUE_FLUSH, null, "vocab_${word.wordId}")
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }

@@ -1,6 +1,7 @@
 package com.opic.android.ui.practice
 
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -8,6 +9,9 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -266,12 +270,17 @@ private fun PracticeContent(
                     )
 
                     // 탭 컨텐츠
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                    ) {
-                        if (selectedTab == 0) {
+                    AnimatedContent(
+                        targetState = selectedTab,
+                        transitionSpec = {
+                            val dir = if (targetState > initialState) 1 else -1
+                            (slideInHorizontally(tween(280)) { it * dir } + fadeIn(tween(200))) togetherWith
+                            (slideOutHorizontally(tween(280)) { -it * dir } + fadeOut(tween(200)))
+                        },
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        label    = "practice_tab_content"
+                    ) { tab ->
+                        if (tab == 0) {
                             WaveformComparisonPanel(
                                 modifier = Modifier.fillMaxWidth(),
                                 showButtonRow = false,

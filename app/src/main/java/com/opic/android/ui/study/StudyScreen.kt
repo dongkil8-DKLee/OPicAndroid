@@ -1,11 +1,16 @@
 package com.opic.android.ui.study
 
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -557,30 +562,41 @@ private fun AnswerTabSection(
             onTabSelected = { viewModel.onAnswerTabSelected(it) },
             modifier      = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)
         )
-        when (state.answerTabIndex) {
-            0 -> ScriptSection(
-                modifier             = Modifier.fillMaxWidth().weight(1f),
-                label                = "Answer",
-                scriptText           = state.currentQuestion?.answerScript,
-                highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.ANSWER) state.highlightedWordIndex else -1,
-                isEditing            = state.editingAnswer,
-                draft                = state.answerDraft,
-                onToggleEdit         = { viewModel.toggleEditAnswer() },
-                onCancelEdit         = { viewModel.cancelEditAnswer() },
-                onDraftChange        = { viewModel.updateAnswerDraft(it) },
-                onSave               = { viewModel.saveAnswerScript() },
-                fontSize             = state.fontSize,
-                isPlaying            = state.playingTarget == StudyPlayTarget.ANSWER,
-                canPlay              = !isBusy && state.currentQuestion != null,
-                onPlay               = { viewModel.playAnswerAudio() },
-                onStop               = { viewModel.stopAudio() },
-                scrollState          = scrollState
-            )
-            else -> AiAnswerSection(
-                modifier  = Modifier.fillMaxWidth().weight(1f),
-                state     = state,
-                viewModel = viewModel
-            )
+        AnimatedContent(
+            targetState  = state.answerTabIndex,
+            transitionSpec = {
+                val dir = if (targetState > initialState) 1 else -1
+                (slideInHorizontally(tween(280)) { it * dir } + fadeIn(tween(200))) togetherWith
+                (slideOutHorizontally(tween(280)) { -it * dir } + fadeOut(tween(200)))
+            },
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            label    = "answer_tab_content"
+        ) { tabIndex ->
+            when (tabIndex) {
+                0 -> ScriptSection(
+                    modifier             = Modifier.fillMaxSize(),
+                    label                = "Answer",
+                    scriptText           = state.currentQuestion?.answerScript,
+                    highlightedWordIndex = if (state.playingTarget == StudyPlayTarget.ANSWER) state.highlightedWordIndex else -1,
+                    isEditing            = state.editingAnswer,
+                    draft                = state.answerDraft,
+                    onToggleEdit         = { viewModel.toggleEditAnswer() },
+                    onCancelEdit         = { viewModel.cancelEditAnswer() },
+                    onDraftChange        = { viewModel.updateAnswerDraft(it) },
+                    onSave               = { viewModel.saveAnswerScript() },
+                    fontSize             = state.fontSize,
+                    isPlaying            = state.playingTarget == StudyPlayTarget.ANSWER,
+                    canPlay              = !isBusy && state.currentQuestion != null,
+                    onPlay               = { viewModel.playAnswerAudio() },
+                    onStop               = { viewModel.stopAudio() },
+                    scrollState          = scrollState
+                )
+                else -> AiAnswerSection(
+                    modifier  = Modifier.fillMaxSize(),
+                    state     = state,
+                    viewModel = viewModel
+                )
+            }
         }
     }
 }
