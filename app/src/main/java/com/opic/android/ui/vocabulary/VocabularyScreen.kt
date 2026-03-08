@@ -37,8 +37,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -57,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.opic.android.data.local.entity.VocabularyEntity
+import com.opic.android.ui.common.PillTabRow
 import com.opic.android.ui.theme.OPicColors
 import java.util.Locale
 
@@ -97,21 +96,12 @@ fun VocabularyScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TabRow(
-                    selectedTabIndex = state.selectedTab,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Tab(
-                        selected = state.selectedTab == 0,
-                        onClick = { viewModel.selectTab(0) },
-                        text = { Text("단어장", fontWeight = FontWeight.Bold) }
-                    )
-                    Tab(
-                        selected = state.selectedTab == 1,
-                        onClick = { viewModel.selectTab(1) },
-                        text = { Text("암기장", fontWeight = FontWeight.Bold) }
-                    )
-                }
+                PillTabRow(
+                    tabs          = listOf("단어장", "암기장"),
+                    selectedIndex = state.selectedTab,
+                    onTabSelected = { viewModel.selectTab(it) },
+                    modifier      = Modifier.weight(1f)
+                )
                 IconButton(
                     onClick = { viewModel.showAddDialog() },
                     modifier = Modifier.size(40.dp)
@@ -259,9 +249,9 @@ private fun VocabularyCard(
 
                 // 암기상태 뱃지 (탭 → X→△→O 순환)
                 val (badgeLabel, badgeColor) = when (word.memoryLevel) {
-                    2    -> "암기:(O)"   to Color(0xFF2ECC71)
-                    1    -> "암기:(세모)" to Color(0xFFF39C12)
-                    else -> "암기:(X)"   to Color(0xFFE74C3C)
+                    2    -> "✔️"   to Color(0xFF2ECC71)
+                    1    -> "➖" to Color(0xFFF39C12)
+                    else -> "✖️"   to Color(0xFFE74C3C)
                 }
                 Surface(
                     shape = RoundedCornerShape(12.dp),

@@ -51,8 +51,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -80,6 +78,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.opic.android.ui.common.PillTabRow
 import com.opic.android.ui.common.filter.BottomSheetPicker
 import com.opic.android.ui.common.filter.FilterPanel
 import com.opic.android.ui.common.filter.StudyFilterState
@@ -311,9 +310,12 @@ private fun IconButtonRow(
                 onClick  = { viewModel.toggleGroupPlay() },
                 modifier = Modifier.size(48.dp)
             ) {
-                Icon(Icons.Filled.Stop, contentDescription = "그룹 재생 중지",
+                Icon(
+                    Icons.Filled.Stop,
+                    contentDescription = "그룹 재생 중지",
                     tint     = OPicColors.RecordActive,
-                    modifier = Modifier.size(28.dp))
+                    modifier = Modifier.size(28.dp)
+                )
             }
         } else {
             IconButton(
@@ -322,13 +324,28 @@ private fun IconButtonRow(
                 modifier = Modifier.size(48.dp)
             ) {
                 val groupPlayEnabled = !state.isRecording && hasQuestion
-                Icon(
-                    painter            = androidx.compose.ui.res.painterResource(
-                        if (groupPlayEnabled) com.opic.android.R.drawable.ic_group_play else com.opic.android.R.drawable.ic_group_play_disabled),
-                    contentDescription = "그룹 재생",
-                    tint               = Color.Unspecified,
-                    modifier           = Modifier.size(48.dp)
-                )
+                val contentColor = if (groupPlayEnabled) Color.Black else Color.Gray // 활성/비활성 색상 처리
+
+                // 아이콘 대신 텍스트로 구성 (전체 크기 38dp 수준 유지)
+                Row(
+                    modifier = Modifier.size(38.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "G",
+                        fontSize = 24.sp, // 강조된 G 크기
+                        fontWeight = FontWeight.Bold,
+                        color = contentColor
+                    )
+                    Text(
+                        text = "play",
+                        fontSize = 11.sp, // 작게 표시될 play
+                        fontWeight = FontWeight.Normal,
+                        color = contentColor,
+                        modifier = Modifier.padding(top = 4.dp) // G와 베이스라인을 맞추기 위한 미세 조정
+                    )
+                }
             }
         }
 
@@ -396,7 +413,7 @@ private fun SpeedAndControlRow(
             onClick         = { viewModel.onPlaybackSpeedChanged((state.playbackSpeed - 0.1f).coerceAtLeast(0.5f)) },
             contentPadding  = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
             modifier        = Modifier.height(36.dp)
-        ) { Text("−", fontSize = 14.sp, color = OPicColors.TimerRed) }
+        ) { Text("▼", fontSize = 16.sp, color = OPicColors.TimerGreen) }
         Text(
             text     = String.format("%.1f", state.playbackSpeed) + "x",
             fontSize = 11.sp,
@@ -407,7 +424,7 @@ private fun SpeedAndControlRow(
             onClick         = { viewModel.onPlaybackSpeedChanged((state.playbackSpeed + 0.1f).coerceAtMost(1.5f)) },
             contentPadding  = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
             modifier        = Modifier.height(36.dp)
-        ) { Text("+", fontSize = 14.sp, color = OPicColors.TimerGreen) }
+        ) { Text("▲", fontSize = 16.sp, color = OPicColors.TimerGreen) }
 
         Spacer(modifier = Modifier.weight(1f))
 
@@ -534,18 +551,12 @@ private fun AnswerTabSection(
     scrollState: ScrollState
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        TabRow(selectedTabIndex = state.answerTabIndex) {
-            Tab(
-                selected = state.answerTabIndex == 0,
-                onClick  = { viewModel.onAnswerTabSelected(0) },
-                text     = { Text("기본 답변", fontSize = 12.sp) }
-            )
-            Tab(
-                selected = state.answerTabIndex == 1,
-                onClick  = { viewModel.onAnswerTabSelected(1) },
-                text     = { Text("AI 답변", fontSize = 12.sp) }
-            )
-        }
+        PillTabRow(
+            tabs          = listOf("기본 답변", "AI 답변"),
+            selectedIndex = state.answerTabIndex,
+            onTabSelected = { viewModel.onAnswerTabSelected(it) },
+            modifier      = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)
+        )
         when (state.answerTabIndex) {
             0 -> ScriptSection(
                 modifier             = Modifier.fillMaxWidth().weight(1f),

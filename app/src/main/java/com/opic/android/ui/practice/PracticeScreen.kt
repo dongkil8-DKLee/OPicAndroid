@@ -82,6 +82,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.opic.android.ui.common.PillTabRow
 import com.opic.android.ui.common.SpeechAnalysisPanel
 import com.opic.android.ui.common.WaveformComparisonPanel
 import com.opic.android.ui.common.filter.FilterPanel
@@ -257,39 +258,12 @@ private fun PracticeContent(
                         .weight(1f - splitFraction)
                 ) {
                     // 탭 행
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(36.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        listOf("발음 학습", "문장 학습").forEachIndexed { index, label ->
-                            val isSelected = selectedTab == index
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .clickable { selectedTab = index },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = label,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                    color = if (isSelected) OPicColors.Primary else Color.Gray
-                                )
-                                if (isSelected) {
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomCenter)
-                                            .fillMaxWidth(0.6f)
-                                            .height(2.dp)
-                                            .background(OPicColors.Primary)
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    PillTabRow(
+                        tabs          = listOf("발음 학습", "문장 학습"),
+                        selectedIndex = selectedTab,
+                        onTabSelected = { selectedTab = it },
+                        modifier      = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
 
                     // 탭 컨텐츠
                     Box(
@@ -374,7 +348,7 @@ private fun PracticeContent(
                 onClick = { viewModel.setComparisonSpeed((state.comparisonSpeed - 0.1f).coerceAtLeast(0.5f)) },
                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                 modifier = Modifier.height(28.dp)
-            ) { Text("▼", fontSize = 18.sp, color = OPicColors.TimerRed) }
+            ) { Text("▼", fontSize = 16.sp, color = OPicColors.TimerGreen) }
             Text(
                 text     = String.format("%.1f", state.comparisonSpeed) + "x",
                 fontSize = 11.sp,
@@ -385,7 +359,7 @@ private fun PracticeContent(
                 onClick = { viewModel.setComparisonSpeed((state.comparisonSpeed + 0.1f).coerceAtMost(1.5f)) },
                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                 modifier = Modifier.height(28.dp)
-            ) { Text("▲", fontSize = 18.sp, color = OPicColors.TimerGreen) }
+            ) { Text("▲", fontSize = 16.sp, color = OPicColors.TimerGreen) }
         }
 
         // ===== 공유 하단 버튼 행 =====
